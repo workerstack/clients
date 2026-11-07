@@ -6,7 +6,7 @@
  */
 import type { ExtractedProp, ExtractedTypes } from "../../extract/extract.ts"
 import { type OpenApiDocument, toIR } from "../../ir/build.ts"
-import type { IR, IROperation, IRParam, IRSchema } from "../../ir/model.ts"
+import type { IR, IROperation, IRParam, IRResponse, IRSchema } from "../../ir/model.ts"
 import { isJsonMedia, mediaEssence } from "../../ir/sdk-model.ts"
 import { bodiesOf } from "../../ir/slots.ts"
 import { tsString } from "../shared/escape.ts"
@@ -119,6 +119,18 @@ function wireInput(op: IROperation, ctx: Ctx): Field[] {
 	return fields
 }
 
+/**
+ * Where a response with no body reads back as `.output()` declares it, with its type: a redirect carries its target and
+ * a 304 (the other bodiless 3xx `.output()` declares under `redirect`) has none; a 204 or 205 is written with no body,
+ * and reads back as the shorthand declares it, under JSON. `undefined` for a body, or any other bodiless status.
+ */
+function bodilessAt(response: IRResponse): readonly [media: string, type: string] | undefined {
+	if (response.contents !== undefined) return undefined
+	if (response.status === "204" || response.status === "205") return ["application/json", "unknown"]
+	const located = response.headers?.some((h) => h.name.toLowerCase() === "location") === true
+	return response.status.startsWith("3") && (located || response.status === "304") ? ["redirect", "true"] : undefined
+}
+
 /** What the route answers, error responses aside: `{ [media]: { [statusKey]: T } }`, a redirect as `redirect`. */
 function outputOf(op: IROperation, ctx: Ctx): string {
 	const media = new Map<string, Field[]>()
@@ -126,10 +138,8 @@ function outputOf(op: IROperation, ctx: Ctx): string {
 	for (const response of Object.values(op.responses).sort((a, b) => compareCodeUnits(a.status, b.status))) {
 		const key = /^[0-9]{3}$/.test(response.status) ? statusKeyOf(Number(response.status)) : undefined
 		if (response.error === true || key === undefined) continue
-		/* a redirect carries its target; a 304, the other bodiless 3xx `.output()` declares under `redirect`, has none */
-		const located = response.headers?.some((h) => h.name.toLowerCase() === "location") === true
-		const bodiless = response.status.startsWith("3") && (located || response.status === "304")
-		if (bodiless && response.contents === undefined) add("redirect", [key, "true"])
+		const bodiless = bodilessAt(response)
+		if (bodiless !== undefined) add(bodiless[0], [key, bodiless[1]])
 		for (const { contentType, schema } of response.contents ?? [])
 			add(contentType, [key, schema === undefined ? "unknown" : ctx.resolve(schema)])
 	}

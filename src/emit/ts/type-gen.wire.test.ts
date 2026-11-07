@@ -125,4 +125,22 @@ expectType<Equal<RouteOutput<"/go", "get">, { redirect: { found: true } }>>()`
 		const consumer = `expectType<Equal<RouteOutput<"/file", "get">, { redirect: { not_modified: true }; "text/csv": { ok: string } }>>()`
 		expect(check(document, consumer)).toEqual([])
 	})
+
+	it("keeps a 204 and a 205, which the document writes with no body, as the shorthand declares them", () => {
+		const document = documentOf({
+			"/a": { delete: { responses: { 204: { description: "no content" } } } },
+			"/b": {
+				post: {
+					responses: {
+						200: { content: { "text/csv": { schema: STRING } }, description: "" },
+						204: { description: "no content" },
+						205: { description: "reset content" },
+					},
+				},
+			},
+		})
+		const consumer = `expectType<Equal<RouteOutput<"/a", "delete">, { "application/json": { no_content: unknown } }>>()
+expectType<Equal<RouteOutput<"/b", "post">, { "application/json": { no_content: unknown; reset_content: unknown }; "text/csv": { ok: string } }>>()`
+		expect(check(document, consumer)).toEqual([])
+	})
 })
