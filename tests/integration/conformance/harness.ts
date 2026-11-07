@@ -130,7 +130,11 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 
 /** Spawn the reference app, `env` beside this process's, wait for both listeners, and fetch its document. */
 export async function startReferenceApp(env: Readonly<Record<string, string>> = {}): Promise<ReferenceApp> {
-	const child = spawn("bun", [APP], { env: { ...process.env, ...env }, stdio: ["pipe", "pipe", "pipe"] })
+	/* core's source, resolved as every checkout process resolves it (honey-source) */
+	const child = spawn("bun", ["--conditions=honey-source", APP], {
+		env: { ...process.env, ...env },
+		stdio: ["pipe", "pipe", "pipe"],
+	})
 	let err = ""
 	child.stderr.on("data", (chunk: Buffer) => {
 		err = (err + chunk.toString()).slice(-TAIL)

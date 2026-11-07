@@ -34,18 +34,39 @@ function coreRoot(from: string): string | undefined {
 	}
 }
 
-/** A core checkout's (it keeps tsconfig.json, which is never published) public subpaths mapped to their source. */
-function sourceAliases(root: string): Record<string, string> {
-	if (!existsSync(join(root, "tsconfig.json"))) return {}
-	const { exports = {} } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-		exports?: Record<string, { "honey-source"?: string } | string>
-	}
-	const aliases: Record<string, string> = {}
-	for (const [subpath, target] of Object.entries(exports)) {
+/** What a core checkout's source is read through, each mapped to its `honey-source` file. */
+type SourceAliases = {
+	/** its public subpaths (`@lovrozagar/honey/openapi`) */
+	readonly exports: Record<string, string>
+	/** its own subpath imports (`#output-check`), which jiti would resolve to the unbuilt dist/ */
+	readonly imports: Record<string, string>
+}
+
+/** A package.json map's entries with a `honey-source` target: each keyed by `key(subpath)`, at that file under `root`. */
+function sourcesOf(
+	root: string,
+	map: Record<string, { "honey-source"?: string } | string>,
+	key: (subpath: string) => string,
+): Record<string, string> {
+	const out: Record<string, string> = {}
+	for (const [subpath, target] of Object.entries(map)) {
 		const source = typeof target === "object" ? target["honey-source"] : undefined
-		if (source !== undefined) aliases[CORE + subpath.slice(1)] = join(root, source)
+		if (source !== undefined) out[key(subpath)] = join(root, source)
 	}
-	return aliases
+	return out
+}
+
+/** A core checkout's (it keeps tsconfig.json, which is never published) subpaths and imports mapped to their source. */
+function sourceAliases(root: string): SourceAliases {
+	if (!existsSync(join(root, "tsconfig.json"))) return { exports: {}, imports: {} }
+	const { exports = {}, imports = {} } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+		exports?: Record<string, { "honey-source"?: string } | string>
+		imports?: Record<string, { "honey-source"?: string } | string>
+	}
+	return {
+		exports: sourcesOf(root, exports, (subpath) => CORE + subpath.slice(1)),
+		imports: sourcesOf(root, imports, (subpath) => subpath),
+	}
 }
 
 /** The app `name` (else `app`, else `default`) of the loaded module `mod`, or why there is none. */
@@ -96,7 +117,11 @@ export async function loadAppDocument(ref: string, cwd: string): Promise<Record<
 		throw new Error(`--app ${ref}: no ${CORE} is installed where ${relative(cwd, path)} resolves it`)
 	const bun = (globalThis as { Bun?: BunResolver }).Bun
 	const aliases = sourceAliases(root)
-	const load = bun === undefined ? await jitiImporter(path, aliases) : bunImporter(bun, path, aliases, ref)
+	/* Bun resolves core's own imports under the honey-source condition, through core's package.json */
+	const load =
+		bun === undefined
+			? await jitiImporter(path, { ...aliases.exports, ...aliases.imports })
+			: bunImporter(bun, path, aliases.exports, ref)
 	const mod = await load(path)
 	const app = appOf(mod, ref, name)
 	const { generateOpenApi } = (await load(`${CORE}/openapi`)) as {

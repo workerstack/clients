@@ -15,9 +15,14 @@ const WORLD = new URL("../../../../core/tests/integration/mcp-oauth/serve.ts", i
 
 /** The world started, the Python session run against it, then the world's log of every request it answered. */
 async function run(): Promise<[Record<string, unknown>, OAuthTarget, readonly string[]]> {
-	const child = spawn("bun", ["-e", `await (await import(${JSON.stringify(WORLD)})).main()`], {
-		stdio: ["pipe", "pipe", "inherit"],
-	})
+	/* core's source, resolved as every checkout process resolves it (honey-source) */
+	const child = spawn(
+		"bun",
+		["--conditions=honey-source", "-e", `await (await import(${JSON.stringify(WORLD)})).main()`],
+		{
+			stdio: ["pipe", "pipe", "inherit"],
+		},
+	)
 	const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
 	try {
 		const target = JSON.parse(String((await lines.next()).value)) as OAuthTarget
