@@ -1,4 +1,5 @@
 import { relative } from "node:path"
+import { defaultClientConditions, defaultServerConditions } from "vite"
 import { configDefaults, defineConfig } from "vitest/config"
 import { BaseSequencer, type TestSpecification } from "vitest/node"
 
@@ -151,6 +152,10 @@ export default defineConfig(({ mode }) =>
 				},
 			}
 		: {
+				/* core's source, wherever a test reaches it (by path, or as a checkout an --app module imports), resolves as
+				 * every checkout process resolves it: its own `#output-check` lands on src/, never on an unbuilt dist/ */
+				resolve: { conditions: ["honey-source", ...defaultClientConditions] },
+				ssr: { resolve: { conditions: ["honey-source", ...defaultServerConditions.filter((c) => c !== "module")] } },
 				test: {
 					coverage: {
 						/* 00-rules "Coverage": the vendored SDK runtime templates and the vendored tokenizer are never
