@@ -257,7 +257,7 @@ function routeLine(route: Emitted, intern: InternPool): string {
 	return `\t[${intern.expr(route.id)}]: ${parts.length > 0 ? `{ ${parts.join(", ")} }` : "{}"}`
 }
 
-const HEAD = `import type { RouteTree, TreeNode } from "@lovrozagar/honey/tree"
+const HEAD = `import type { RouteTree, TreeNode } from "@workerstack/backend/tree"
 
 function S<T>(o: Record<string, T>): Record<string, T> {
 	return Object.assign(Object.create(null) as Record<string, T>, o)

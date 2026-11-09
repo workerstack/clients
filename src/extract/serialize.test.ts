@@ -209,7 +209,7 @@ describe("an app's types: written exactly (H73)", () => {
 			const entryPath = project.write(
 				"h73/app.ts",
 				lines(
-					'import { createMiddleware, honey } from "@lovrozagar/honey"',
+					'import { createMiddleware, honey } from "@workerstack/backend"',
 					"class Secret { #hidden = 1; visible = 2 }",
 					"const mw = createMiddleware((_c, next) =>",
 					"\tnext({",
@@ -256,7 +256,7 @@ describe("an app's types: recursive and generic", () => {
 			const entryPath = project.write(
 				"h73r/app.ts",
 				lines(
-					'import { createMiddleware, honey } from "@lovrozagar/honey"',
+					'import { createMiddleware, honey } from "@workerstack/backend"',
 					"export interface Tree { children: Tree[]; name: string }",
 					"const mw = createMiddleware((_c, next) =>",
 					"\tnext({",
@@ -317,7 +317,7 @@ describe("global types: an ambient namespace's", () => {
 				)
 				const entryPath = ambient.write(
 					"app.ts",
-					lines('import { honey } from "@lovrozagar/honey"', "export const app = honey<Cloudflare.Env>()"),
+					lines('import { honey } from "@workerstack/backend"', "export const app = honey<Cloudflare.Env>()"),
 				)
 				const { env } = extract(entryPath, { outputDir: ambient.root }).types
 				ambient.write("gen.d.ts", `export type Env = ${env}\n`)
@@ -360,7 +360,7 @@ describe("global types: a `declare global` interface", () => {
 				)
 				const entryPath = global.write(
 					"app.ts",
-					lines('import { honey } from "@lovrozagar/honey"', "export const app = honey<AppBindings>()"),
+					lines('import { honey } from "@workerstack/backend"', "export const app = honey<AppBindings>()"),
 				)
 				expect(extract(entryPath).types.env).toBe("AppBindings")
 			} finally {
@@ -383,19 +383,19 @@ describe("unresolved types: a name the program cannot resolve", () => {
 		() => {
 			const env = project.write(
 				"unresolved/env.ts",
-				lines('import { honey } from "@lovrozagar/honey"', "export const app = honey<Missing.Env>()"),
+				lines('import { honey } from "@workerstack/backend"', "export const app = honey<Missing.Env>()"),
 			)
 			const middleware = project.write(
 				"unresolved/middleware.ts",
 				lines(
-					'import { createMiddleware, honey } from "@lovrozagar/honey"',
+					'import { createMiddleware, honey } from "@workerstack/backend"',
 					"const mw = createMiddleware((_c, next) => next({ db: null as unknown as Nope }))",
 					"export const app = honey<{}>().use(mw)",
 				),
 			)
 			const meta = project.write(
 				"unresolved/meta.ts",
-				lines('import { honey } from "@lovrozagar/honey"', "export const app = honey<{}>().metaType<Gone>()"),
+				lines('import { honey } from "@workerstack/backend"', "export const app = honey<{}>().metaType<Gone>()"),
 			)
 			expect(() => extract(env)).toThrow("type Missing.Env does not resolve")
 			expect(() => extract(middleware)).toThrow("type Nope does not resolve")

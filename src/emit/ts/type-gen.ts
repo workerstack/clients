@@ -278,12 +278,12 @@ export function generateTypes(options: GenerateTypesOptions): string {
 		...(hasErrors ? ["HoneyError"] : []),
 		...(declaredMeta === null ? [] : ["HoneyMeta"]),
 	]
-	const out = [`import type { ${imports.join(", ")} } from "@lovrozagar/honey"`]
+	const out = [`import type { ${imports.join(", ")} } from "@workerstack/backend"`]
 	out.push(...baseCtx(options.extracted, name))
 	if (selectors.length > 0) {
 		out.push(`export type RouteSelector = ${selectors.map(tsString).join(" | ")}`)
 		out.push(
-			'declare module "@lovrozagar/honey" {\n\tinterface HoneyCodegen {\n\t\trouteSelector: RouteSelector\n\t}\n}',
+			'declare module "@workerstack/backend" {\n\tinterface HoneyCodegen {\n\t\trouteSelector: RouteSelector\n\t}\n}',
 		)
 	}
 	for (const schema of Object.keys(ir.schemas).sort(compareCodeUnits))

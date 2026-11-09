@@ -1,8 +1,8 @@
-# @lovrozagar/honey-clients
+# @workerstack/clients
 
 Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a Go command-line client and a Model Context Protocol
 server from an OpenAPI 3.x document, or straight from a
-[`@lovrozagar/honey`](https://www.npmjs.com/package/@lovrozagar/honey) app.
+[`@workerstack/backend`](https://www.npmjs.com/package/@workerstack/backend) app.
 
 Every target reads one intermediate representation and vendors its own small runtime, so a generated SDK has no
 dependency on honey, and a spec from another framework generates just as well. The output is formatted and
@@ -31,11 +31,13 @@ This page is the whole generator — every target, every flag, and what each cli
 
 ## Install
 
-1.0 is out as a release candidate, published under npm's `next` tag, so an install without a tag still gives 0.7.3.
+honey moved to the workerstack org in 1.0.0-rc.23, and [the migration note](https://github.com/workerstack/backend/blob/main/docs/migrating-to-workerstack.md)
+maps each old package name to its new one. 1.0 is out as a release candidate, published under npm's `next` tag, so
+an install without a tag gets a deprecated placeholder.
 Add `@next` until the final release:
 
 ```sh
-npm install --save-dev @lovrozagar/honey-clients@next
+npm install --save-dev @workerstack/clients@next
 ```
 
 Node 22.12 or later, or Bun 1.3 or later.
@@ -88,7 +90,7 @@ honey-clients generate --spec openapi.json --target ts --target cli --out genera
 
 - `--spec <file>`: the OpenAPI document, as JSON.
 - `--app <module>[#export]`: a honey app module instead of `--spec` (give one, never both). Its named export, else
-  `app`, else `default`, is the app; its document is made by the app's own `@lovrozagar/honey/openapi`, resolved from
+  `app`, else `default`, is the app; its document is made by the app's own `@workerstack/backend/openapi`, resolved from
   the app as at run time, and the module's `openApi` export, if any, is that document's options (`info`,
   `securitySchemes`, `invalidate`, …, as `generateOpenApi` takes them). Started by `bun run`, the bin hands the load to
   that Bun, so a module needing Bun's loaders works; a run ends once it has written, whatever the module left open.
@@ -209,7 +211,7 @@ Every SDK takes the same configuration — a base URL, the auth the spec's secur
 hooks around each HTTP call, and per-call overrides — and every one answers the same way: the normal call returns
 your value and throws a typed error by status, while `client.safe` answers a result instead. What follows is each
 language's client in a slice of a compiled example; the
-[SDK recipes](https://github.com/lovrozagar/honey/blob/main/docs/sdk-recipes.md) page has the whole programs.
+[SDK recipes](https://github.com/workerstack/backend/blob/main/docs/sdk-recipes.md) page has the whole programs.
 
 ### The TypeScript SDK
 
@@ -456,7 +458,7 @@ A name of yours that collides with the mirror, or with a runtime type, is rename
 silently. An operation or root resource named `safe` becomes `safe_`, and a component named like one of the runtime
 types becomes `<Name>Model`.
 
-Full reference: [generated clients](https://github.com/lovrozagar/honey/blob/main/docs/client.md).
+Full reference: [generated clients](https://github.com/workerstack/backend/blob/main/docs/client.md).
 
 ## The command-line client
 
@@ -484,8 +486,8 @@ shop orders list --status open --output json
 Its configuration has one precedence, everywhere: **flag, then environment, then config file.** The environment
 variables are the `--cli-env-prefix` (or the API's name) upper-cased.
 
-Full reference: [the generated CLI](https://github.com/lovrozagar/honey/blob/main/docs/cli.md) and
-[releasing it](https://github.com/lovrozagar/honey/blob/main/docs/cli-release.md).
+Full reference: [the generated CLI](https://github.com/workerstack/backend/blob/main/docs/cli.md) and
+[releasing it](https://github.com/workerstack/backend/blob/main/docs/cli-release.md).
 
 ## The MCP server
 
@@ -532,9 +534,9 @@ upper-cased):
 
 **The standalone server needs Node**: it holds a listening socket and reads local files, so it belongs on a machine
 or a container, never on serverless or Workers. To serve the same tools remotely, mount them in the app instead with
-`mcp()` from `@lovrozagar/honey/mcp`, which runs wherever the app runs and is guarded by the app's own auth.
+`mcp()` from `@workerstack/backend/mcp`, which runs wherever the app runs and is guarded by the app's own auth.
 
-Full reference: [the generated MCP server](https://github.com/lovrozagar/honey/blob/main/docs/mcp.md).
+Full reference: [the generated MCP server](https://github.com/workerstack/backend/blob/main/docs/mcp.md).
 
 ## Configuring generation
 
@@ -573,7 +575,7 @@ Every target is held to the same conformance grid: one shared scenario suite run
 for all eight targets, and each decoded answer and each request on the wire must match one expected table. A feature
 that works in one SDK and breaks in another fails the grid.
 
-To lay the files out yourself, `generated(run, document, ctx)` from `@lovrozagar/honey-clients` returns each
+To lay the files out yourself, `generated(run, document, ctx)` from `@workerstack/clients` returns each
 target's `files` unwritten, each as its text but for the C# package's icon, which is its bytes, and its `packages`:
 the package on each registry it publishes to, as `{ registry, name, version }` (`npm` and `jsr` for a scoped TS SDK,
 `npm` and `mcp-registry` for an MCP server with an `mcpName`, `pypi`, `crates.io`, `nuget`, `maven-central` as
@@ -592,26 +594,26 @@ anything generates, and `GenerateRun` types them by target, so a misspelled opti
 arrays, checked with the same rules.
 
 ```ts
-import { TARGETS, targetOptionSchemas } from "@lovrozagar/honey-clients"
+import { TARGETS, targetOptionSchemas } from "@workerstack/clients"
 
 const result = targetOptionSchemas.go["~standard"].validate({ modulePath: "github.com/acme/shop-go" })
 export const ok = result.issues === undefined && TARGETS.includes("go")
 ```
 
 This package also exports the app-side generators the honey CLI and Vite plugin use: `generateRouteTree`,
-`generateTypes` and `extractTypes` from `@lovrozagar/honey-clients`, and the command's own entry at
-`@lovrozagar/honey-clients/cli`.
+`generateTypes` and `extractTypes` from `@workerstack/clients`, and the command's own entry at
+`@workerstack/clients/cli`.
 
 ## Documentation
 
-- [Code generation](https://github.com/lovrozagar/honey/blob/main/docs/codegen.md): every target and its options.
-- [Generated clients](https://github.com/lovrozagar/honey/blob/main/docs/client.md) and their
-  [per-language recipes](https://github.com/lovrozagar/honey/blob/main/docs/sdk-recipes.md).
-- [The generated CLI](https://github.com/lovrozagar/honey/blob/main/docs/cli.md),
-  [releasing it](https://github.com/lovrozagar/honey/blob/main/docs/cli-release.md), and
-  [the MCP server](https://github.com/lovrozagar/honey/blob/main/docs/mcp.md).
-- [SDK conformance](https://github.com/lovrozagar/honey/blob/main/docs/conformance.md) and
-  [the framework itself](https://github.com/lovrozagar/honey/blob/main/packages/core/README.md).
+- [Code generation](https://github.com/workerstack/backend/blob/main/docs/codegen.md): every target and its options.
+- [Generated clients](https://github.com/workerstack/backend/blob/main/docs/client.md) and their
+  [per-language recipes](https://github.com/workerstack/backend/blob/main/docs/sdk-recipes.md).
+- [The generated CLI](https://github.com/workerstack/backend/blob/main/docs/cli.md),
+  [releasing it](https://github.com/workerstack/backend/blob/main/docs/cli-release.md), and
+  [the MCP server](https://github.com/workerstack/backend/blob/main/docs/mcp.md).
+- [SDK conformance](https://github.com/workerstack/backend/blob/main/docs/conformance.md) and
+  [the framework itself](https://github.com/workerstack/backend/blob/main/packages/core/README.md).
 
 ## License
 

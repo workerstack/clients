@@ -1,5 +1,5 @@
 /**
- * A project whose `@lovrozagar/honey` is core's v1 source as a checkout (bit 19 h2): the package carries tsconfig.json
+ * A project whose `@workerstack/backend` is core's v1 source as a checkout (bit 19 h2): the package carries tsconfig.json
  * and core's export shape over a `src` link to packages/core/src, each subpath's `honey-source` its source and its
  * `default` its unbuilt dist/ (bit 20: no `bun` condition, which core dropped and which pointed Bun at the source), so
  * `--app` resolves core from the app as a checkout would; its own `#` imports read core's package.json through the
@@ -21,7 +21,7 @@ export function appProject(
 	options: { installed?: boolean } = {},
 ): { dir: string; done: () => void } {
 	const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "codegen-app-"))
-	const core = join(dir, "node_modules/@lovrozagar/honey")
+	const core = join(dir, "node_modules/@workerstack/backend")
 	mkdirSync(core, { recursive: true })
 	const coreRoot = resolve(import.meta.dirname, "../../../../core")
 	const installed = options.installed === true
@@ -50,7 +50,7 @@ export function appProject(
 	const all = { ...exports, "./package.json": "./package.json", "./plain": { default: "./src/routing/app.ts" } }
 	writeFileSync(
 		join(core, "package.json"),
-		JSON.stringify({ exports: all, imports: own, name: "@lovrozagar/honey", type: "module" }),
+		JSON.stringify({ exports: all, imports: own, name: "@workerstack/backend", type: "module" }),
 	)
 	if (!installed) writeFileSync(join(core, "tsconfig.json"), "{}\n")
 	for (const [path, text] of Object.entries(files)) {

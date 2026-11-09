@@ -1,12 +1,23 @@
 {
-	"name": "@lovrozagar/honey-clients",
+	"name": "@workerstack/clients",
 	"version": "1.0.0-rc.22",
 	"description": "Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a CLI and an MCP server from any OpenAPI 3.x document.",
+	"keywords": [
+		"codegen",
+		"mcp",
+		"openapi",
+		"sdk",
+		"workerstack"
+	],
+	"homepage": "https://github.com/workerstack/backend#readme",
+	"bugs": {
+		"url": "https://github.com/workerstack/backend/issues"
+	},
 	"license": "MIT",
 	"author": "lovrozagar",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/lovrozagar/honey.git",
+		"url": "git+https://github.com/workerstack/backend.git",
 		"directory": "packages/gen"
 	},
 	"bin": {

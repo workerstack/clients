@@ -370,7 +370,7 @@ expectType<Equal<RouteSelector, "DELETE /v1/users/:id" | "GET /v1/users" | "GET 
 
 	// v0: b99f9ef5db
 	it("leaves HoneyCodegen unaugmented with no routes: invalidate keeps plain strings", () => {
-		const consumer = `import type { RouteSelectorOf } from "@lovrozagar/honey"
+		const consumer = `import type { RouteSelectorOf } from "@workerstack/backend"
 expectType<Equal<RouteSelectorOf, string>>()`
 		const { diagnostics, text } = check(honeyDoc([]), consumer)
 		expect({ diagnostics, augmented: text.includes("HoneyCodegen") }).toEqual({ augmented: false, diagnostics: [] })
@@ -386,14 +386,14 @@ expectType<Equal<keyof Routes, "/v1/users">>()`
 	})
 
 	// v0: 2ab0bbb8f5
-	it('augments "@lovrozagar/honey" HoneyCodegen so invalidate takes exactly the route selectors', () => {
+	it('augments "@workerstack/backend" HoneyCodegen so invalidate takes exactly the route selectors', () => {
 		const app = honeyDoc([route("GET", "/v1/users"), route("POST", "/v1/users")])
-		const consumer = `import type { HoneyCodegen, RouteSelectorOf } from "@lovrozagar/honey"
+		const consumer = `import type { HoneyCodegen, RouteSelectorOf } from "@workerstack/backend"
 import type { RouteSelector } from "./types.gen"
 expectType<Equal<HoneyCodegen["routeSelector"], RouteSelector>>()
 expectType<Equal<RouteSelectorOf, "GET /v1/users" | "POST /v1/users">>()`
 		const { diagnostics, text } = check(app, consumer)
-		expect({ diagnostics, module: text.includes('declare module "@lovrozagar/honey"') }).toEqual({
+		expect({ diagnostics, module: text.includes('declare module "@workerstack/backend"') }).toEqual({
 			diagnostics: [],
 			module: true,
 		})

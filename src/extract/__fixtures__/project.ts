@@ -1,6 +1,6 @@
 /**
  * A throwaway TypeScript project for the extract suites: a temp directory holding the app files a
- * case writes, a tsconfig, and `@lovrozagar/honey` mapped to a barrel over core's source. The barrel
+ * case writes, a tsconfig, and `@workerstack/backend` mapped to a barrel over core's source. The barrel
  * is a user app's import, written as text; gen itself imports nothing from core (H2).
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -26,7 +26,7 @@ export const COMPILER_OPTIONS = {
 	module: "ESNext",
 	moduleResolution: "Bundler",
 	noEmit: true,
-	paths: { "@lovrozagar/honey": ["./honey.ts"] },
+	paths: { "@workerstack/backend": ["./honey.ts"] },
 	strict: true,
 	target: "ES2022",
 }

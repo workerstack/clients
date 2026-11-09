@@ -1,7 +1,7 @@
 /**
  * The MCP handler an app mounts (bit 21 e, H24.3): the honey plugin's `codegen.mcp` output, from the app's own
  * document. Its entry holds the tool table and the handler (`mcpHandler`) over the portable runtime and the API's own
- * TS SDK, each in the companion directory beside it; @lovrozagar/honey/mcp's `mcp(app, path, mcpHandler)` mounts it.
+ * TS SDK, each in the companion directory beside it; @workerstack/backend/mcp's `mcp(app, path, mcpHandler)` mounts it.
  * Each call runs in-process through the app. The handler is `secured` when any tool's operation requires a credential
  * (its `security`, else the document's, with no empty requirement), and carries the headers the schemes those tools
  * name read (an http, OAuth or OpenID scheme's Authorization, an API key's own header or Cookie; mutual TLS and a query
@@ -96,7 +96,7 @@ export function generateMcpHandler(
 	const sdk = generateSdk(spec, { name: "Api", stem: "api" })
 	const entry = `${MARKER}
 
-// The ${name} API's tools, mounted in the app: mcp(app, path, mcpHandler) from @lovrozagar/honey/mcp serves them over
+// The ${name} API's tools, mounted in the app: mcp(app, path, mcpHandler) from @workerstack/backend/mcp serves them over
 // Streamable HTTP, each call dispatched in-process through the app. ${secured ? "Its tools require a credential, so the mount needs authenticate." : "No tool requires a credential."}
 import type { ToolSpec } from "./${dir}/runtime.gen"
 import { mountedMcp } from "./${dir}/runtime.gen"
