@@ -45,10 +45,12 @@ jobs:
     uses: ./.github/workflows/release-validate.yml
     with:
       config: .github/release-fixture/release.config.ts
+      cli: node bin/honey-clients.js
   sync-dry-run:
     uses: ./.github/workflows/release-sync.yml
     with:
       config: .github/release-fixture/release.config.ts
+      cli: node bin/honey-clients.js
       app-owner: workerstack
       dry-run: true
   # a fork's token is read-only, and a reusable workflow's job gets no more than its caller grants
@@ -60,4 +62,5 @@ jobs:
     uses: ./.github/workflows/release-bump.yml
     with:
       config: .github/release-fixture/release.config.ts
+      cli: node bin/honey-clients.js
       major: false
