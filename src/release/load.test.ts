@@ -41,6 +41,7 @@ function recording(events: string[]): RegisterHooks {
 describe("readRelease on an old Node", () => {
 	it.each(["22.17.0", "23.5.0"])(
 		"refuses a .ts config on Node %s, naming the version it needs",
+		{ timeout: SPAWN_TIMEOUT },
 		async (nodeVersion) => {
 			const root = await acme()
 			const importModule = async () => ({ default: CONFIG })
@@ -50,7 +51,7 @@ describe("readRelease on an old Node", () => {
 		},
 	)
 
-	it("refuses a .mts config on an old Node too, and takes a .mjs one there", async () => {
+	it("refuses a .mts config on an old Node too, and takes a .mjs one there", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await acme()
 		writeAll(root, { "acme-release/release.config.mts": "", "acme-release/release.config.mjs": "" })
 		const options = {
@@ -69,25 +70,29 @@ describe("readRelease on an old Node", () => {
 })
 
 describe("readRelease on Node, importing", () => {
-	it("holds the self-resolve hook for the import alone, also when the import throws", async () => {
-		const root = await acme()
-		const events: string[] = []
-		const importing = (fail: boolean) => async () => {
-			events.push("import")
-			if (fail) throw new Error("boom")
-			return { default: CONFIG }
-		}
-		const registerHooks = recording(events)
+	it(
+		"holds the self-resolve hook for the import alone, also when the import throws",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await acme()
+			const events: string[] = []
+			const importing = (fail: boolean) => async () => {
+				events.push("import")
+				if (fail) throw new Error("boom")
+				return { default: CONFIG }
+			}
+			const registerHooks = recording(events)
 
-		await readRelease(configOf(root), { importModule: importing(false), registerHooks, runtime: NODE })
-		await expect(
-			readRelease(configOf(root), { importModule: importing(true), registerHooks, runtime: NODE }),
-		).rejects.toThrow(/failed to load .*release\.config\.ts: boom/)
+			await readRelease(configOf(root), { importModule: importing(false), registerHooks, runtime: NODE })
+			await expect(
+				readRelease(configOf(root), { importModule: importing(true), registerHooks, runtime: NODE }),
+			).rejects.toThrow(/failed to load .*release\.config\.ts: boom/)
 
-		expect(events).toEqual(["register", "import", "deregister", "register", "import", "deregister"])
-	})
+			expect(events).toEqual(["register", "import", "deregister", "register", "import", "deregister"])
+		},
+	)
 
-	it("names the config when its import throws something that is no Error", async () => {
+	it("names the config when its import throws something that is no Error", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await acme()
 		const importModule = async () => Promise.reject("a string")
 
@@ -96,7 +101,7 @@ describe("readRelease on Node, importing", () => {
 		).rejects.toThrow(/failed to load .*release\.config\.ts: a string/)
 	})
 
-	it("loads a real .ts config with the running process's own hook and entry", async () => {
+	it("loads a real .ts config with the running process's own hook and entry", { timeout: SPAWN_TIMEOUT }, async () => {
 		const release = await loadRelease(configOf(await acme()))
 
 		expect(release.packages.map((pkg) => pkg.path)).toEqual(["acme-release/sdk"])
@@ -104,36 +109,40 @@ describe("readRelease on Node, importing", () => {
 })
 
 describe("readRelease on Bun", () => {
-	it("maps the release specifier to the running package before importing the config", async () => {
-		const root = await acme()
-		const order: string[] = []
-		const modules = new Map<string, () => unknown>()
-		const bun: BunLike = {
-			plugin(plugin) {
-				order.push(`plugin:${plugin.name}`)
-				const build: BunBuild = { module: (specifier, load) => void modules.set(specifier, load) }
-				void plugin.setup(build)
-			},
-		}
-		const self = { defineRelease: (config: unknown) => config }
+	it(
+		"maps the release specifier to the running package before importing the config",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await acme()
+			const order: string[] = []
+			const modules = new Map<string, () => unknown>()
+			const bun: BunLike = {
+				plugin(plugin) {
+					order.push(`plugin:${plugin.name}`)
+					const build: BunBuild = { module: (specifier, load) => void modules.set(specifier, load) }
+					void plugin.setup(build)
+				},
+			}
+			const self = { defineRelease: (config: unknown) => config }
 
-		const release = await readRelease(configOf(root), {
-			importModule: async (url) => {
-				order.push(url)
-				return url === "file:///self/index.js" ? self : { default: CONFIG }
-			},
-			runtime: { bun, nodeVersion: "22.0.0", runtime: "bun" },
-			selfUrl: "file:///self/index.js",
-		})
+			const release = await readRelease(configOf(root), {
+				importModule: async (url) => {
+					order.push(url)
+					return url === "file:///self/index.js" ? self : { default: CONFIG }
+				},
+				runtime: { bun, nodeVersion: "22.0.0", runtime: "bun" },
+				selfUrl: "file:///self/index.js",
+			})
 
-		expect(order).toEqual([
-			"file:///self/index.js",
-			`plugin:self:${RELEASE_SPECIFIER}`,
-			pathToFileURL(realpathSync(configOf(root))).href,
-		])
-		expect(modules.get(RELEASE_SPECIFIER)?.()).toEqual({ exports: self, loader: "object" })
-		expect(release.project).toBe("acme")
-	})
+			expect(order).toEqual([
+				"file:///self/index.js",
+				`plugin:self:${RELEASE_SPECIFIER}`,
+				pathToFileURL(realpathSync(configOf(root))).href,
+			])
+			expect(modules.get(RELEASE_SPECIFIER)?.()).toEqual({ exports: self, loader: "object" })
+			expect(release.project).toBe("acme")
+		},
+	)
 })
 
 /* The real runtimes against the source, from a repo outside any install: v8 cannot see these. */

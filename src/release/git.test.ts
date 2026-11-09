@@ -4,6 +4,7 @@ import path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { getRemoteTip, gitExitCode, gitOutput, gitRun } from "./git.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 const workdirs: string[] = []
 
@@ -43,7 +44,7 @@ describe("a sandbox, under the environment a git hook gives its children", () =>
 		for (const key of leaked) delete process.env[key]
 	})
 
-	it("keeps its commits out of the enclosing repository", async () => {
+	it("keeps its commits out of the enclosing repository", { timeout: SPAWN_TIMEOUT }, async () => {
 		const enclosing = await sandboxRepo()
 		const before = await gitOutput(["rev-list", "--count", "HEAD"], enclosing)
 
@@ -61,7 +62,7 @@ describe("a sandbox, under the environment a git hook gives its children", () =>
 	 * every commit made in the enclosing checkout afterwards — which is how eight commits came to be
 	 * authored `Test <test@example.com>` before this was found.
 	 */
-	it("keeps the identity it sets out of the enclosing repository's config", async () => {
+	it("keeps the identity it sets out of the enclosing repository's config", { timeout: SPAWN_TIMEOUT }, async () => {
 		const enclosing = await sandboxRepo()
 		await gitRun(["config", "user.email", "owner@example.org"], enclosing)
 
@@ -76,19 +77,19 @@ describe("a sandbox, under the environment a git hook gives its children", () =>
 })
 
 describe("gitOutput", () => {
-	it("returns trimmed stdout", async () => {
+	it("returns trimmed stdout", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = await sandboxRepo()
 
 		expect(await gitOutput(["rev-parse", "--abbrev-ref", "HEAD"], dir)).toBe("main")
 	})
 
-	it("runs in the directory it is given, not the process cwd", async () => {
+	it("runs in the directory it is given, not the process cwd", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = await sandboxRepo()
 
 		expect(await gitOutput(["rev-parse", "--show-toplevel"], dir)).toContain(path.basename(dir))
 	})
 
-	it("throws with the command and git's own stderr when git fails", async () => {
+	it("throws with the command and git's own stderr when git fails", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = await sandboxRepo()
 
 		await expect(gitOutput(["rev-parse", "no-such-ref"], dir)).rejects.toThrow(
@@ -96,7 +97,7 @@ describe("gitOutput", () => {
 		)
 	})
 
-	it("throws outside a repository", async () => {
+	it("throws outside a repository", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = tmp("public-sync-git-bare-")
 
 		await expect(gitOutput(["status"], dir)).rejects.toThrow(/failed:/)
@@ -104,7 +105,7 @@ describe("gitOutput", () => {
 })
 
 describe("gitRun", () => {
-	it("resolves when the command succeeds", async () => {
+	it("resolves when the command succeeds", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = await sandboxRepo()
 
 		await gitRun(["status", "--porcelain"], dir)
@@ -112,29 +113,37 @@ describe("gitRun", () => {
 		expect(await gitOutput(["rev-parse", "--abbrev-ref", "HEAD"], dir)).toBe("main")
 	})
 
-	it("rejects when the command fails, so a caller cannot continue past a broken step", async () => {
-		const dir = await sandboxRepo()
+	it(
+		"rejects when the command fails, so a caller cannot continue past a broken step",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const dir = await sandboxRepo()
 
-		await expect(gitRun(["checkout", "no-such-branch"], dir)).rejects.toThrow(/failed:/)
-	})
+			await expect(gitRun(["checkout", "no-such-branch"], dir)).rejects.toThrow(/failed:/)
+		},
+	)
 })
 
 describe("gitExitCode", () => {
-	it("reports 0 for a command that succeeds", async () => {
+	it("reports 0 for a command that succeeds", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = await sandboxRepo()
 
 		expect(await gitExitCode(["rev-parse", "HEAD"], dir)).toBe(0)
 	})
 
-	it("reports non-zero instead of throwing, which is why callers use it to probe", async () => {
-		const dir = await sandboxRepo()
+	it(
+		"reports non-zero instead of throwing, which is why callers use it to probe",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const dir = await sandboxRepo()
 
-		expect(await gitExitCode(["rev-parse", "no-such-ref"], dir)).not.toBe(0)
-	})
+			expect(await gitExitCode(["rev-parse", "no-such-ref"], dir)).not.toBe(0)
+		},
+	)
 })
 
 describe("getRemoteTip", () => {
-	it("returns the sha the mirror branch points at", async () => {
+	it("returns the sha the mirror branch points at", { timeout: SPAWN_TIMEOUT }, async () => {
 		const source = await sandboxRepo()
 		const mirror = tmp("public-sync-mirror-")
 		await gitRun(["clone", "--quiet", "--bare", source, mirror], source)
@@ -143,7 +152,7 @@ describe("getRemoteTip", () => {
 		expect(await getRemoteTip(mirror, "main", source)).toBe(expected)
 	})
 
-	it("returns undefined when the branch does not exist on the mirror", async () => {
+	it("returns undefined when the branch does not exist on the mirror", { timeout: SPAWN_TIMEOUT }, async () => {
 		const source = await sandboxRepo()
 		const mirror = tmp("public-sync-mirror-")
 		await gitRun(["clone", "--quiet", "--bare", source, mirror], source)
@@ -151,7 +160,7 @@ describe("getRemoteTip", () => {
 		expect(await getRemoteTip(mirror, "no-such-branch", source)).toBeUndefined()
 	})
 
-	it("returns undefined when the mirror itself is unreachable", async () => {
+	it("returns undefined when the mirror itself is unreachable", { timeout: SPAWN_TIMEOUT }, async () => {
 		const source = await sandboxRepo()
 
 		expect(await getRemoteTip(path.join(source, "no-such-remote"), "main", source)).toBeUndefined()
@@ -159,7 +168,7 @@ describe("getRemoteTip", () => {
 })
 
 describe("gitExitCode of a git that dies", () => {
-	it("reports a git killed by a signal as a failure, not a success", async () => {
+	it("reports a git killed by a signal as a failure, not a success", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = await sandboxRepo()
 
 		/* a shell alias runs as git's child, so $PPID is git itself */

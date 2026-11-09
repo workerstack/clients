@@ -70,7 +70,7 @@ describe("release --config", () => {
 		expect(result.status).toBe(1)
 	})
 
-	it("names the config and the project when the config names none", async () => {
+	it("names the config and the project when the config names none", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await acme({ ...CONFIG, project: undefined })
 
 		const result = await captured((io) => release(["sync", "--config", configOf(root), "--validate-only"], io))
