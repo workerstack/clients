@@ -69,5 +69,5 @@ export const strayExcerpts = (blocks: readonly Block[], info: string, program: s
 /** The API the docs' SDK examples call: the Kitchen e2e app's committed OpenAPI document. */
 export const docsDocument = (): Record<string, unknown> =>
 	JSON.parse(
-		readFileSync(join(REPO, "packages/core/tests/e2e/apps/kitchen/src/_gen/openapi.gen.json"), "utf8"),
+		readFileSync(new URL("../../../../tests/fixtures/apps/kitchen.openapi.json", import.meta.url), "utf8"),
 	) as Record<string, unknown>

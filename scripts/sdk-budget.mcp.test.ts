@@ -172,7 +172,7 @@ const largestCeiling = (measured: number) => Math.min(ceilingOf([measured], TOKE
 /** An e2e app's emitted OpenAPI document, every operation opted into the MCP server. */
 const appSpec = (app: string) =>
 	markAllMcp(
-		JSON.parse(readFileSync(join(REPO, `packages/core/tests/e2e/apps/${app}/src/_gen/openapi.gen.json`), "utf8")) as {
+		JSON.parse(readFileSync(new URL(`../tests/fixtures/apps/${app}.openapi.json`, import.meta.url), "utf8")) as {
 			paths?: Record<string, Record<string, unknown>>
 		},
 	) as Record<string, unknown>

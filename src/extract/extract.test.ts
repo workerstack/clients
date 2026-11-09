@@ -1,7 +1,17 @@
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { extract, type FixtureProject, fixtureProject, lines, routeId, SLOW, shown } from "./__fixtures__/project.ts"
+import {
+	backendEntry,
+	COMPILER_OPTIONS,
+	extract,
+	type FixtureProject,
+	fixtureProject,
+	lines,
+	routeId,
+	SLOW,
+	shown,
+} from "./__fixtures__/project.ts"
 import * as tsMorph from "ts-morph"
 import { extractTypes, loadTsMorph } from "./extract.ts"
 
@@ -119,14 +129,14 @@ describe("the base: the entry and the tsconfig it is read with", () => {
 		"reads the project through the tsconfig it is given, else the nearest one",
 		() => {
 			// v0: 0ca2eabe14
-			const broken = fixtureProject({ paths: { "@workerstack/backend": ["./missing.ts"] } })
+			/* backend unlinked here, so only a tsconfig's paths can find it */
+			const broken = fixtureProject({ paths: { "@workerstack/backend": ["./missing.ts"] } }, false)
 			try {
 				broken.write(
 					"alt/tsconfig.json",
-					readFileSync(join(project.root, "tsconfig.json"), "utf8").replace(
-						"./honey.ts",
-						resolve(project.root, "honey.ts"),
-					),
+					JSON.stringify({
+						compilerOptions: { ...COMPILER_OPTIONS, paths: { "@workerstack/backend": [backendEntry()] } },
+					}),
 				)
 				const entryPath = broken.write(
 					"app.ts",

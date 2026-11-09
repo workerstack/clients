@@ -205,9 +205,10 @@ export const BUDGET_APPS = ["compose", "defaults", "gateway", "kitchen", "surfac
 
 /** An e2e app's emitted OpenAPI document, the input every language's emitter is measured over. */
 export const budgetSpec = (app: string): Record<string, unknown> =>
-	JSON.parse(
-		readFileSync(join(BUDGET_REPO, `packages/core/tests/e2e/apps/${app}/src/_gen/openapi.gen.json`), "utf8"),
-	) as Record<string, unknown>
+	JSON.parse(readFileSync(new URL(`../tests/fixtures/apps/${app}.openapi.json`, import.meta.url), "utf8")) as Record<
+		string,
+		unknown
+	>
 
 /** One language's measurement: each `<app>/<key>`'s tokens, and each app whose reader read fewer surfaces than planned. */
 export type Measured = { readonly missed: readonly string[]; readonly tokens: ReadonlyMap<string, number> }

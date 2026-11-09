@@ -25,7 +25,7 @@ import { main } from "./cli.ts"
 import { isWriteTemp } from "./gen/write.ts"
 import { pinnedBunVersion, withPinnedBun } from "./gen/__fixtures__/pinned-bun.ts"
 import { MARK_KEY, markOf, reap } from "./gen/__fixtures__/survivors.ts"
-import { appProject } from "./ir/__fixtures__/app-project.ts"
+import { appProject, backend } from "./ir/__fixtures__/app-project.ts"
 import { SPAWN_TIMEOUT } from "./gen/__fixtures__/spawn-timeout.ts"
 
 const BIN = resolve(import.meta.dirname, "../bin/honey-clients.js")
@@ -271,11 +271,13 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 	}, 90_000)
 
 	it("reads a checkout core from its source, never a stale dist/ beside it", () => {
+		/* a stale build that re-exports the checkout's own tree, logging each evaluation */
+		const { ext } = backend()
 		const stale = (file: string) =>
-			`import { appendFileSync } from "node:fs"\nappendFileSync("evaluations.log", "dist ")\nexport * from ${JSON.stringify(join(REPO, "packages/core/src", file))}\n`
+			`import { appendFileSync } from "node:fs"\nappendFileSync("evaluations.log", "dist ")\nexport * from "../../src/${file}.${ext}"\n`
 		const dir = project({
-			"node_modules/@workerstack/backend/dist/openapi/register.js": stale("openapi/register.ts"),
-			"node_modules/@workerstack/backend/dist/routing/app.js": stale("routing/app.ts"),
+			"node_modules/@workerstack/backend/dist/openapi/register.js": stale("openapi/register"),
+			"node_modules/@workerstack/backend/dist/routing/app.js": stale("routing/app"),
 			"src/app.ts": `${HONEY}export const app = honey().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
 		})
 		const run = onBun(dir)

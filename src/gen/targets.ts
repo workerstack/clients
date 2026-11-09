@@ -85,7 +85,7 @@ export const TARGET_OPTIONS = {
 /**
  * The target options that take no value, since their name already says what they turn on
  * (`--ts-tanstack-query`, not `--ts-query tanstack`). They stay listed in `TARGET_OPTIONS` above, which is what
- * `packages/core/tests/docs/readmes.test.ts` reads to hold every flag to its README row; this table only
+ * the repo's README test (`tests/docs/readmes.test.ts`) reads to hold every flag to its README row; this table only
  * says how one is read. Bare is `true` and an inline `true`/`false` is read, exactly as `--watch` is.
  */
 const BOOLEAN_OPTIONS = { cli: ["aur"], ts: ["tanstackQuery"] } as const satisfies {

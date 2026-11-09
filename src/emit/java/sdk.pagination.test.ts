@@ -23,7 +23,7 @@ function documents(): [string, Record<string, unknown>][] {
 	const apps = APPS.map((app): [string, Record<string, unknown>] => [
 		app,
 		JSON.parse(
-			readFileSync(join(REPO, `packages/core/tests/e2e/apps/${app}/src/_gen/openapi.gen.json`), "utf8"),
+			readFileSync(new URL(`../../../tests/fixtures/apps/${app}.openapi.json`, import.meta.url), "utf8"),
 		) as Record<string, unknown>,
 	])
 	return [...fixtures, ...apps]

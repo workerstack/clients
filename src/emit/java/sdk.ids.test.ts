@@ -18,7 +18,7 @@ const REPO = join(import.meta.dirname, "../../../../..")
 /** An e2e app's emitted OpenAPI document. */
 const appSpec = (app: string) =>
 	JSON.parse(
-		readFileSync(join(REPO, `packages/core/tests/e2e/apps/${app}/src/_gen/openapi.gen.json`), "utf8"),
+		readFileSync(new URL(`../../../tests/fixtures/apps/${app}.openapi.json`, import.meta.url), "utf8"),
 	) as Record<string, unknown>
 
 /** A call-plan map's operation ids, sorted. */

@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileS
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { appProject } from "./__fixtures__/app-project.ts"
+import { appProject, backend } from "./__fixtures__/app-project.ts"
 import { appRef, type BunResolver, loadAppDocument } from "./load.ts"
 
 const projects: (() => void)[] = []
@@ -126,7 +126,7 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 	})
 
 	/* vitest resolves the app's own imports by Node's conditions, never honey-source, so the app reaches core by path */
-	const BY_PATH = 'import { honey } from "../node_modules/@workerstack/backend/src/routing/app.ts"\n'
+	const BY_PATH = `import { honey } from "../node_modules/@workerstack/backend/src/routing/app.${backend().ext}"\n`
 
 	it("generates from a checkout core its source under the honey-source condition, and from an installed one", async () => {
 		const checkout = project({ "src/app.ts": `${BY_PATH}export const app = ${route("/checkout")}\n` })

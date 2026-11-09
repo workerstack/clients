@@ -10,11 +10,10 @@
  * (`HONEY_REQUIRE_FORMATTERS`), and this leg is what notices the next time one is borrowed.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs"
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import { describe, expect, it } from "vitest"
 
 const GEN = join(import.meta.dirname, "../..")
-const CORE = join(GEN, "../core")
 
 /** The harness's own variables: a test may read these, product source may not. */
 const HARNESS_ONLY = ["HONEY_REQUIRE_TOOLCHAINS", "HONEY_REQUIRE_GO", "HONEY_REQUIRE_PYTHON", "HONEY_REQUIRE_RUST"]
@@ -44,20 +43,20 @@ export function readsEnv(text: string, name: string): boolean {
 }
 
 describe("the test harness's environment variables stay the harness's (bit 22)", () => {
-	it("is read by no product source of either package", () => {
-		const sources = [...productSources(join(GEN, "src")), ...productSources(join(CORE, "src"))]
+	it("is read by no product source", () => {
+		const sources = productSources(join(GEN, "src"))
 		const borrowed = sources
 			.map((path) => {
 				const text = readFileSync(path, "utf8")
 				return { names: HARNESS_ONLY.filter((name) => readsEnv(text, name)), path }
 			})
 			.filter(({ names }) => names.length > 0)
-			.map(({ names, path }) => `${path.slice(path.indexOf("packages/"))}: ${names.join(", ")}`)
+			.map(({ names, path }) => `${relative(GEN, path)}: ${names.join(", ")}`)
 		expect(borrowed).toEqual([])
 	})
 
 	it("reads a real tree, and tells a read from a mention", () => {
-		const sources = [...productSources(join(GEN, "src")), ...productSources(join(CORE, "src"))]
+		const sources = productSources(join(GEN, "src"))
 		expect(sources.length).toBeGreaterThan(100)
 		/* the product's own switch is read, which is what a read looks like */
 		const own = sources.filter((path) => readsEnv(readFileSync(path, "utf8"), "HONEY_REQUIRE_FORMATTERS"))
