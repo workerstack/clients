@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest"
-import { PACKAGE_NAME } from "./bun.ts"
 import { registerNodeHook, type RegisterHooks } from "./node.ts"
 
 type Hooks = Parameters<RegisterHooks>[0]
+
+const PACKAGE_NAME = "@workerstack/clients/installers"
 
 const context = { conditions: [], importAttributes: {}, parentURL: undefined }
 const unreachable = () => {
@@ -24,7 +25,7 @@ function capture(): { register: RegisterHooks; hooks: () => Hooks } {
 describe("registerNodeHook", () => {
 	test("maps the package name to the running package, its format left to Node (index.ts from source, index.js built)", () => {
 		const { register, hooks } = capture()
-		registerNodeHook("file:///pkg/dist/index.js", register)
+		registerNodeHook(PACKAGE_NAME, "file:///pkg/dist/index.js", register)
 		expect(hooks().resolve?.(PACKAGE_NAME, context, unreachable)).toEqual({
 			url: "file:///pkg/dist/index.js",
 			shortCircuit: true,
@@ -33,12 +34,12 @@ describe("registerNodeHook", () => {
 
 	test("returns the deregister handle", () => {
 		const handle = { deregister: () => {} }
-		expect(registerNodeHook("file:///pkg/dist/index.js", () => handle)).toBe(handle)
+		expect(registerNodeHook(PACKAGE_NAME, "file:///pkg/dist/index.js", () => handle)).toBe(handle)
 	})
 
 	test("passes every other specifier on", () => {
 		const { register, hooks } = capture()
-		registerNodeHook("file:///pkg/dist/index.js", register)
+		registerNodeHook(PACKAGE_NAME, "file:///pkg/dist/index.js", register)
 		expect(hooks().resolve?.("node:fs", context, passOn)).toEqual({ url: "file:///resolved/node:fs" })
 		expect(hooks().resolve?.(`${PACKAGE_NAME}/package.json`, context, passOn)).toEqual({
 			url: `file:///resolved/${PACKAGE_NAME}/package.json`,
@@ -54,7 +55,7 @@ describe("registerNodeHook", () => {
 			return { deregister: () => {} }
 		}) as RegisterHooks
 		try {
-			registerNodeHook("file:///pkg/dist/index.js")
+			registerNodeHook(PACKAGE_NAME, "file:///pkg/dist/index.js")
 		} finally {
 			module.registerHooks = before
 		}
