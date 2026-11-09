@@ -1,0 +1,108 @@
+name: release-bump
+
+# Reusable: cuts the next version of each package of a consumer's release config whose generated output or hand files
+# changed, and opens (or updates) the release PR on branch auto/release-bump. Installs the toolchains its codegen
+# needs from the consumer's system.config.ts, plus go, which bump runs oasdiff with. The caller owns triggers and
+# concurrency, and must grant this job contents: write and pull-requests: write. A PR opened with the caller's
+# GITHUB_TOKEN starts no workflows of its own.
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: The release config, relative to the repo root (release.config.ts)
+        type: string
+        required: true
+      major:
+        description: Release every changed package as a major (otherwise any API change is a minor)
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      CONFIG: ${{ inputs.config }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      # the release config loads as TypeScript, which Node strips from 22.18 on
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      # each name in the config's toolchains, then go (bump runs oasdiff through go run) when the config does not list
+      # it, installed at its system.config.ts pin; then the PATH a new shell gets (system install's managed ~/.bashrc
+      # blocks) goes first for every later step. GITHUB_PATH prepends each line, so the entries are written last to
+      # first.
+      - name: Install the release config's toolchains and go
+        run: |
+          set -euo pipefail
+          names=$(bun x --no-install honey-clients release toolchains --config "$CONFIG")
+          toolchains=()
+          if [ -n "$names" ]; then mapfile -t toolchains <<< "$names"; fi
+          if ! printf '%s\n' "${toolchains[@]}" | grep -qx go; then toolchains+=(go); fi
+          for name in "${toolchains[@]}"; do
+            bun x --no-install system install "$name" --upgrade
+          done
+          bash -ic 'printf "\n__RELEASE_PATH__%s\n" "$PATH"' 2>/dev/null \
+            | sed -n 's/^__RELEASE_PATH__//p' | tr ':' '\n' | tac >> "$GITHUB_PATH"
+      - name: Bump every changed package
+        id: bump
+        env:
+          MAJOR: ${{ inputs.major }}
+        run: |
+          set -euo pipefail
+          # bump runs codegen itself (the config's `codegen`), before deciding and again at the versions it releases;
+          # one "bumped: <name> <version> <kind>" line per package whose output or hand files changed
+          args=(--config "$CONFIG")
+          if [ "$MAJOR" = "true" ]; then args+=(--major); fi
+          OUT=$(bun x --no-install honey-clients release bump "${args[@]}")
+          echo "$OUT"
+          SUMMARY_FILE=$(mktemp)
+          echo "$OUT" | awk '/^bumped: / {print $2 "," $3 "," $4}' > "$SUMMARY_FILE"
+
+          # the release PR carries exactly what bump reports ("wrote: <path>"): version files, state, CHANGELOG and
+          # each released package's regenerated tracked files
+          {
+            if [ -s "$SUMMARY_FILE" ]; then echo "changed=1"; else echo "changed=0"; fi
+            echo "paths<<PATHS_EOF"
+            echo "$OUT" | awk '/^wrote: / {print $2}'
+            echo "PATHS_EOF"
+            echo "summary<<SUMMARY_EOF"
+            if [ -s "$SUMMARY_FILE" ]; then
+              awk -F, '{printf "- %s → %s (%s)\n", $1, $2, $3}' "$SUMMARY_FILE"
+            else
+              echo "(no changes)"
+            fi
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Open the release PR
+        if: steps.bump.outputs.changed == '1'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          commit-message: "chore(release): spec-derived package bumps"
+          title: "chore(release): spec-derived package bumps"
+          body: |
+            Machine-generated: each package below changed its generated output or hand files since its last release; any API change since the spec that release was cut from is a minor, generated-code and package-file changes a patch, and a major only comes from a manual run with `major` checked. Review each CHANGELOG entry before merge.
+
+            ### Proposed bumps
+
+            ${{ steps.bump.outputs.summary }}
+
+            ### After merge
+
+            Nothing to tag. Once this merges, release sync pushes each package and `v<version>` to its public repo, whose `release.yml` publishes it to the channels its package kind ships on (the registries `release.config.ts` lists, or the CLI's release channels). Watch those runs in the public repos.
+          branch: auto/release-bump
+          delete-branch: true
+          labels: release,automated
+          add-paths: ${{ steps.bump.outputs.paths }}

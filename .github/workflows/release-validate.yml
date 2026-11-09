@@ -1,0 +1,55 @@
+name: release-validate
+
+# Reusable: checks a consumer's release config. Installs the toolchains its codegen needs from the consumer's
+# system.config.ts, runs that codegen as bump does, then loads and validates every package the config lists.
+# The caller owns triggers, concurrency and the permissions it grants (this job needs contents: read).
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: The release config, relative to the repo root (release.config.ts)
+        type: string
+        required: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CONFIG: ${{ inputs.config }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # the release config loads as TypeScript, which Node strips from 22.18 on
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      # each name in the config's toolchains, installed at its system.config.ts pin; then the PATH a new shell gets
+      # (system install's managed ~/.bashrc blocks) goes first for every later step. GITHUB_PATH prepends each line,
+      # so the entries are written last to first.
+      - name: Install the release config's toolchains
+        run: |
+          set -euo pipefail
+          names=$(bun x --no-install honey-clients release toolchains --config "$CONFIG")
+          if [ -z "$names" ]; then
+            echo "the release config lists no toolchains"
+            exit 0
+          fi
+          mapfile -t toolchains <<< "$names"
+          for name in "${toolchains[@]}"; do
+            bun x --no-install system install "$name" --upgrade
+          done
+          bash -ic 'printf "\n__RELEASE_PATH__%s\n" "$PATH"' 2>/dev/null \
+            | sed -n 's/^__RELEASE_PATH__//p' | tr ':' '\n' | tac >> "$GITHUB_PATH"
+      - name: Run the release config's codegen
+        run: bun x --no-install honey-clients release codegen --config "$CONFIG"
+      - name: Validate the release config
+        run: bun x --no-install honey-clients release sync --config "$CONFIG" --validate-only
