@@ -1,0 +1,3 @@
+# Every checkout keeps LF, Windows included: installgen's templates and golden files, and the README tables its
+# tests parse, are compared byte for byte.
+* text=auto eol=lf
