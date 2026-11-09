@@ -3,7 +3,7 @@
 Each deliberate break from v0 0.7.x in the generated SDKs, the CLI and the MCP server, with what you wrote before and
 what you write now. A "before" block is v0 and is shown as it was; an "after" block is v1 and is compiled by this
 repo's tests. The framework's own breaks are in
-[the framework's migration guide](https://github.com/workerstack/clients/blob/main/docs/migration.md).
+[the framework's migration guide](https://github.com/workerstack/backend/blob/main/docs/migration.md).
 
 ## Code generation moved to `@workerstack/clients`
 
