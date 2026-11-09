@@ -112,11 +112,11 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
-      # the pinned and floor toolchains and the WebSocket module: a change in any saves a new cache
+      # the pinned and floor toolchains, the WebSocket module and oasdiff's pin: a change in any saves a new cache
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/honey-tmp/go/mod
-          key: ${{ runner.os }}-gomod-test-${{ hashFiles('.go-version', 'packages/gen/src/emit/go/__fixtures__/go-env.ts', 'packages/gen/src/emit/go/sdk.ts') }}
+          key: ${{ runner.os }}-gomod-test-${{ hashFiles('.go-version', 'packages/gen/src/emit/go/__fixtures__/go-env.ts', 'packages/gen/src/emit/go/sdk.ts', 'packages/gen/src/release/oasdiff.ts') }}
           restore-keys: ${{ runner.os }}-gomod-test-
       # the Go build cache and the compiled SDKs (go/__fixtures__/compiled.ts), each SDK dir named by the hash
       # of what it holds. The key hashes every input of what gets compiled (toolchain-projects.test.ts holds
@@ -133,6 +133,7 @@ jobs:
             ${{ runner.os }}-gobuild-${{ hashFiles('.go-version', 'packages/gen/src/emit/go/**',
             'packages/gen/src/emit/cli/**', 'packages/gen/src/emit/shared/**', 'packages/gen/src/ir/**',
             'packages/gen/src/runtime/go/**', 'packages/gen/src/runtime/cli/**', 'packages/gen/src/cli.test.ts',
+            'packages/gen/src/release/oasdiff.test.ts', 'packages/gen/src/release/bump.e2e.test.ts',
             'packages/gen/scripts/sdk-budget.cli.test.ts',
             'packages/gen/tests/security/**', 'packages/gen/tests/structure/mutation-harness*.ts',
             'packages/gen/tests/integration/conformance/features.ts',
@@ -216,7 +217,7 @@ jobs:
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/honey-tmp/go/mod
-          key: ${{ runner.os }}-gomod-test-${{ hashFiles('.go-version', 'packages/gen/src/emit/go/__fixtures__/go-env.ts', 'packages/gen/src/emit/go/sdk.ts') }}
+          key: ${{ runner.os }}-gomod-test-${{ hashFiles('.go-version', 'packages/gen/src/emit/go/__fixtures__/go-env.ts', 'packages/gen/src/emit/go/sdk.ts', 'packages/gen/src/release/oasdiff.ts') }}
           restore-keys: ${{ runner.os }}-gomod-test-
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -227,6 +228,7 @@ jobs:
             ${{ runner.os }}-gobuild-${{ hashFiles('.go-version', 'packages/gen/src/emit/go/**',
             'packages/gen/src/emit/cli/**', 'packages/gen/src/emit/shared/**', 'packages/gen/src/ir/**',
             'packages/gen/src/runtime/go/**', 'packages/gen/src/runtime/cli/**', 'packages/gen/src/cli.test.ts',
+            'packages/gen/src/release/oasdiff.test.ts', 'packages/gen/src/release/bump.e2e.test.ts',
             'packages/gen/scripts/sdk-budget.cli.test.ts',
             'packages/gen/tests/security/**', 'packages/gen/tests/structure/mutation-harness*.ts',
             'packages/gen/tests/integration/conformance/features.ts',
@@ -771,7 +773,7 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
-      # the pinned and floor toolchains and the WebSocket module: a change in any saves a new cache
+      # the pinned and floor toolchains, the WebSocket module and oasdiff's pin: a change in any saves a new cache
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/honey-tmp/go/mod

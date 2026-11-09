@@ -1,21 +1,22 @@
 import module from "node:module"
-import { PACKAGE_NAME } from "./bun.ts"
 
 export type RegisterHooks = typeof module.registerHooks
 
 /**
- * Maps the config's `@workerstack/clients/installers` import to the running package, so a config in a project without
- * a local install (zero-install `bunx`) still resolves. `module.register` is deprecated on Node 26 (DEP0205).
+ * Maps a config's import of `specifier` (`@workerstack/clients/installers`, `@workerstack/clients/release`) to the
+ * running package's entry `selfUrl`, so a config in a project without a local install (zero-install `bunx`) still
+ * resolves. `module.register` is deprecated on Node 26 (DEP0205).
  * Reached through the default export: Bun's `node:module` has no `registerHooks`, and a named import would fail to link.
  */
 export function registerNodeHook(
+	specifier: string,
 	selfUrl: string,
 	register: RegisterHooks = module.registerHooks,
 ): ReturnType<RegisterHooks> {
 	return register({
-		resolve(specifier, context, nextResolve) {
-			if (specifier === PACKAGE_NAME) return { url: selfUrl, shortCircuit: true }
-			return nextResolve(specifier, context)
+		resolve(imported, context, nextResolve) {
+			if (imported === specifier) return { url: selfUrl, shortCircuit: true }
+			return nextResolve(imported, context)
 		},
 	})
 }
