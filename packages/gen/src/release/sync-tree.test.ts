@@ -54,15 +54,19 @@ describe("pendingTag", () => {
 	it.each([
 		["records no version", "{}\n"],
 		["records an empty one", '{"version":""}\n'],
-	])("throws naming the state of a self-publishing package that %s", async (_case, state) => {
-		const [repoRoot, worktree] = [tmp(), tmp()]
-		writeAll(worktree, { [RELEASE_WORKFLOW]: "on: push\n" })
-		writeAll(repoRoot, { [join(ENTRY.path, RELEASE_STATE)]: state })
+	])(
+		"throws naming the state of a self-publishing package that %s",
+		{ timeout: SPAWN_TIMEOUT },
+		async (_case, state) => {
+			const [repoRoot, worktree] = [tmp(), tmp()]
+			writeAll(worktree, { [RELEASE_WORKFLOW]: "on: push\n" })
+			writeAll(repoRoot, { [join(ENTRY.path, RELEASE_STATE)]: state })
 
-		await expect(pendingTag(ENTRY, repoRoot, worktree, "https://example.invalid/acme/sdk.git")).rejects.toThrow(
-			`${join(ENTRY.path, RELEASE_STATE)} records no version`,
-		)
-	})
+			await expect(pendingTag(ENTRY, repoRoot, worktree, "https://example.invalid/acme/sdk.git")).rejects.toThrow(
+				`${join(ENTRY.path, RELEASE_STATE)} records no version`,
+			)
+		},
+	)
 })
 
 describe("readSidecar", () => {
