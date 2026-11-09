@@ -21,9 +21,11 @@
 		"directory": "packages/gen"
 	},
 	"bin": {
-		"honey-clients": "bin/honey-clients.js"
+		"honey-clients": "bin/honey-clients.js",
+		"installgen": "bin/installgen.js"
 	},
 	"files": [
+		"assets",
 		"bin",
 		"dist"
 	],
@@ -39,6 +41,11 @@
 			"types": "./dist/cli.d.ts",
 			"default": "./dist/cli.js"
 		},
+		"./installers": {
+			"honey-source": "./src/installers/index.ts",
+			"types": "./dist/installers/index.d.ts",
+			"default": "./dist/installers/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"publishConfig": {
@@ -52,7 +59,6 @@
 		"type:check": "tsc --noEmit -p tsconfig.json"
 	},
 	"dependencies": {
-		"@lovrozagar/installgen": "0.3.0",
 		"jiti": "2.7.0",
 		"oxc-transform": "0.155.0"
 	},

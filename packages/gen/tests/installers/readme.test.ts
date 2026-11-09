@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, test } from "vitest"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const README = join(HERE, "../../../README.md")
-const SOURCE = readFileSync(join(HERE, "../src/config/define-config.ts"), "utf8")
+const README = join(HERE, "../../src/installers/README.md")
+const SOURCE = readFileSync(join(HERE, "../../src/installers/config/define-config.ts"), "utf8")
 
 interface Prop {
 	type: string
@@ -61,11 +61,13 @@ describe("README.md", () => {
 	})
 
 	test("every installgen command line in the README names a real command and option", async () => {
-		const { run } = await import("../src/cli.ts")
+		const { run } = await import("../../src/installers/cli.ts")
 		const markdown = readFileSync(README, "utf8")
-		const commands = [...markdown.matchAll(/^\$ (?:bunx (?:--bun )?(?:@lovrozagar\/)?)?installgen ([^\n#|]*)/gm)].map(
-			(m) => (m[1] as string).trim(),
-		)
+		const commands = [
+			...markdown.matchAll(
+				/^\$ (?:(?:bunx|npx) (?:--bun )?(?:--package @workerstack\/clients )?)?installgen ([^\n#|]*)/gm,
+			),
+		].map((m) => (m[1] as string).trim())
 		expect(commands.length).toBeGreaterThan(3)
 		for (const line of commands) {
 			const [command, ...args] = line.split(/\s+/)

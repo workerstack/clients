@@ -2,10 +2,10 @@ import { createHash } from "node:crypto"
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import type { AddressInfo } from "node:net"
 import { crc32, deflateRawSync, gzipSync } from "node:zlib"
-import type { InstallgenConfig, Os } from "../../src/config/define-config.ts"
-import { resolveConfig } from "../../src/config/resolve.ts"
-import type { ResolvedConfig, ResolvedPlatform, Segment } from "../../src/config/types.ts"
-import { render } from "../../src/render/render.ts"
+import type { InstallgenConfig, Os } from "../../../src/installers/config/define-config.ts"
+import { resolveConfig } from "../../../src/installers/config/resolve.ts"
+import type { ResolvedConfig, ResolvedPlatform, Segment } from "../../../src/installers/config/types.ts"
+import { render } from "../../../src/installers/render/render.ts"
 
 /* ---------- archives ---------- */
 
@@ -231,8 +231,7 @@ function packageFor(
 	p: ResolvedPlatform,
 	resolved: ResolvedConfig,
 	version: string,
-	wrap: boolean,
-	extra: readonly Entry[],
+	{ wrap = false, extra = [] }: Pick<ReleaseOptions, "wrap" | "extra">,
 ): Buffer {
 	const binary = fakeBinary(resolved.name, version, p.os)
 	if (p.format === "raw") return binary
@@ -264,35 +263,42 @@ function checksumLine(style: ChecksumStyle, hash: string, file: string): string 
 	return `${hash}  ${file}`
 }
 
+/** A checksums file's lines with `file`'s line added once; a fresh file starts with another asset's line. */
+function withSum(lines: string[] | undefined, style: ChecksumStyle, data: Buffer, file: string): string[] {
+	const out = lines ?? (style === "bare" ? [] : [`${sha256("other")}  ${file}.sbom.json`])
+	const line = checksumLine(style, sha256(data), file)
+	if (!out.includes(line)) out.push(line)
+	return out
+}
+
+/** Serves every platform's asset of `version`, its checksums files and its sigstore bundles. */
+function publishVersion(server: TestServer, options: ReleaseOptions, resolved: ResolvedConfig, version: string): void {
+	const style = options.checksums ?? "plain"
+	const sums = new Map<string, string[]>()
+	for (const p of resolved.platforms) {
+		const asset = expand(p.asset, version, resolved.tagPrefix)
+		const data = packageFor(p, resolved, version, options)
+		server.set(`${options.prefix}/${asset}`, data)
+		if (p.checksums) {
+			const path = expand(p.checksums, version, resolved.tagPrefix)
+			sums.set(path, withSum(sums.get(path), style, data, asset.slice(asset.lastIndexOf("/") + 1)))
+		}
+		if (p.signature) {
+			server.set(
+				`${options.prefix}/${expand(p.signature.bundle, version, resolved.tagPrefix)}`,
+				options.bundle ?? "good",
+			)
+		}
+	}
+	for (const [path, lines] of sums) server.set(`${options.prefix}/${path}`, `${lines.join("\n")}\n`)
+}
+
 export function publish(server: TestServer, options: ReleaseOptions): Release {
 	const baseUrl = `${server.url}${options.prefix}`
 	const resolved = resolveConfig({ ...options.config, baseUrl } as InstallgenConfig)
-	const style = options.checksums ?? "plain"
 	const assetOf = (p: ResolvedPlatform, version: string) => expand(p.asset, version, resolved.tagPrefix)
 
-	for (const version of options.versions) {
-		const sums = new Map<string, string[]>()
-		for (const p of resolved.platforms) {
-			const asset = assetOf(p, version)
-			const data = packageFor(p, resolved, version, options.wrap ?? false, options.extra ?? [])
-			server.set(`${options.prefix}/${asset}`, data)
-			if (p.checksums) {
-				const path = expand(p.checksums, version, resolved.tagPrefix)
-				const file = asset.slice(asset.lastIndexOf("/") + 1)
-				const lines = sums.get(path) ?? (style === "bare" ? [] : [`${sha256("other")}  ${file}.sbom.json`])
-				if (!lines.includes(checksumLine(style, sha256(data), file)))
-					lines.push(checksumLine(style, sha256(data), file))
-				sums.set(path, lines)
-			}
-			if (p.signature) {
-				server.set(
-					`${options.prefix}/${expand(p.signature.bundle, version, resolved.tagPrefix)}`,
-					options.bundle ?? "good",
-				)
-			}
-		}
-		for (const [path, lines] of sums) server.set(`${options.prefix}/${path}`, `${lines.join("\n")}\n`)
-	}
+	for (const version of options.versions) publishVersion(server, options, resolved, version)
 	server.set(
 		`${options.prefix}/${resolved.latestPath}`,
 		options.latest ?? `${resolved.tagPrefix}${options.versions.at(-1) ?? ""}\n`,

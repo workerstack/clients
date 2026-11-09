@@ -16,15 +16,15 @@
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { createServer, type Server } from "node:http"
-import { createRequire } from "node:module"
-import { delimiter, dirname, join } from "node:path"
+import { delimiter, join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { generateInstallers, type InstallgenConfig } from "@lovrozagar/installgen"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { goCacheDir, goEnv, withGo } from "../go/__fixtures__/go-env.ts"
 import { shop } from "./__fixtures__/shop.ts"
 import { syntaxCheck, toolBin, withTools } from "./__fixtures__/tools.ts"
-import { INSTALLGEN_CONFIG, INSTALLGEN_VERSION, installerConfig } from "./install.ts"
+import { generateInstallers, type InstallgenConfig } from "../../installers/index.ts"
+import { clientsVersion } from "../../version.ts"
+import { INSTALLGEN_CONFIG, installerConfig, installgenCommand } from "./install.ts"
 import { type GoCliOptions, generateGoCli } from "./module.ts"
 import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts"
 
@@ -93,15 +93,8 @@ describe("the install scripts' layout (phase g)", () => {
 	)
 })
 
-/** The installed installgen's manifest: the release the scripts are written by, and its CLI. */
-const installgen = () => {
-	const manifest = createRequire(import.meta.url).resolve("@lovrozagar/installgen/package.json")
-	const { bin, version } = JSON.parse(readFileSync(manifest, "utf8")) as {
-		bin: { installgen: string }
-		version: string
-	}
-	return { bin: join(dirname(manifest), bin.installgen), version }
-}
+/** This package's installgen bin: the CLI the release workflow's npx runs, from the same clients release. */
+const INSTALLGEN_BIN = join(import.meta.dirname, "../../../bin/installgen.js")
 
 /** `generated`'s installgen.config.mts, alone in a fresh directory. */
 function configDir(generated: Readonly<Record<string, string>>): string {
@@ -125,8 +118,14 @@ describe("installgen.config.mts, the scripts' config as a file", () => {
 		}
 	})
 
-	it("names the installgen release that writes the scripts, which the release workflow's npx runs", () => {
-		expect(INSTALLGEN_VERSION).toBe(installgen().version)
+	it("names the clients release that writes the scripts, which the release workflow's npx runs installgen from", () => {
+		expect(installgenCommand()).toBe(`npx --yes --package @workerstack/clients@${clientsVersion()} installgen`)
+		const config = files()[INSTALLGEN_CONFIG] ?? ""
+		expect([
+			config.includes(`\`${installgenCommand()} check\``),
+			config.includes('import type { InstallgenConfig } from "@workerstack/clients/installers"'),
+			config.includes("@lovrozagar/installgen"),
+		]).toEqual([true, true, false])
 	})
 
 	it(
@@ -134,7 +133,7 @@ describe("installgen.config.mts, the scripts' config as a file", () => {
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
 			const dir = configDir(files())
-			const ran = spawnSync(process.execPath, [installgen().bin, "check", "--list", "--default-version", "v1.2.3"], {
+			const ran = spawnSync(process.execPath, [INSTALLGEN_BIN, "check", "--list", "--default-version", "v1.2.3"], {
 				cwd: dir,
 				encoding: "utf8",
 			})

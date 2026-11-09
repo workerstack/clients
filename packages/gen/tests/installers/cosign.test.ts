@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync }
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import type { InstallgenConfig } from "../src/config/define-config.ts"
-import { resolveConfig } from "../src/config/resolve.ts"
-import { render } from "../src/render/render.ts"
+import type { InstallgenConfig } from "../../src/installers/config/define-config.ts"
+import { resolveConfig } from "../../src/installers/config/resolve.ts"
+import { render } from "../../src/installers/render/render.ts"
 import { startServer, type TestServer } from "./support/server.ts"
 import { runners, shPipeline } from "./support/shells.ts"
 
@@ -33,7 +33,51 @@ const HOST =
 const WORKFLOW = "https://github.com/goreleaser/goreleaser/.github/workflows/release.yml@refs/tags/"
 
 /* cosign and a host sh come from the environment; say so rather than report an empty file */
-if (!COSIGN || !RUNNER) test.skip("real cosign: no cosign on PATH, or no host sh runner", () => {})
+if (!COSIGN || !RUNNER) {
+	test.skipIf(!COSIGN || !RUNNER)("real cosign: no cosign on PATH, or no host sh runner", () => {
+		expect(Boolean(COSIGN && RUNNER)).toBe(false)
+	})
+}
+
+/** Serves GoReleaser v2.19.0's signed checksums under `prefix`, beside an install.sh that checks them by `signature`. */
+function serveRelease(
+	server: TestServer,
+	prefix: string,
+	signature: NonNullable<InstallgenConfig["signature"]>,
+	checksums: Buffer,
+): void {
+	const resolved = resolveConfig({
+		name: "goreleaser",
+		baseUrl: `${server.url}${prefix}`,
+		platforms: [HOST],
+		assetPath: ({ tag }) => `${tag}/${ARCHIVE[HOST]}`,
+		checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
+		signature,
+	})
+	const sh = render(resolved, { defaultVersion: "2.19.0" }).sh as string
+	server.set(`${prefix}/install.sh`, sh)
+	server.set(`${prefix}/v2.19.0/${ARCHIVE[HOST]}`, Buffer.from("not goreleaser"))
+	server.set(`${prefix}/v2.19.0/checksums.txt`, checksums)
+	server.set(
+		`${prefix}/v2.19.0/checksums.txt.sigstore.json`,
+		readFileSync(join(FIXTURES, "checksums.txt.sigstore.json")),
+	)
+}
+
+/** Pipes `url` into the host sh from `root`, with a fresh HOME and only the real cosign shimmed onto PATH. */
+function runInstall(root: string, url: string) {
+	const home = join(root, "home")
+	const shims = join(root, "shims")
+	mkdirSync(home)
+	mkdirSync(shims)
+	symlinkSync(COSIGN as string, join(shims, "cosign"))
+	const runner = RUNNER as NonNullable<typeof RUNNER>
+	return runner.run({
+		command: shPipeline(runner, url),
+		cwd: root,
+		env: { HOME: home, PATH: `${shims}:${runner.systemPath}`, SHELL: "/bin/sh" },
+	})
+}
 
 describe.runIf(COSIGN && RUNNER)("real cosign on GoReleaser v2.19.0", () => {
 	let server: TestServer
@@ -47,41 +91,15 @@ describe.runIf(COSIGN && RUNNER)("real cosign on GoReleaser v2.19.0", () => {
 		for (const r of roots) rmSync(r, { recursive: true, force: true })
 	})
 
-	async function install(
+	function install(
 		signature: NonNullable<InstallgenConfig["signature"]>,
 		checksums = readFileSync(join(FIXTURES, "checksums.txt")),
 	) {
 		const prefix = `/real${++cases}`
-		const resolved = resolveConfig({
-			name: "goreleaser",
-			baseUrl: `${server.url}${prefix}`,
-			platforms: [HOST],
-			assetPath: ({ tag }) => `${tag}/${ARCHIVE[HOST]}`,
-			checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
-			signature,
-		})
-		const sh = render(resolved, { defaultVersion: "2.19.0" }).sh as string
-		server.set(`${prefix}/install.sh`, sh)
-		server.set(`${prefix}/v2.19.0/${ARCHIVE[HOST]}`, Buffer.from("not goreleaser"))
-		server.set(`${prefix}/v2.19.0/checksums.txt`, checksums)
-		server.set(
-			`${prefix}/v2.19.0/checksums.txt.sigstore.json`,
-			readFileSync(join(FIXTURES, "checksums.txt.sigstore.json")),
-		)
-
+		serveRelease(server, prefix, signature, checksums)
 		const root = mkdtempSync(join(tmpdir(), "installgen-cosign-"))
 		roots.push(root)
-		const home = join(root, "home")
-		const shims = join(root, "shims")
-		mkdirSync(home)
-		mkdirSync(shims)
-		symlinkSync(COSIGN as string, join(shims, "cosign"))
-		const runner = RUNNER as NonNullable<typeof RUNNER>
-		return runner.run({
-			command: shPipeline(runner, `${server.url}${prefix}/install.sh`),
-			cwd: root,
-			env: { HOME: home, PATH: `${shims}:${runner.systemPath}`, SHELL: "/bin/sh" },
-		})
+		return runInstall(root, `${server.url}${prefix}/install.sh`)
 	}
 
 	test("accepts the release workflow's signature for its own tag", async () => {

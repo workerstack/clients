@@ -14,7 +14,7 @@ export interface UiIo {
 	env: Record<string, string | undefined>
 }
 
-const ESC = String.fromCharCode(27)
+const ESC = "\u001b"
 const row = (glyph: string, label: string, value: string) => `${glyph} ${label.padEnd(13)} ${value}\n`
 
 export function createUi(io: UiIo): Ui {

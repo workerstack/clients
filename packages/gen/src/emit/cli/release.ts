@@ -18,7 +18,7 @@
  */
 
 import { channelBlock, type Release, SECRETS } from "./channels.ts"
-import { INSTALLGEN_VERSION } from "./install.ts"
+import { installgenCommand } from "./install.ts"
 
 export { REPO, type Release, type ReleaseOptions, resolvedRelease } from "./channels.ts"
 
@@ -103,9 +103,6 @@ changelog:
 ${github}${(release?.channels ?? []).map((channel) => channelBlock(bin, channel)).join("")}`
 }
 
-/** The `npx` that runs the installgen the scripts were written by, on installgen.config.mts in the module's root. */
-const INSTALLGEN = `npx --yes @lovrozagar/installgen@${INSTALLGEN_VERSION}`
-
 /**
  * The steps that prove the install scripts work against the release just published, which a release with a repository
  * runs after its attestation. The scripts install `<PREFIX>_VERSION` when it is set and otherwise the tag
@@ -119,12 +116,14 @@ const INSTALLGEN = `npx --yes @lovrozagar/installgen@${INSTALLGEN_VERSION}`
  *   the release goreleaser made, not re-derived from the tag, and latest's URL from `check --list`, the one the
  *   scripts read.
  */
-const installerChecks = `      - uses: ${RELEASE_ACTIONS.setupNode}
+function installerChecks(): string {
+	const installgen = installgenCommand()
+	return `      - uses: ${RELEASE_ACTIONS.setupNode}
         with:
           node-version: "24"
           package-manager-cache: false
       - name: Check every file the install scripts fetch for this tag
-        run: ${INSTALLGEN} check --default-version "$GITHUB_REF_NAME"
+        run: ${installgen} check --default-version "$GITHUB_REF_NAME"
       - name: Check latest reads this tag
         shell: bash
         env:
@@ -135,13 +134,14 @@ const installerChecks = `      - uses: ${RELEASE_ACTIONS.setupNode}
             echo "$GITHUB_REF_NAME is a prerelease: latest stays on the last release"
             exit 0
           fi
-          url="$(${INSTALLGEN} check --list | awk '$1 == "latest" { print $2 }')"
+          url="$(${installgen} check --list | awk '$1 == "latest" { print $2 }')"
           latest="$(curl -fsSL --retry 3 "$url" | tr -d '[:space:]')"
           if [ "$latest" != "$GITHUB_REF_NAME" ]; then
             echo "::error::$url reads '$latest', not $GITHUB_REF_NAME"
             exit 1
           fi
 `
+}
 
 /**
  * .github/workflows/release.yml: goreleaser on a `v*` tag, publishing the signed release, then attesting it, then,
@@ -194,5 +194,5 @@ jobs:
 ${secrets.join("")}      - uses: ${RELEASE_ACTIONS.attest}
         with:
           subject-checksums: dist/checksums.txt
-${release === undefined ? "" : installerChecks}`
+${release === undefined ? "" : installerChecks()}`
 }

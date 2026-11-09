@@ -1,4 +1,4 @@
-import { defineConfig } from "@lovrozagar/installgen"
+import { defineConfig } from "@workerstack/clients/installers"
 
 /*
  * GitHub Releases. Assets live at releases/download/<tag>/; each release also uploads:

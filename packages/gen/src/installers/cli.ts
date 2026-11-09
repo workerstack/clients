@@ -4,7 +4,7 @@ import { build } from "./commands/build.ts"
 import { check } from "./commands/check.ts"
 import { init, PRESETS, type Preset } from "./commands/init.ts"
 import { detectRuntime, type RuntimeInfo } from "./config/load.ts"
-import { createUi, type UiIo } from "./ui.ts"
+import { createUi, type Ui, type UiIo } from "./ui.ts"
 
 export interface Io extends UiIo {
 	cwd: string
@@ -30,7 +30,7 @@ Run \`installgen <command> --help\` for a command's options.
 
 const COMMANDS = {
 	init: {
-		usage: `Usage: installgen init [--preset ${PRESETS.join("|")}] [--force]
+		usage: `Usage: installgen init [--preset ${/* @__PURE__ */ PRESETS.join("|")}] [--force]
 
   --preset <name>   the example to start from (default: raw)
   --force           overwrite an existing config
@@ -66,7 +66,72 @@ class UsageError extends Error {}
 const isCommand = (name: string): name is keyof typeof COMMANDS => Object.hasOwn(COMMANDS, name)
 
 function version(): string {
-	return (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version
+	return (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string })
+		.version
+}
+
+type Values = Record<string, string | boolean | undefined>
+
+/** The exit code of a top-level flag; undefined for anything else. */
+function topLevel(command: string, io: Io): number | undefined {
+	if (command === "--help" || command === "-h") {
+		io.stdout(HELP)
+		return 0
+	}
+	if (command === "--version") {
+		io.stdout(`${version()}\n`)
+		return 0
+	}
+	return undefined
+}
+
+function parse(command: keyof typeof COMMANDS, rest: readonly string[]): Values {
+	try {
+		return parseArgs({
+			args: [...rest],
+			options: { ...COMMANDS[command].options, help: { type: "boolean", short: "h" } },
+			strict: true,
+			allowPositionals: false,
+		}).values as Values
+	} catch (error) {
+		throw new UsageError((error as Error).message)
+	}
+}
+
+function presetOf(values: Values): Preset {
+	const preset = (values.preset as string | undefined) ?? "raw"
+	if (!(PRESETS as readonly string[]).includes(preset)) {
+		throw new UsageError(
+			`unknown preset ${JSON.stringify(preset)}; use ${PRESETS.slice(0, -1).join(", ")} or ${PRESETS.at(-1)}`,
+		)
+	}
+	return preset as Preset
+}
+
+async function dispatch(command: keyof typeof COMMANDS, values: Values, io: Io, ui: Ui): Promise<number> {
+	const runtime = io.runtime ?? detectRuntime()
+	const configPath = values.config as string | undefined
+	const defaultVersion = values["default-version"] as string | undefined
+	if (command === "init") {
+		init({ cwd: io.cwd, preset: presetOf(values), force: values.force === true }, ui)
+		return 0
+	}
+	if (command === "build") {
+		await build({ cwd: io.cwd, configPath, runtime, out: values.out as string | undefined, defaultVersion }, ui)
+		return 0
+	}
+	const problems = await check(
+		{
+			cwd: io.cwd,
+			configPath,
+			runtime,
+			defaultVersion,
+			list: values.list === true,
+			...(io.fetch ? { fetch: io.fetch } : {}),
+		},
+		ui,
+	)
+	return problems === 0 ? 0 : 1
 }
 
 /** The whole CLI, in-process: every effect goes through `io`, so tests run it without spawning. Returns the exit code. */
@@ -78,62 +143,15 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
 			io.stderr(HELP)
 			return 2
 		}
-		if (command === "--help" || command === "-h") {
-			io.stdout(HELP)
-			return 0
-		}
-		if (command === "--version") {
-			io.stdout(`${version()}\n`)
-			return 0
-		}
+		const early = topLevel(command, io)
+		if (early !== undefined) return early
 		if (!isCommand(command)) throw new UsageError(`unknown command ${JSON.stringify(command)}`)
-
-		const spec = COMMANDS[command]
-		let values: Record<string, string | boolean | undefined>
-		try {
-			values = parseArgs({
-				args: [...rest],
-				options: { ...spec.options, help: { type: "boolean", short: "h" } },
-				strict: true,
-				allowPositionals: false,
-			}).values as Record<string, string | boolean | undefined>
-		} catch (error) {
-			throw new UsageError((error as Error).message)
-		}
+		const values = parse(command, rest)
 		if (values.help) {
-			io.stdout(spec.usage)
+			io.stdout(COMMANDS[command].usage)
 			return 0
 		}
-
-		const runtime = io.runtime ?? detectRuntime()
-		const configPath = values.config as string | undefined
-		const defaultVersion = values["default-version"] as string | undefined
-		if (command === "init") {
-			const preset = (values.preset as string | undefined) ?? "raw"
-			if (!(PRESETS as readonly string[]).includes(preset)) {
-				throw new UsageError(
-					`unknown preset ${JSON.stringify(preset)}; use ${PRESETS.slice(0, -1).join(", ")} or ${PRESETS.at(-1)}`,
-				)
-			}
-			init({ cwd: io.cwd, preset: preset as Preset, force: values.force === true }, ui)
-			return 0
-		}
-		if (command === "build") {
-			await build({ cwd: io.cwd, configPath, runtime, out: values.out as string | undefined, defaultVersion }, ui)
-			return 0
-		}
-		const problems = await check(
-			{
-				cwd: io.cwd,
-				configPath,
-				runtime,
-				defaultVersion,
-				list: values.list === true,
-				...(io.fetch ? { fetch: io.fetch } : {}),
-			},
-			ui,
-		)
-		return problems === 0 ? 0 : 1
+		return await dispatch(command, values, io, ui)
 	} catch (error) {
 		if (error instanceof UsageError) {
 			ui.error(error.message)

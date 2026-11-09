@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process"
 import { describe, expect, test } from "vitest"
+import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts"
 import type { Segment } from "../config/types.ts"
-import { pwshCommand } from "../../tests/support/shells.ts"
+import { pwshCommand } from "../../../tests/installers/support/shells.ts"
 import { psString, shWord } from "./quote.ts"
 
 const lit = (value: string): Segment => ({ kind: "literal", value })
@@ -65,13 +66,21 @@ describe("shWord", () => {
 		expect(shWord([])).toBe("''")
 	})
 
-	test.each(HOSTILE)("round-trips %j in host sh", (value) => {
-		expect(shEval(shWord([lit(value)]))).toBe(value)
-	})
+	test.each(HOSTILE)(
+		"round-trips %j in host sh",
+		(value) => {
+			expect(shEval(shWord([lit(value)]))).toBe(value)
+		},
+		SPAWN_TIMEOUT,
+	)
 
-	test("round-trips tokens between hostile literals in host sh", () => {
-		expect(shEval(shWord([lit("'$("), T, lit("`;\n"), V, lit('"')]))).toBe("'$(v1.2.3`;\n1.2.3\"")
-	})
+	test(
+		"round-trips tokens between hostile literals in host sh",
+		() => {
+			expect(shEval(shWord([lit("'$("), T, lit("`;\n"), V, lit('"')]))).toBe("'$(v1.2.3`;\n1.2.3\"")
+		},
+		SPAWN_TIMEOUT,
+	)
 })
 
 describe("psString", () => {
@@ -83,8 +92,12 @@ describe("psString", () => {
 		expect(psString([])).toBe("''")
 	})
 
-	test.runIf(PWSH)("round-trips every hostile literal and tokens in pwsh (host or Docker)", () => {
-		const cases = [...HOSTILE.map((v) => [lit(v)]), [lit("'$("), T, lit("`;\n"), V, lit('"')]]
-		expect(pwshEval(cases.map((c) => psString(c)))).toEqual([...HOSTILE, "'$(v1.2.3`;\n1.2.3\""])
-	})
+	test.runIf(PWSH)(
+		"round-trips every hostile literal and tokens in pwsh (host or Docker)",
+		() => {
+			const cases = [...HOSTILE.map((v) => [lit(v)]), [lit("'$("), T, lit("`;\n"), V, lit('"')]]
+			expect(pwshEval(cases.map((c) => psString(c)))).toEqual([...HOSTILE, "'$(v1.2.3`;\n1.2.3\""])
+		},
+		SPAWN_TIMEOUT,
+	)
 })

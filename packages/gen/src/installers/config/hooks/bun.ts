@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = "@lovrozagar/installgen"
+export const PACKAGE_NAME = "@workerstack/clients/installers"
 
 export interface BunBuild {
 	module(specifier: string, load: () => { exports: Record<string, unknown>; loader: "object" }): void
@@ -18,7 +18,7 @@ type Importer = (url: string) => Promise<Record<string, unknown>>
 
 /**
  * Bun's `onResolve` never sees the imports a runtime-loaded config makes; `build.module` does. The config's
- * `@lovrozagar/installgen` import becomes a virtual module holding the running package's exports.
+ * `@workerstack/clients/installers` import becomes a virtual module holding the running package's exports.
  */
 export async function registerBunHook(
 	bun: BunLike,
