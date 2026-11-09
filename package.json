@@ -88,7 +88,7 @@
 		"@total-typescript/ts-reset": "0.6.1",
 		"@types/node": "26.1.1",
 		"@vitest/coverage-v8": "4.1.10",
-		"@workerstack/backend": "1.0.0-rc.23",
+		"@workerstack/backend": "1.0.0-rc.24",
 		"ajv": "8.20.0",
 		"ajv-formats": "3.0.1",
 		"js-yaml": "4.3.1",
