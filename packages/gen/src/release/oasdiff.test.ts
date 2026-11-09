@@ -4,6 +4,7 @@ import path from "node:path"
 import { afterAll, describe, expect, it } from "vitest"
 import { goEnv } from "../emit/go/__fixtures__/go-env.ts"
 import { apiChanges } from "./oasdiff.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 /* Real oasdiff through `go run`: the first call compiles it, so the timeout is generous. */
 const TIMEOUT_MS = 180_000
@@ -64,7 +65,7 @@ describe("apiChanges", () => {
 		TIMEOUT_MS,
 	)
 
-	it("says Go could not start when there is none on PATH", () => {
+	it("says Go could not start when there is none on PATH", { timeout: SPAWN_TIMEOUT }, () => {
 		expect(() => apiChanges(base, base, { PATH: "" })).toThrow(/oasdiff could not start \(it runs through Go on PATH\)/)
 	})
 })

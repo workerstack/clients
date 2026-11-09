@@ -15,6 +15,7 @@ import {
 import { gitRepo, removeRepos, writeAll, writeConfig } from "./__fixtures__/release-repo.ts"
 import { release } from "./cli.ts"
 import { gitOutput, gitRun, sshToHttps } from "./git.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 const DEFAULTS: BootstrapOptions = {
 	all: false,
@@ -208,29 +209,33 @@ describe("judgeMirror", () => {
 })
 
 describe("countRemoteCommits", () => {
-	it("counts the commits on the mirror branch", async () => {
+	it("counts the commits on the mirror branch", { timeout: SPAWN_TIMEOUT }, async () => {
 		const mirror = await mirrorWithCommits(2)
 
 		expect(await countRemoteCommits(mirror, "main")).toBe(2)
 	})
 
-	it("caps the count at the force limit plus one, so history size never drives the fetch", async () => {
-		const mirror = await mirrorWithCommits(FORCE_COMMIT_LIMIT + 4)
+	it(
+		"caps the count at the force limit plus one, so history size never drives the fetch",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const mirror = await mirrorWithCommits(FORCE_COMMIT_LIMIT + 4)
 
-		expect(await countRemoteCommits(mirror, "main")).toBe(FORCE_COMMIT_LIMIT + 1)
-	})
+			expect(await countRemoteCommits(mirror, "main")).toBe(FORCE_COMMIT_LIMIT + 1)
+		},
+	)
 
-	it("returns 0 when the branch does not exist on the mirror", async () => {
+	it("returns 0 when the branch does not exist on the mirror", { timeout: SPAWN_TIMEOUT }, async () => {
 		const mirror = await mirrorWithCommits(1)
 
 		expect(await countRemoteCommits(mirror, "no-such-branch")).toBe(0)
 	})
 
-	it("returns 0 when the mirror is unreachable", async () => {
+	it("returns 0 when the mirror is unreachable", { timeout: SPAWN_TIMEOUT }, async () => {
 		expect(await countRemoteCommits(path.join(tmp("public-sync-gone-"), "nope"), "main")).toBe(0)
 	})
 
-	it("leaves no temp clone behind", async () => {
+	it("leaves no temp clone behind", { timeout: SPAWN_TIMEOUT }, async () => {
 		const mirror = await mirrorWithCommits(1)
 		const before = new Set(await listTmpCounts())
 
@@ -247,7 +252,7 @@ async function listTmpCounts(): Promise<string[]> {
 }
 
 describe("cli", () => {
-	it("exits 1 with usage when given no target, before touching any mirror", async () => {
+	it("exits 1 with usage when given no target, before touching any mirror", { timeout: SPAWN_TIMEOUT }, async () => {
 		const { config } = await product()
 		const result = await run(["--config", config], { GH_TOKEN: "unused" })
 
@@ -255,7 +260,7 @@ describe("cli", () => {
 		for (const line of USAGE.filter(Boolean)) expect(result.stderr).toContain(line)
 	})
 
-	it("exits 1 without GH_TOKEN", async () => {
+	it("exits 1 without GH_TOKEN", { timeout: SPAWN_TIMEOUT }, async () => {
 		const { config } = await product()
 		const result = await run(["--config", config, "--all"])
 
@@ -263,7 +268,7 @@ describe("cli", () => {
 		expect(result.stderr).toContain("GH_TOKEN env is required")
 	})
 
-	it("exits 1 naming the available packages when the filter matches nothing", async () => {
+	it("exits 1 naming the available packages when the filter matches nothing", { timeout: SPAWN_TIMEOUT }, async () => {
 		const { config } = await product()
 		const result = await run(["--config", config, "--only", "not-a-package"], { GH_TOKEN: "unused" })
 
@@ -271,7 +276,7 @@ describe("cli", () => {
 		expect(result.stderr).toContain("No packages match. Available: acme/openapi")
 	})
 
-	it("checks the target before the token, so a missing target is not masked", async () => {
+	it("checks the target before the token, so a missing target is not masked", { timeout: SPAWN_TIMEOUT }, async () => {
 		const { config, root } = await product()
 		const noTarget = await run(["--config", config], { GH_TOKEN: "unused" })
 

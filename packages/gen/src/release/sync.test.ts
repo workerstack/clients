@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import * as gitMod from "./git.ts"
 import type { PublicPackage } from "./types.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 /* every git call is a fake; the token URL is built as sync builds it */
 vi.mock("./git.ts", async (original) => ({
@@ -73,7 +74,7 @@ function usePackageRoot(pkg: PublicPackage, files: Readonly<Record<string, strin
 		for (const [name, content] of Object.entries(files)) writeFileSync(join(root, pkg.path, name), content)
 		vi.mocked(gitMod.gitRun).mockResolvedValue(undefined)
 		vi.mocked(gitMod.gitExitCode).mockResolvedValue(1)
-	})
+	}, SPAWN_TIMEOUT)
 	afterEach(() => {
 		rmSync(root, { force: true, recursive: true })
 		vi.clearAllMocks()
@@ -113,9 +114,9 @@ const BASE_OPTS = {
 
 describe("syncPackage dry-run messages", () => {
 	const root = usePackageRoot(DRY_RUN_ENTRY)
-	beforeEach(botTip)
+	beforeEach(botTip, SPAWN_TIMEOUT)
 
-	it("first sync to an empty mirror uses the initial release message", async () => {
+	it("first sync to an empty mirror uses the initial release message", { timeout: SPAWN_TIMEOUT }, async () => {
 		vi.mocked(gitMod.getRemoteTip).mockResolvedValue(undefined)
 
 		const { syncPackage } = await import("./sync.ts")
@@ -131,7 +132,7 @@ describe("syncPackage dry-run messages", () => {
 		expect(pushCalls).toHaveLength(0)
 	})
 
-	it("a later sync uses the package commitMessage template", async () => {
+	it("a later sync uses the package commitMessage template", { timeout: SPAWN_TIMEOUT }, async () => {
 		vi.mocked(gitMod.getRemoteTip).mockResolvedValue(PRIOR_MIRROR_SHA)
 
 		const { syncPackage } = await import("./sync.ts")
@@ -141,7 +142,7 @@ describe("syncPackage dry-run messages", () => {
 		expect(result.reason).toMatch(/chore: update openapi spec/)
 	})
 
-	it("a sidecar message overrides the template", async () => {
+	it("a sidecar message overrides the template", { timeout: SPAWN_TIMEOUT }, async () => {
 		writeFileSync(
 			join(root(), "packages", "openapi", ".publicsync-message"),
 			"fix(retry): handle 5xx without unbounded backoff\n",
@@ -164,23 +165,27 @@ describe("syncPackage spec gate on a drifting prod", () => {
 		"client.go": "package acme\n",
 	})
 
-	it("refuses a changed generated file while prod's spec drifts, pushing nothing", async () => {
-		mirrorDiff(["client.go"])
-		const { syncPackage } = await import("./sync.ts")
-		const result = await syncPackage(GATE_ENTRY, {
-			repoRoot: root(),
-			repoSettings: IN_STEP,
-			specGate: DRIFT,
-			token: "tok",
-		})
+	it(
+		"refuses a changed generated file while prod's spec drifts, pushing nothing",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			mirrorDiff(["client.go"])
+			const { syncPackage } = await import("./sync.ts")
+			const result = await syncPackage(GATE_ENTRY, {
+				repoRoot: root(),
+				repoSettings: IN_STEP,
+				specGate: DRIFT,
+				token: "tok",
+			})
 
-		expect(result.status).toBe("failed")
-		expect(result.reason).toContain("acme/sdk-go: its generated output changed")
-		expect(result.reason).toContain("GET /v1/new")
-		expect(vi.mocked(gitMod.gitRun).mock.calls.filter((c) => c[0].includes("push"))).toHaveLength(0)
-	})
+			expect(result.status).toBe("failed")
+			expect(result.reason).toContain("acme/sdk-go: its generated output changed")
+			expect(result.reason).toContain("GET /v1/new")
+			expect(vi.mocked(gitMod.gitRun).mock.calls.filter((c) => c[0].includes("push"))).toHaveLength(0)
+		},
+	)
 
-	it("syncs a hand-file-only change without asking prod", async () => {
+	it("syncs a hand-file-only change without asking prod", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirrorDiff(["README.md"])
 		const gate = vi.fn(DRIFT)
 		const { syncPackage } = await import("./sync.ts")
@@ -204,7 +209,7 @@ describe("syncPackage spec gate on a matching prod", () => {
 		"client.go": "package acme\n",
 	})
 
-	it("syncs a generated change when prod serves the committed spec", async () => {
+	it("syncs a generated change when prod serves the committed spec", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirrorDiff(["client.go", "README.md"])
 		const { syncPackage } = await import("./sync.ts")
 		const result = await syncPackage(GATE_ENTRY, {
@@ -218,7 +223,7 @@ describe("syncPackage spec gate on a matching prod", () => {
 		expect(result.status).toBe("synced")
 	})
 
-	it("keeps honey's manifest out of the mirror", async () => {
+	it("keeps honey's manifest out of the mirror", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirrorDiff(["README.md"])
 		/* the staged tree, seen when sync stages it (the worktree is removed afterwards) */
 		const staged: string[] = []
@@ -291,7 +296,7 @@ describe("filterPackages", () => {
 describe("syncPackage repo settings applied", () => {
 	const root = usePackageRoot(SETTINGS_ENTRY)
 
-	it("applies the settings to a package whose content is unchanged", async () => {
+	it("applies the settings to a package whose content is unchanged", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirror(true)
 		const repoSettings = vi.fn(async () => ({
 			changed: ["homepage" as const],
@@ -309,26 +314,30 @@ describe("syncPackage repo settings applied", () => {
 		expect(result).toMatchObject({ settings: "settings changed: homepage", status: "skipped" })
 	})
 
-	it("fails a package GitHub refuses the settings of, keeping the push that landed", async () => {
-		mirror(false)
-		const { syncPackage } = await import("./sync.ts")
-		const result = await syncPackage(SETTINGS_ENTRY, {
-			repoRoot: root(),
-			repoSettings: REFUSED,
-			specGate: MATCH,
-			token: "tok",
-		})
+	it(
+		"fails a package GitHub refuses the settings of, keeping the push that landed",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			mirror(false)
+			const { syncPackage } = await import("./sync.ts")
+			const result = await syncPackage(SETTINGS_ENTRY, {
+				repoRoot: root(),
+				repoSettings: REFUSED,
+				specGate: MATCH,
+				token: "tok",
+			})
 
-		expect(vi.mocked(gitMod.gitRun).mock.calls.some((call) => call[0].includes("push"))).toBe(true)
-		expect(result).toMatchObject({ mirrorSha: HEAD_SHA, status: "failed" })
-		expect(result.reason).toContain("403: Resource not accessible by integration")
-	})
+			expect(vi.mocked(gitMod.gitRun).mock.calls.some((call) => call[0].includes("push"))).toBe(true)
+			expect(result).toMatchObject({ mirrorSha: HEAD_SHA, status: "failed" })
+			expect(result.reason).toContain("403: Resource not accessible by integration")
+		},
+	)
 })
 
 describe("syncPackage repo settings reported", () => {
 	const root = usePackageRoot(SETTINGS_ENTRY)
 
-	it("reports a dry run's settings as what it would change", async () => {
+	it("reports a dry run's settings as what it would change", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirror(false)
 		const { syncPackage } = await import("./sync.ts")
 		const result = await syncPackage(SETTINGS_ENTRY, {
@@ -345,7 +354,7 @@ describe("syncPackage repo settings reported", () => {
 		})
 	})
 
-	it("says the settings went unchecked without a token", async () => {
+	it("says the settings went unchecked without a token", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirror(true)
 		const { syncPackage } = await import("./sync.ts")
 		const result = await syncPackage(SETTINGS_ENTRY, {
@@ -363,7 +372,7 @@ describe("syncPackage repo settings reported", () => {
 describe("syncPackage repo settings failing", () => {
 	const root = usePackageRoot(SETTINGS_ENTRY)
 
-	it("adds GitHub's refusal to what a dry run would have done", async () => {
+	it("adds GitHub's refusal to what a dry run would have done", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirror(false)
 		const { syncPackage } = await import("./sync.ts")
 		const result = await syncPackage(SETTINGS_ENTRY, { ...BASE_OPTS, repoRoot: root(), repoSettings: REFUSED })
@@ -372,7 +381,7 @@ describe("syncPackage repo settings failing", () => {
 		expect(result.reason).toMatch(/^.+; acme\/openapi: GitHub answered PATCH \/ with 403/)
 	})
 
-	it("reports a settings step that throws no Error by what it threw", async () => {
+	it("reports a settings step that throws no Error by what it threw", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirror(false)
 		const { syncPackage } = await import("./sync.ts")
 		const result = await syncPackage(SETTINGS_ENTRY, {
@@ -392,7 +401,7 @@ describe("syncAll on a package that throws", () => {
 	it.each([
 		["an Error, by its message", new Error("disk full"), "disk full"],
 		["anything else, as it is", "disk gone", "disk gone"],
-	])("fails that package and reports %s", async (_case, thrown, reason) => {
+	])("fails that package and reports %s", { timeout: SPAWN_TIMEOUT }, async (_case, thrown, reason) => {
 		vi.mocked(gitMod.getRemoteTip).mockRejectedValue(thrown)
 		const { syncAll } = await import("./sync.ts")
 

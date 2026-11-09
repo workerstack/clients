@@ -56,17 +56,21 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { force: true, recursive: true }))
 
 describe("handDigest", () => {
-	it("ignores the version, the CHANGELOG, the state, the manifest and generated files", () => {
-		const before = handDigest(root, pkg(true))
-		write("package.json", '{\n\t"name": "@acme/sdk",\n\t"version": "2.0.0"\n}\n')
-		write("CHANGELOG.md", "# Changelog\n\n## 2.0.0\n")
-		write(".release-state.json", '{"version":"2.0.0"}\n')
-		write("client.go", "package sdk // changed\n")
-		manifest({ "client.go": "f".repeat(64) })
-		expect(handDigest(root, pkg(true))).toBe(before)
-	})
+	it(
+		"ignores the version, the CHANGELOG, the state, the manifest and generated files",
+		{ timeout: SPAWN_TIMEOUT },
+		() => {
+			const before = handDigest(root, pkg(true))
+			write("package.json", '{\n\t"name": "@acme/sdk",\n\t"version": "2.0.0"\n}\n')
+			write("CHANGELOG.md", "# Changelog\n\n## 2.0.0\n")
+			write(".release-state.json", '{"version":"2.0.0"}\n')
+			write("client.go", "package sdk // changed\n")
+			manifest({ "client.go": "f".repeat(64) })
+			expect(handDigest(root, pkg(true))).toBe(before)
+		},
+	)
 
-	it("changes when a hand file changes", () => {
+	it("changes when a hand file changes", { timeout: SPAWN_TIMEOUT }, () => {
 		const before = handDigest(root, pkg(true))
 		write("README.md", "# sdk, now documented\n")
 		expect(handDigest(root, pkg(true))).not.toBe(before)
@@ -91,7 +95,7 @@ describe("outputDigest", () => {
 })
 
 describe("handDigest of a deleted file", () => {
-	it("changes when a tracked hand file is deleted from the worktree", () => {
+	it("changes when a tracked hand file is deleted from the worktree", { timeout: SPAWN_TIMEOUT }, () => {
 		const before = handDigest(root, pkg(true))
 		rmSync(path.join(root, PKG_DIR, "README.md"))
 		expect(handDigest(root, pkg(true))).not.toBe(before)

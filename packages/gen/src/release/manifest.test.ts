@@ -7,6 +7,7 @@ import { configOf, gitRepo, removeRepos, writeConfig } from "./__fixtures__/rele
 import { readRelease } from "./load.ts"
 import { defineRelease, MIRROR_ALLOWLIST } from "./manifest.ts"
 import type { PackageMetadata } from "./types.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 afterEach(removeRepos)
 
@@ -81,7 +82,7 @@ describe("MIRROR_ALLOWLIST", () => {
 })
 
 describe("loadPackages spec and codegen", () => {
-	it("gives each package the release's spec, with an absolute committed path", async () => {
+	it("gives each package the release's spec, with an absolute committed path", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		const [pkg] = await loadPackages(root)
@@ -91,14 +92,14 @@ describe("loadPackages spec and codegen", () => {
 		})
 	})
 
-	it("gives each package the release's codegen command", async () => {
+	it("gives each package the release's codegen command", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		const [pkg] = await loadPackages(root)
 		expect(pkg?.codegen).toEqual(CODEGEN)
 	})
 
-	it("rejects a release without a codegen command, naming the manifest", async () => {
+	it("rejects a release without a codegen command, naming the manifest", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		writeConfig(root, {
@@ -111,25 +112,29 @@ describe("loadPackages spec and codegen", () => {
 })
 
 describe("loadPackages homepage, description and topics", () => {
-	it("gives each package the release's homepage, its description and its topics", async () => {
-		const root = await repo()
-		product(root, [
-			{
-				description: "Acme SDK (example.com)",
-				name: "sdk",
-				repo: "acme/sdk",
-				topics: ["acme", "sdk"],
-			},
-		])
-		const [pkg] = await loadPackages(root)
-		expect([pkg?.homepage, pkg?.description, pkg?.topics]).toEqual([
-			HOMEPAGE,
-			"Acme SDK (example.com)",
-			["acme", "sdk"],
-		])
-	})
+	it(
+		"gives each package the release's homepage, its description and its topics",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await repo()
+			product(root, [
+				{
+					description: "Acme SDK (example.com)",
+					name: "sdk",
+					repo: "acme/sdk",
+					topics: ["acme", "sdk"],
+				},
+			])
+			const [pkg] = await loadPackages(root)
+			expect([pkg?.homepage, pkg?.description, pkg?.topics]).toEqual([
+				HOMEPAGE,
+				"Acme SDK (example.com)",
+				["acme", "sdk"],
+			])
+		},
+	)
 
-	it("rejects a release without a homepage, naming the manifest", async () => {
+	it("rejects a release without a homepage, naming the manifest", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }], { homepage: null })
 		await expect(loadPackages(root)).rejects.toThrow(/release\.config\.ts is invalid:[\s\S]*homepage/)
@@ -140,7 +145,7 @@ describe("loadPackages homepage, description and topics", () => {
 		["an empty topic list", { topics: [] }, /topics/],
 		["a topic GitHub refuses", { topics: ["Not A Slug"] }, /topics/],
 		["a description longer than GitHub keeps", { description: "x".repeat(351) }, /description/],
-	])("rejects a package with %s, naming the manifest", async (_case, fields, message) => {
+	])("rejects a package with %s, naming the manifest", { timeout: SPAWN_TIMEOUT }, async (_case, fields, message) => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk", ...fields }])
 		await expect(loadPackages(root)).rejects.toThrow(message)
@@ -148,7 +153,7 @@ describe("loadPackages homepage, description and topics", () => {
 })
 
 describe("loadPackages deployed spec URL", () => {
-	it("accepts http on a loopback host, for tests", async () => {
+	it("accepts http on a loopback host, for tests", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }], {
 			spec: { committedPath: "spec.json", deployedUrl: "http://127.0.0.1:8123/openapi/spec.json" },
@@ -169,7 +174,7 @@ describe("loadPackages deployed spec URL", () => {
 			{ committedPath: "nope.json", deployedUrl: "https://api.example.com/spec.json" },
 			/release\.config\.ts: spec\.committedPath nope\.json does not exist/,
 		],
-	])("rejects %s, naming the manifest", async (_case, spec, message) => {
+	])("rejects %s, naming the manifest", { timeout: SPAWN_TIMEOUT }, async (_case, spec, message) => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }], { spec: spec as FixtureSpec })
 		await expect(loadPackages(root)).rejects.toThrow(message)
@@ -177,7 +182,7 @@ describe("loadPackages deployed spec URL", () => {
 })
 
 describe("loadPackages placement", () => {
-	it("places each package beside its release config", async () => {
+	it("places each package beside its release config", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [
 			{ name: "openapi", repo: "acme/openapi" },
@@ -192,14 +197,14 @@ describe("loadPackages placement", () => {
 		])
 	})
 
-	it("rejects a listed package whose dir is missing", async () => {
+	it("rejects a listed package whose dir is missing", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "openapi", repo: "acme/openapi" }], { dirs: [] })
 
 		await expect(loadPackages(root)).rejects.toThrow(/acme-release\/openapi/)
 	})
 
-	it("rejects a public dir the manifest does not list, but not a dot-dir", async () => {
+	it("rejects a public dir the manifest does not list, but not a dot-dir", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "openapi", repo: "acme/openapi" }], { dirs: ["openapi", ".tmp"] })
 		await expect(loadPackages(root)).resolves.toHaveLength(1)
@@ -210,7 +215,7 @@ describe("loadPackages placement", () => {
 })
 
 describe("loadPackages registries", () => {
-	it("gives each package its registries, none when it lists none", async () => {
+	it("gives each package its registries, none when it lists none", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [
 			{ name: "sdk", registries: [{ kind: "npm" }, { kind: "jsr" }], repo: "acme/sdk" },
@@ -230,7 +235,7 @@ describe("loadPackages registries", () => {
 		})
 	})
 
-	it("takes C# and Java packages published to NuGet and Maven Central", async () => {
+	it("takes C# and Java packages published to NuGet and Maven Central", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [
 			{
@@ -256,15 +261,19 @@ describe("loadPackages registries", () => {
 })
 
 describe("loadPackages duplicates and repos", () => {
-	it("rejects an unknown registry kind and a GitHub release with no assets, naming the manifest", async () => {
-		for (const registries of [[{ kind: "hackage" }], [{ assets: [], kind: "github" }]]) {
-			const root = await repo()
-			product(root, [{ name: "sdk", registries, repo: "acme/sdk" }])
-			await expect(loadPackages(root)).rejects.toThrow(/release\.config\.ts is invalid:[\s\S]*registries/)
-		}
-	})
+	it(
+		"rejects an unknown registry kind and a GitHub release with no assets, naming the manifest",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			for (const registries of [[{ kind: "hackage" }], [{ assets: [], kind: "github" }]]) {
+				const root = await repo()
+				product(root, [{ name: "sdk", registries, repo: "acme/sdk" }])
+				await expect(loadPackages(root)).rejects.toThrow(/release\.config\.ts is invalid:[\s\S]*registries/)
+			}
+		},
+	)
 
-	it("rejects a duplicate package name, naming the manifest", async () => {
+	it("rejects a duplicate package name, naming the manifest", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [
 			{ name: "openapi", repo: "acme/openapi" },
@@ -274,7 +283,7 @@ describe("loadPackages duplicates and repos", () => {
 		await expect(loadPackages(root)).rejects.toThrow(/release\.config\.ts[\s\S]*duplicate/)
 	})
 
-	it("rejects a duplicate repo within one manifest", async () => {
+	it("rejects a duplicate repo within one manifest", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [
 			{ name: "openapi", repo: "acme/openapi" },
@@ -284,7 +293,7 @@ describe("loadPackages duplicates and repos", () => {
 		await expect(loadPackages(root)).rejects.toThrow(/release\.config\.ts[\s\S]*duplicate/)
 	})
 
-	it("rejects a repo that is not owner/name", async () => {
+	it("rejects a repo that is not owner/name", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "openapi", repo: "git@github.com:acme/openapi.git" }])
 
@@ -295,25 +304,29 @@ describe("loadPackages duplicates and repos", () => {
 describe("loadRelease on a project laid out outside any monorepo", () => {
 	const SDK = { commitMessage: "c", description: "d", name: "sdk", repo: "acme/sdk", topics: ["acme"] }
 
-	it("roots the release at the git toplevel and places each package beside the config", async () => {
-		const root = await repo()
-		product(root, [{ name: "sdk", repo: "acme/sdk" }])
-		const release = await readRelease(configOf(root), {})
-		expect(release.root).toBe(realpathSync(root))
-		expect([release.project, release.codegen, release.spec.committedPath]).toEqual([
-			"acme",
-			CODEGEN,
-			path.join(realpathSync(root), "spec.json"),
-		])
-		expect(release.packages.map((p) => [p.project, p.path, p.mirror])).toEqual([
-			["acme", "acme-release/sdk", "git@github.com:acme/sdk.git"],
-		])
-	})
+	it(
+		"roots the release at the git toplevel and places each package beside the config",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await repo()
+			product(root, [{ name: "sdk", repo: "acme/sdk" }])
+			const release = await readRelease(configOf(root), {})
+			expect(release.root).toBe(realpathSync(root))
+			expect([release.project, release.codegen, release.spec.committedPath]).toEqual([
+				"acme",
+				CODEGEN,
+				path.join(realpathSync(root), "spec.json"),
+			])
+			expect(release.packages.map((p) => [p.project, p.path, p.mirror])).toEqual([
+				["acme", "acme-release/sdk", "git@github.com:acme/sdk.git"],
+			])
+		},
+	)
 
 	it.each([
 		["no project", {}, "got undefined"],
 		["a project that is not a slug", { project: "Acme Corp" }, 'got "Acme Corp"'],
-	])("requires the project, naming the config, for %s", async (_case, project, got) => {
+	])("requires the project, naming the config, for %s", { timeout: SPAWN_TIMEOUT }, async (_case, project, got) => {
 		const root = await repo()
 		writeFileSync(path.join(root, "spec.json"), "{}\n")
 		mkdirSync(path.join(root, "acme-release/sdk"), { recursive: true })
@@ -323,7 +336,7 @@ describe("loadRelease on a project laid out outside any monorepo", () => {
 		)
 	})
 
-	it("commits as public-sync[bot] unless the config names its own committer", async () => {
+	it("commits as public-sync[bot] unless the config names its own committer", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		const [byDefault] = await loadPackages(root)
@@ -350,14 +363,14 @@ describe("loadRelease on a project laid out outside any monorepo", () => {
 describe("loadRelease refusing a config it cannot read", () => {
 	const SDK = { commitMessage: "c", description: "d", name: "sdk", repo: "acme/sdk", topics: ["acme"] }
 
-	it("names a config that is not there", async () => {
+	it("names a config that is not there", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		await expect(readRelease(configOf(root), {})).rejects.toThrow(
 			/acme-release\/release\.config\.ts: no such release config/,
 		)
 	})
 
-	it("names a config outside any git repository", async () => {
+	it("names a config outside any git repository", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		/* without .git the dir is a plain temp dir, which no repository encloses */
@@ -366,7 +379,7 @@ describe("loadRelease refusing a config it cannot read", () => {
 		await expect(readRelease(configOf(root), {})).rejects.toThrow(/release\.config\.ts: not inside a git repository/)
 	})
 
-	it("names a config with no default export", async () => {
+	it("names a config with no default export", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		writeFileSync(configOf(root), "export const release = {}\n")
@@ -383,31 +396,35 @@ describe("loadRelease refusing a config it cannot read", () => {
 })
 
 describe("loadPackages metadata", () => {
-	it("lays a package's metadata over the release's, adding its keywords to the release's", async () => {
-		const root = await repo()
-		product(root, [{ name: "sdk", repo: "acme/sdk" }])
-		writeConfig(root, {
-			codegen: CODEGEN,
-			homepage: HOMEPAGE,
-			metadata: { keywords: ["acme"], license: "MIT" },
-			packages: [
-				{
-					commitMessage: "c",
-					description: "d",
-					metadata: { keywords: ["sdk"], license: "Apache-2.0" },
-					name: "sdk",
-					repo: "acme/sdk",
-					topics: ["acme"],
-				},
-			],
-			project: "acme",
-			spec: SPEC,
-		})
-		const [pkg] = await loadPackages(root)
-		expect(pkg?.metadata).toEqual({ keywords: ["acme", "sdk"], license: "Apache-2.0" })
-	})
+	it(
+		"lays a package's metadata over the release's, adding its keywords to the release's",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await repo()
+			product(root, [{ name: "sdk", repo: "acme/sdk" }])
+			writeConfig(root, {
+				codegen: CODEGEN,
+				homepage: HOMEPAGE,
+				metadata: { keywords: ["acme"], license: "MIT" },
+				packages: [
+					{
+						commitMessage: "c",
+						description: "d",
+						metadata: { keywords: ["sdk"], license: "Apache-2.0" },
+						name: "sdk",
+						repo: "acme/sdk",
+						topics: ["acme"],
+					},
+				],
+				project: "acme",
+				spec: SPEC,
+			})
+			const [pkg] = await loadPackages(root)
+			expect(pkg?.metadata).toEqual({ keywords: ["acme", "sdk"], license: "Apache-2.0" })
+		},
+	)
 
-	it("names the missing project when the default export is no object", async () => {
+	it("names the missing project when the default export is no object", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await repo()
 		product(root, [{ name: "sdk", repo: "acme/sdk" }])
 		writeFileSync(configOf(root), "export default 42\n")
