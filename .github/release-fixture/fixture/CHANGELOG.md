@@ -5,4 +5,3 @@
 The release workflows' fixture package
 
 Generated from openapi@a9f7dce.
-

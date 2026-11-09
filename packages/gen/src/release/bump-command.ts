@@ -22,10 +22,13 @@ import { readVersions, writeVersions } from "./version-files.ts"
 /** The header every CHANGELOG bump writes starts with; entries go directly under it, newest first. */
 export const CHANGELOG_HEADER = "# Changelog\n\n"
 
-/** `existing` with `entry` directly under the `# Changelog` header, which it gains when it had none. */
+/**
+ * `existing` with `entry` directly under the `# Changelog` header, which it gains when it had none; one blank line
+ * between the entry and the previous one, none after the last, so a markdown formatter leaves the file as written.
+ */
 export function prependEntry(existing: string, entry: string): string {
 	const body = existing.startsWith(CHANGELOG_HEADER) ? existing.slice(CHANGELOG_HEADER.length) : existing
-	return `${CHANGELOG_HEADER}${entry}\n${body}`
+	return body === "" ? `${CHANGELOG_HEADER}${entry}` : `${CHANGELOG_HEADER}${entry}\n${body}`
 }
 
 /** The release `stateFile` records; undefined before a package's first release. Throws on a state that does not parse. */

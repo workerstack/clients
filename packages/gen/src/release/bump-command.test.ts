@@ -58,8 +58,14 @@ describe("parseBumpArgs", () => {
 })
 
 describe("prependEntry", () => {
-	it("writes the header and the entry into an empty changelog", () => {
-		expect(prependEntry("", "## 1.0.0\n\n- first\n")).toBe(`${CHANGELOG_HEADER}## 1.0.0\n\n- first\n\n`)
+	it("writes the header and the entry into an empty changelog, ending on the entry's last line", () => {
+		expect(prependEntry("", "## 1.0.0\n\n- first\n")).toBe(`${CHANGELOG_HEADER}## 1.0.0\n\n- first\n`)
+	})
+
+	it("separates a new entry from the previous one by one blank line", () => {
+		expect(prependEntry(`${CHANGELOG_HEADER}## 1.0.0\n\n- first\n`, "## 1.1.0\n\n- second\n")).toBe(
+			`${CHANGELOG_HEADER}## 1.1.0\n\n- second\n\n## 1.0.0\n\n- first\n`,
+		)
 	})
 
 	it("puts a new entry above the previous ones, under a single header", () => {
