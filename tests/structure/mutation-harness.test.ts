@@ -72,8 +72,8 @@ describe("the gen guard registry", () => {
 	it("names each guard once, with the gen module it lives in", () => {
 		const ids = GUARDS.map((g) => g.id)
 		expect(new Set(ids).size).toBe(ids.length)
-		expect(GUARDS.every((g) => g.module.startsWith("packages/gen/src/"))).toBe(true)
-		expect(guardNamed("escape-bypass")).toMatchObject({ module: "packages/gen/src/emit/shared/escape.ts" })
+		expect(GUARDS.every((g) => g.module.startsWith("src/"))).toBe(true)
+		expect(guardNamed("escape-bypass")).toMatchObject({ module: "src/emit/shared/escape.ts" })
 	})
 
 	it("runs the plain suite when no mutant is named, and refuses one it does not know", () => {
@@ -85,17 +85,13 @@ describe("the gen guard registry", () => {
 describe("each guard's toolchain", () => {
 	it("holds the three Go runtime guards, each needing Go and patching the Go runtime reader", () => {
 		expect(GO_GUARDS.map((id) => guardNamed(id))).toEqual(
-			GO_GUARDS.map((id) =>
-				expect.objectContaining({ id, module: "packages/gen/src/emit/go/http.ts", toolchain: "go" }),
-			),
+			GO_GUARDS.map((id) => expect.objectContaining({ id, module: "src/emit/go/http.ts", toolchain: "go" })),
 		)
 	})
 
 	it("holds the three Rust runtime guards, each needing Rust and patching the Rust runtime reader", () => {
 		expect(RUST_GUARDS.map((id) => guardNamed(id))).toEqual(
-			RUST_GUARDS.map((id) =>
-				expect.objectContaining({ id, module: "packages/gen/src/emit/rust/http.ts", toolchain: "rust" }),
-			),
+			RUST_GUARDS.map((id) => expect.objectContaining({ id, module: "src/emit/rust/http.ts", toolchain: "rust" })),
 		)
 		expect(changedFiles(RUST_GUARDS, rustRuntimeFiles, PLAIN)).toEqual([["redirect.rs"], ["exchange.rs"], ["path.rs"]])
 	})
@@ -103,7 +99,7 @@ describe("each guard's toolchain", () => {
 	it("holds the three Python runtime guards, each needing Python and patching the Python runtime reader", () => {
 		expect(PYTHON_GUARDS.map((id) => guardNamed(id))).toEqual(
 			PYTHON_GUARDS.map((id) =>
-				expect.objectContaining({ id, module: "packages/gen/src/emit/python/transport.ts", toolchain: "python" }),
+				expect.objectContaining({ id, module: "src/emit/python/transport.ts", toolchain: "python" }),
 			),
 		)
 		expect(changedFiles(PYTHON_GUARDS, pythonRuntimeFiles, PLAIN)).toEqual([
@@ -116,7 +112,7 @@ describe("each guard's toolchain", () => {
 	it("holds the three C# runtime guards, each needing .NET and patching the C# runtime reader", () => {
 		expect(CSHARP_GUARDS.map((id) => guardNamed(id))).toEqual(
 			CSHARP_GUARDS.map((id) =>
-				expect.objectContaining({ id, module: "packages/gen/src/emit/csharp/transport.ts", toolchain: "csharp" }),
+				expect.objectContaining({ id, module: "src/emit/csharp/transport.ts", toolchain: "csharp" }),
 			),
 		)
 		expect(changedFiles(CSHARP_GUARDS, csharpRuntimeFiles, PLAIN, CSHARP_ROOT)).toEqual([
@@ -193,7 +189,7 @@ describe("each toolchain guard's suite", () => {
 		const naming = sources("tests/security", true).filter((file) =>
 			readFileSync(join(GEN, file), "utf8").includes("src/emit/mcp/"),
 		)
-		const mcp = GUARDS.filter((g) => g.module.startsWith("packages/gen/src/emit/mcp/"))
+		const mcp = GUARDS.filter((g) => g.module.startsWith("src/emit/mcp/"))
 		expect([naming, mcp.map((g) => [g.id, g.suite, g.toolchain])]).toEqual([
 			[MCP_SUITE],
 			["mcp-path-segment", "mcp-prototype-arguments", "mcp-prototype-schema", "mcp-key-redaction"].map((id) => [

@@ -12,7 +12,7 @@ import { afterAll, describe, expect, it } from "vitest"
 import { allBlocks, type Block, docsDocument, exampleOf, REPO } from "../shared/__fixtures__/docs-blocks.ts"
 import { generateSdk } from "./sdk.ts"
 
-const GEN = join(REPO, "packages/gen")
+const GEN = REPO
 const TSC = join(REPO, "node_modules/typescript/bin/tsc")
 const OPTIONS = {
 	lib: ["ESNext", "DOM"],

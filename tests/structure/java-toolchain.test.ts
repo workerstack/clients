@@ -21,7 +21,7 @@ import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
 const { execJava, gjfJava, javaCacheDir, javaEnv, javaHome, javaInstall, runGjf, runGradle, runJava, withJava } = env
 
 const GEN = resolve(import.meta.dirname, "../..")
-const REPO = join(GEN, "../..")
+const REPO = GEN
 const ROOTS = ["src", "tests", "scripts"]
 const SELF = "tests/structure/java-toolchain.test.ts"
 const ENV = "src/emit/java/__fixtures__/java-env.ts"

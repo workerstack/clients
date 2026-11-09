@@ -33,8 +33,8 @@ const ENV: Readonly<Record<keyof typeof TOOLCHAIN_PROJECTS, string>> = {
 const CACHE: Readonly<Record<keyof typeof TOOLCHAIN_PROJECTS, readonly [key: string, ...pins: string[]]>> = {
 	go: ["gobuild", ".go-version"],
 	python: ["python", ".python-version", "uv.toml"],
-	csharp: ["dotnet", "global.json", "packages/gen/src/emit/csharp/__fixtures__/dotnet-sdk.sha512"],
-	java: ["java", "packages/gen/src/emit/java/__fixtures__/java-pins.json"],
+	csharp: ["dotnet", "global.json", "src/emit/csharp/__fixtures__/dotnet-sdk.sha512"],
+	java: ["java", "src/emit/java/__fixtures__/java-pins.json"],
 	rust: ["rust", "rust-toolchain.toml"],
 }
 
@@ -129,7 +129,7 @@ function diskImports(): Imports {
 	}
 }
 
-const WORKFLOW = readFileSync(join(GEN, "../../.github/workflows/ci.yml"), "utf8")
+const WORKFLOW = readFileSync(join(GEN, ".github/workflows/ci.yml"), "utf8")
 
 /** The `hashFiles` globs of each CI cache step whose key starts `<os>-<name>-`, repo-relative, in workflow order. */
 function cacheKeyGlobs(workflow: string, name: string): string[][] {
@@ -171,7 +171,7 @@ function compileInputs(name: Toolchain, runFiles: readonly string[], imports: Im
 		...closure(tests, imports, (file) => tests.includes(file) || file.startsWith("tests/")),
 		...dirFiles(`src/runtime/${name}`),
 		...dirFiles(`src/emit/${name}/__fixtures__/driver`),
-	].map((file) => `packages/gen/${file}`)
+	].map((file) => `${file}`)
 }
 
 /**
@@ -251,14 +251,14 @@ const SCRIPTS = (dir: string) =>
 	(JSON.parse(readFileSync(join(GEN, dir, "package.json"), "utf8")) as { scripts: Record<string, string> }).scripts
 
 /**
- * The harness projects `bun run <script>` from the repo root runs: through the root scripts to gen's `test:harness`,
- * its `--project` filters (none: every harness project); none when the script never reaches it.
+ * The harness projects `bun run <script>` runs: the package's own `vitest run --mode harness`, through any script that
+ * calls it, by its `--project` filters (none: every harness project); none when the script never reaches it.
  */
 function harnessRun(script: string, seen: ReadonlySet<string> = new Set()): string[] {
-	const text = SCRIPTS("../..")[script] ?? ""
+	const text = SCRIPTS(".")[script] ?? ""
 	if (seen.has(script)) return []
-	if (/--filter @workerstack\/clients test:harness\b/.test(text)) {
-		const filters = [...(SCRIPTS(".")["test:harness"] ?? "").matchAll(/--project (\S+)/g)].map(([, name]) => name)
+	if (/\bvitest run --mode harness\b/.test(text)) {
+		const filters = [...text.matchAll(/--project (\S+)/g)].map(([, name]) => name)
 		return filters.length > 0 ? (filters as string[]) : (harness.projects ?? []).map(({ test }) => test.name)
 	}
 	return [...text.matchAll(/\bbun run ([\w:]+)/g)].flatMap(([, next]) =>
@@ -303,7 +303,7 @@ describe("CI installs what each project's fixtures run (carry-in #14)", () => {
 
 	it("reaches gen's whole harness from the harness job's script, and no harness from a gen shard's", () => {
 		expect(harnessRun("test:harness").sort()).toEqual((harness.projects ?? []).map(({ test }) => test.name).sort())
-		expect(harnessRun("test:gen")).toEqual([])
+		expect(harnessRun("test")).toEqual([])
 	})
 })
 

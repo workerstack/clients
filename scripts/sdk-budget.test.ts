@@ -26,11 +26,11 @@ import {
 } from "./sdk-budget.ts"
 import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 
-const REPO = resolve(import.meta.dirname, "../../..")
+const REPO = resolve(import.meta.dirname, "..")
 const APPS = BUDGET_APPS
 const appSpec = budgetSpec
 /** A vendored runtime's directory. */
-const runtimeDir = (language: string) => join(REPO, `packages/gen/src/runtime/${language}`)
+const runtimeDir = (language: string) => join(REPO, `src/runtime/${language}`)
 /** The headroom every G13 ceiling leaves over its measured max. */
 const HEADROOM = 0.2
 

@@ -10,7 +10,7 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
 /** The repository root's package.json. */
-const rootManifest = () => resolve(import.meta.dirname, "../../../../../package.json")
+const rootManifest = () => resolve(import.meta.dirname, "../../../package.json")
 
 /** The Bun version package.json's packageManager pins. */
 export function pinnedBunVersion(manifest = rootManifest()): string {

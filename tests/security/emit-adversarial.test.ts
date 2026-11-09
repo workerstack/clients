@@ -21,7 +21,7 @@ import { adversarialCorpus } from "../../src/emit/shared/__fixtures__/adversaria
 /** Whether Go is here: a missing one fails where it is required and skips the Go tests elsewhere (go-env). */
 const GO = withGo()
 
-const REPO = resolve(import.meta.dirname, "../../../..")
+const REPO = resolve(import.meta.dirname, "../..")
 
 const mutant = guardNamed(process.env.HONEY_MUTANT)
 if (mutant !== undefined) {
@@ -33,14 +33,12 @@ if (mutant !== undefined) {
 
 /* imported after the mock, so a mutant reaches every module that uses it */
 const { commentProblem, failures, literalProblem, TARGETS } = (await import(
-	resolve(REPO, "packages/gen/src/emit/shared/__fixtures__/escape-oracle.ts")
+	resolve(REPO, "src/emit/shared/__fixtures__/escape-oracle.ts")
 )) as typeof import("../../src/emit/shared/__fixtures__/escape-oracle.ts")
 const { irToTs } = (await import(
-	resolve(REPO, "packages/gen/src/emit/shared/type-emitter.ts")
+	resolve(REPO, "src/emit/shared/type-emitter.ts")
 )) as typeof import("../../src/emit/shared/type-emitter.ts")
-const { schemaToIR } = (await import(
-	resolve(REPO, "packages/gen/src/ir/schema.ts")
-)) as typeof import("../../src/ir/schema.ts")
+const { schemaToIR } = (await import(resolve(REPO, "src/ir/schema.ts"))) as typeof import("../../src/ir/schema.ts")
 
 /** The TypeScript of a JSON Schema, as an emitter writes it. */
 const typeOf = (schema: Record<string, unknown>) => irToTs(schemaToIR(schema))
@@ -107,20 +105,18 @@ describe("gen adversarial: spec text never becomes source", () => {
 })
 
 /* the TS emitters and the emitted client, imported after the mock so every guard reaches them */
-const { generateSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/ts/sdk.ts")
-)) as typeof import("../../src/emit/ts/sdk.ts")
+const { generateSdk } = (await import(resolve(REPO, "src/emit/ts/sdk.ts"))) as typeof import("../../src/emit/ts/sdk.ts")
 const { generateTypes } = (await import(
-	resolve(REPO, "packages/gen/src/emit/ts/type-gen.ts")
+	resolve(REPO, "src/emit/ts/type-gen.ts")
 )) as typeof import("../../src/emit/ts/type-gen.ts")
 const { emittedApp, emittedRouteTree, emittedWebhooks, recordingFetch } = (await import(
-	resolve(REPO, "packages/gen/src/emit/ts/__fixtures__/emitted.ts")
+	resolve(REPO, "src/emit/ts/__fixtures__/emitted.ts")
 )) as typeof import("../../src/emit/ts/__fixtures__/emitted.ts")
 const { honeyDoc } = (await import(
-	resolve(REPO, "packages/gen/src/emit/ts/__fixtures__/honey-doc.ts")
+	resolve(REPO, "src/emit/ts/__fixtures__/honey-doc.ts")
 )) as typeof import("../../src/emit/ts/__fixtures__/honey-doc.ts")
 const { treeOf } = (await import(
-	resolve(REPO, "packages/gen/src/emit/ts/__fixtures__/tree-data.ts")
+	resolve(REPO, "src/emit/ts/__fixtures__/tree-data.ts")
 )) as typeof import("../../src/emit/ts/__fixtures__/tree-data.ts")
 
 const OK = { 200: { content: { "application/json": { schema: { type: "object" } } }, description: "" } }
@@ -254,7 +250,7 @@ describe("gen adversarial: an adversarial app compiles under strict", () => {
 	// v0: 88a8924ee0
 	it("types.gen.d.ts and the SDK files compile together, the augmentation narrowing selectors", async () => {
 		const { typechecker } = (await import(
-			resolve(REPO, "packages/gen/src/emit/ts/__fixtures__/typecheck.ts")
+			resolve(REPO, "src/emit/ts/__fixtures__/typecheck.ts")
 		)) as typeof import("../../src/emit/ts/__fixtures__/typecheck.ts")
 		const tsMorph = await import("ts-morph")
 		const kinds = { properties: { kind: { enum: ['a"b', "x\ny"], type: "string" } }, type: "object" }
@@ -339,10 +335,10 @@ describe("gen adversarial: the emitted TS runtime", () => {
 
 /* the Go emitter and the compiled SDK, imported after the mock so every guard (the runtime files included) reaches them */
 const { generateGoSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/go/sdk.ts")
+	resolve(REPO, "src/emit/go/sdk.ts")
 )) as typeof import("../../src/emit/go/sdk.ts")
 const { compileGo, compiledSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/go/__fixtures__/compiled.ts")
+	resolve(REPO, "src/emit/go/__fixtures__/compiled.ts")
 )) as typeof import("../../src/emit/go/__fixtures__/compiled.ts")
 
 const STR = { type: "string" }

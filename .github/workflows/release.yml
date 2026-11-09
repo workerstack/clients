@@ -1,0 +1,145 @@
+name: Release
+
+# A v* tag publishes @workerstack/clients to npm with
+# provenance, once main's ci.yml push run (its harness and conformance gate included) passed on the tagged commit: the
+# tag reuses that run instead of running CI again, so tag the commit right after pushing it to main. A failed release
+# re-runs on its tag: `gh workflow run release.yml --ref vX.Y.Z`; a version already on npm is skipped.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.4.4"
+
+jobs:
+  # each manifest checked against the tag, then packed by its prepack: no write, no token
+  pack:
+    name: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Check @workerstack/clients against the tag
+        env:
+          PACKAGE: "@workerstack/clients"
+        run: |
+          if [ "$GITHUB_REF_TYPE" != tag ]; then echo "the release runs on a v* tag, not $GITHUB_REF_NAME"; exit 1; fi
+          got="$(node -p 'const p = require("./package.json"); p.name + "@" + p.version')"
+          if [ "$got" != "$PACKAGE@${GITHUB_REF_NAME#v}" ]; then echo "$got is not the tag's $PACKAGE@${GITHUB_REF_NAME#v}"; exit 1; fi
+      # the tag's notes: a version nobody wrote an entry for never reaches npm
+      - name: Check the CHANGELOG entry for the tag
+        run: bun "$GITHUB_WORKSPACE/scripts/changelog.ts" "${GITHUB_REF_NAME#v}"
+      - run: bun install --frozen-lockfile
+      # scripts/pack.ts: prepack in a staged copy, then npm pack with no honey-source condition
+      - name: Pack @workerstack/clients
+        run: bun scripts/pack.ts "$RUNNER_TEMP/tarballs" .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tarballs
+          path: ${{ runner.temp }}/tarballs
+          if-no-files-found: error
+          retention-days: 7
+
+  # main's ci.yml push run on the tagged commit, waited on and not run again: the CI evidence a publish needs. A pull
+  # request's run or a dispatched one never counts; a red or cancelled run fails here, naming its re-run.
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      actions: read
+    steps:
+      - name: Wait for main's ci.yml run on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # how long a commit may go without a run before it is judged never pushed to main
+          GRACE_SECONDS: "600"
+        run: |
+          while :; do
+            runs="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --commit "$GITHUB_SHA" --json status,conclusion,url)"
+            passed="$(jq -r 'map(select(.conclusion == "success"))[0].url // empty' <<<"$runs")"
+            if [ -n "$passed" ]; then echo "ci.yml passed on main at $GITHUB_SHA: $passed"; exit 0; fi
+            if [ "$(jq 'map(select(.status != "completed")) | length' <<<"$runs")" -eq 0 ]; then
+              red="$(jq -r 'map(.url) | join(" ")' <<<"$runs")"
+              if [ -n "$red" ]; then
+                echo "ci.yml did not pass on main at $GITHUB_SHA ($red): re-run it with gh run rerun <id> --failed, then this release with gh workflow run release.yml --ref $GITHUB_REF_NAME"
+                exit 1
+              fi
+              if [ "$SECONDS" -ge "$GRACE_SECONDS" ]; then
+                echo "ci.yml has no push run on main at $GITHUB_SHA: push the commit to main before its tag, then gh workflow run release.yml --ref $GITHUB_REF_NAME"
+                exit 1
+              fi
+            fi
+            sleep 30
+          done
+
+  # the one job that mints an OIDC token: it runs no repository code, only npm on the packed tarballs
+  npm:
+    name: npm
+    needs: [pack, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      # trusted publishing (the OIDC exchange, no stored token) needs npm 11.5.1 or later
+      - run: npm install -g npm@11.21.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tarballs
+          path: ${{ runner.temp }}/tarballs
+      - name: Publish @workerstack/clients
+        env:
+          PACKAGE: "@workerstack/clients"
+          TARBALL: workerstack-clients
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          # a prerelease never takes `latest`: it publishes under `next`, so `npm install <pkg>` keeps giving the last
+          # final release until a final tag is cut. A version already on npm is skipped, as a re-run on the tag needs.
+          case "$v" in *-*) tag=next ;; *) tag=latest ;; esac
+          if npm view "$PACKAGE@$v" version >/dev/null 2>&1; then echo "$PACKAGE@$v is already on npm"; exit 0; fi
+          npm publish "$RUNNER_TEMP/tarballs/$TARBALL-$v.tgz" --provenance --access public --tag "$tag"
+
+  # the one job that writes: the tag's GitHub release, once the package is on npm
+  github-release:
+    name: GitHub release
+    needs: npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # a prerelease tag (v1.0.0-rc.1) is marked one on GitHub too, so the releases page agrees with npm's tag
+          pre=()
+          case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease) ;; esac
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "the release $GITHUB_REF_NAME already exists"
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "${GITHUB_REF_NAME#v}" "${pre[@]}"
+          fi

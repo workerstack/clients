@@ -13,7 +13,7 @@ import { RUST_FLOOR } from "../../shared/__fixtures__/installs.ts"
 
 /** The pinned Rust channel, as the repo root's `rust-toolchain.toml` holds it (`1.99.1`). */
 export function pinnedRust(): string {
-	const toml = readFileSync(resolve(import.meta.dirname, "../../../../../../rust-toolchain.toml"), "utf8")
+	const toml = readFileSync(resolve(import.meta.dirname, "../../../../rust-toolchain.toml"), "utf8")
 	const channel = /^channel = "([^"]+)"$/m.exec(toml)?.[1]
 	if (channel === undefined) throw new Error(`rust-toolchain.toml names no channel:\n${toml}`)
 	return channel

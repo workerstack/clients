@@ -1,0 +1,78 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"extends": ["./oxlint.base.json"],
+	"plugins": ["typescript", "unicorn", "oxc"],
+	"jsPlugins": [{ "name": "honey", "specifier": "./lint/index.js" }],
+	"env": {
+		"node": true
+	},
+	"ignorePatterns": [
+		"dist/**",
+		"coverage/**",
+		"**/.cache/**",
+		".agents/**",
+		".claude/**",
+		".codex/**",
+		".gemini/**",
+		".grok/**",
+		".rulesync/**",
+		"src/_tokenizer/**"
+	],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn"
+	},
+	"rules": {
+		"no-unused-vars": "warn",
+		"unicorn/no-array-sort": "off",
+		"unicorn/prefer-string-starts-ends-with": "warn"
+	},
+	"overrides": [
+		{
+			"files": ["**/*.{test,typetest}.ts"],
+			"rules": {
+				"typescript/no-explicit-any": "off"
+			}
+		},
+		{
+			"files": ["src/**", "tests/**", "lint/**"],
+			"plugins": ["typescript", "unicorn", "oxc", "vitest"],
+			"rules": {
+				"complexity": ["error", 15],
+				"max-depth": ["error", 4],
+				"max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+				"max-lines-per-function": ["error", 60],
+				"max-params": ["error", 4],
+				"vitest/expect-expect": "error",
+				"vitest/no-conditional-expect": "error",
+				"vitest/no-disabled-tests": "error",
+				"vitest/no-focused-tests": "error",
+				"honey/boundaries": "error",
+				"honey/content-type-exact-essence": "error",
+				"honey/no-module-side-effects": "error",
+				"honey/no-module-state": "error",
+				"honey/no-v8-ignore": "error",
+				"honey/public-jsdoc": "error",
+				"honey/unversioned-public": "error"
+			}
+		},
+		{
+			"files": ["src/**", "tests/**", "lint/**"],
+			"rules": {
+				"honey/no-console": "error"
+			}
+		},
+		{
+			"files": ["**/*.test.ts"],
+			"rules": {
+				"honey/spawn-timeout": "error"
+			}
+		},
+		{
+			"files": ["src/**/*.test.ts", "lint/**/*.test.ts", "tests/**"],
+			"rules": {
+				"max-lines": ["error", { "max": 500, "skipBlankLines": true, "skipComments": true }]
+			}
+		}
+	]
+}

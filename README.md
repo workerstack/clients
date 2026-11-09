@@ -211,7 +211,7 @@ Every SDK takes the same configuration — a base URL, the auth the spec's secur
 hooks around each HTTP call, and per-call overrides — and every one answers the same way: the normal call returns
 your value and throws a typed error by status, while `client.safe` answers a result instead. What follows is each
 language's client in a slice of a compiled example; the
-[SDK recipes](https://github.com/workerstack/backend/blob/main/docs/sdk-recipes.md) page has the whole programs.
+[SDK recipes](https://github.com/workerstack/clients/blob/main/docs/sdk-recipes.md) page has the whole programs.
 
 ### The TypeScript SDK
 
@@ -458,7 +458,7 @@ A name of yours that collides with the mirror, or with a runtime type, is rename
 silently. An operation or root resource named `safe` becomes `safe_`, and a component named like one of the runtime
 types becomes `<Name>Model`.
 
-Full reference: [generated clients](https://github.com/workerstack/backend/blob/main/docs/client.md).
+Full reference: [generated clients](https://github.com/workerstack/clients/blob/main/docs/client.md).
 
 ## The command-line client
 
@@ -486,8 +486,8 @@ shop orders list --status open --output json
 Its configuration has one precedence, everywhere: **flag, then environment, then config file.** The environment
 variables are the `--cli-env-prefix` (or the API's name) upper-cased.
 
-Full reference: [the generated CLI](https://github.com/workerstack/backend/blob/main/docs/cli.md) and
-[releasing it](https://github.com/workerstack/backend/blob/main/docs/cli-release.md).
+Full reference: [the generated CLI](https://github.com/workerstack/clients/blob/main/docs/cli.md) and
+[releasing it](https://github.com/workerstack/clients/blob/main/docs/cli-release.md).
 
 ## The MCP server
 
@@ -606,13 +606,13 @@ This package also exports the app-side generators the honey CLI and Vite plugin 
 
 ## Documentation
 
-- [Code generation](https://github.com/workerstack/backend/blob/main/docs/codegen.md): every target and its options.
-- [Generated clients](https://github.com/workerstack/backend/blob/main/docs/client.md) and their
-  [per-language recipes](https://github.com/workerstack/backend/blob/main/docs/sdk-recipes.md).
-- [The generated CLI](https://github.com/workerstack/backend/blob/main/docs/cli.md),
-  [releasing it](https://github.com/workerstack/backend/blob/main/docs/cli-release.md), and
+- [Code generation](https://github.com/workerstack/clients/blob/main/docs/codegen.md): every target and its options.
+- [Generated clients](https://github.com/workerstack/clients/blob/main/docs/client.md) and their
+  [per-language recipes](https://github.com/workerstack/clients/blob/main/docs/sdk-recipes.md).
+- [The generated CLI](https://github.com/workerstack/clients/blob/main/docs/cli.md),
+  [releasing it](https://github.com/workerstack/clients/blob/main/docs/cli-release.md), and
   [the MCP server](https://github.com/workerstack/backend/blob/main/docs/mcp.md).
-- [SDK conformance](https://github.com/workerstack/backend/blob/main/docs/conformance.md) and
+- [SDK conformance](https://github.com/workerstack/clients/blob/main/docs/conformance.md) and
   [the framework itself](https://github.com/workerstack/backend#readme).
 
 ## License

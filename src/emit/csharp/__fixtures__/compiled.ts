@@ -86,7 +86,7 @@ const SLOTS = 2
 const STALE_MS = 10 * 60_000
 
 /** The repo root's pin file: copied beside every gated dir, since SDK lookup walks up from the cwd. */
-const globalJson = () => resolve(import.meta.dirname, "../../../../../../global.json")
+const globalJson = () => resolve(import.meta.dirname, "../../../../global.json")
 
 /** Write `text` beside `path`, then rename: a parallel worker never reads half a file. */
 function writeAtomic(path: string, text: string | Uint8Array): void {

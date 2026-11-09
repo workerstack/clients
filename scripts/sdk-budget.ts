@@ -10,7 +10,7 @@ import { compareCodeUnits } from "../src/emit/shared/lang.ts"
 import { countTokens } from "./capture-token-budget.ts"
 
 /** The repository root, from this file. */
-const BUDGET_REPO = /* @__PURE__ */ resolve(import.meta.dirname, "../../..")
+const BUDGET_REPO = /* @__PURE__ */ resolve(import.meta.dirname, "..")
 
 /**
  * Each operation's member line in a v1 emitted `${stem}.types.gen.ts`, what a reader of the SDK takes in to call it

@@ -15,7 +15,7 @@ import { emittedSdk, recordingFetch } from "./__fixtures__/emitted.ts"
 import { generateAppClient } from "./app-client.ts"
 import { generateSdk } from "./sdk.ts"
 
-const GEN = join(REPO, "packages/gen")
+const GEN = REPO
 const TSC = join(REPO, "node_modules/typescript/bin/tsc")
 
 const JSON_OK = { 200: { content: { "application/json": { schema: { type: "object" } } }, description: "ok" } }

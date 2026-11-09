@@ -33,7 +33,7 @@ import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
 const { LEAN_BUILD, csharpCacheDir, dotnetEnv, dotnetInstall, dotnetRoot, pinnedDotnet, runDotnet, withDotnet } = env
 
 const GEN = resolve(import.meta.dirname, "../..")
-const REPO = join(GEN, "../..")
+const REPO = GEN
 const ROOTS = ["src", "tests", "scripts"]
 const SELF = "tests/structure/csharp-toolchain.test.ts"
 const ENV = "src/emit/csharp/__fixtures__/csharp-env.ts"
