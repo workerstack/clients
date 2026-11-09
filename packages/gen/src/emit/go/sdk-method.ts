@@ -1,0 +1,250 @@
+/**
+ * One operation as a Go method (G1): `(ctx, <path params in path order>, <body>?, opts *<Op>Opts,
+ * reqOpts ...RequestOption)`, filling the runtime's `call` and handing it to `doRequest`, or to its
+ * stream's runtime call (`sse.ts`, `ws.ts`). The query and header params ride on `<Op>Opts`, sent
+ * only when set. Spec text reaches the source only through the shared escape layer.
+ */
+import type { IRParam } from "../../ir/model.ts"
+import { mediaEssence, type SdkBody, type SdkOp, type SdkResponseKind, type SdkStream } from "../../ir/sdk-model.ts"
+import { goString, lineComment } from "../shared/escape.ts"
+import { goExported, goLocal, NameScope } from "../shared/lang.ts"
+import { type GoStream, type Shape, shapeOf } from "./sdk-answer.ts"
+import { type GoBody, type GoPart, goBody } from "./sdk-body.ts"
+import { type GoResponseHeaders, type OptsField, optsDecl, optsFields, optsLines, responseHeaders } from "./sdk-opts.ts"
+import { sseStream } from "./sse.ts"
+import { type GoTypeContext, goTypeOf } from "./types.ts"
+import { socketStream } from "./ws.ts"
+
+/**
+ * How a caller reaches a method, by the names this emitter gave it: the test driver's call plan
+ * (G8.4), so a driver invokes the method by reflection without re-deriving a name.
+ */
+export type GoMethodCall = {
+	readonly operation: string
+	readonly method: string
+	/** the path params by spec name, in signature order */
+	readonly pathParams: readonly string[]
+	/** the kind of the body parameter that follows them (`goBody`, which also emits it); null without one */
+	readonly body: SdkBody["kind"] | null
+	/** each query param by spec name, to its `<Op>Opts` field */
+	readonly query: Readonly<Record<string, string>>
+	/** each header param by spec name, to its `<Op>Opts` field */
+	readonly headers: Readonly<Record<string, string>>
+	readonly response: SdkResponseKind
+	/**
+	 * the `<Op>Headers` struct `WithHeadersInto` fills: its type name and each declared response
+	 * header (as the spec spells it) to its field; null for a method that has none
+	 */
+	readonly responseHeaders: GoResponseHeaders | null
+	readonly stream: SdkStream
+	/** the body parameter's Go type (`goBody`); null without one: the CLI declares the value it decodes into */
+	readonly bodyType: string | null
+	/** what the method returns, as its signature spells it: the CLI calls it in that shape */
+	readonly returns: string
+	/** the method's `<Op>Opts` type, as claimed (a clash gets a suffix) */
+	readonly opts: string
+	/** a multipart body's parts by their `<Op>Body` fields; null for any other body */
+	readonly parts: readonly GoPart[] | null
+}
+
+/**
+ * One operation's method, its client.go declarations by name (`<Op>Opts`, `<Op>Headers`), how a caller reaches it,
+ * and its `Client.Safe()` twin.
+ */
+export type GoMethod = {
+	readonly call: GoMethodCall
+	readonly decls: readonly (readonly [string, string])[]
+	readonly lines: readonly string[]
+	readonly twin: Twin
+}
+
+/** What every method of one SDK shares: the type context it hoists into. */
+export type MethodEnv = { readonly at: GoTypeContext }
+
+/** Where a method lives: its receiver's type, and the expression reaching the `*Client` from it. */
+export type Receiver = { readonly type: string; readonly client: string }
+
+/* the receiver, the method's own locals and the unexported runtime names its body calls: a path param never shadows one */
+const METHOD_LOCALS = [
+	"c",
+	"call",
+	"ctx",
+	"data",
+	"decodeJSON",
+	"dialWebSocket",
+	"doRequest",
+	"err",
+	"expandPath",
+	"fields",
+	"fileField",
+	"formBody",
+	"jsonBody",
+	"key",
+	"mp",
+	"multipartBody",
+	"multipartField",
+	"newRealtime",
+	"opts",
+	"params",
+	"path",
+	"r",
+	"rawBody",
+	"readerBody",
+	"reqOpts",
+	"result",
+	"setHeaderValue",
+	"setIdempotencyKey",
+	"sseFail",
+	"streamJSON",
+	"streamText",
+	"textField",
+	"topts",
+	"v",
+]
+
+/** The operation's path params in the order the path holds them, whatever order they were declared in. */
+function pathParamsOf(op: SdkOp): IRParam[] {
+	const order = op.pathSegments.flatMap((segment) => (segment.kind === "param" ? [segment.name] : []))
+	return [...op.pathParams].sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name))
+}
+
+/** How a caller reaches the method `name` of `op`: its path params, body and Opts fields by spec name. */
+function callOf(op: SdkOp, name: string, path: readonly [IRParam, string][], fields: readonly OptsField[]) {
+	const by = (at: OptsField["in"]) =>
+		Object.fromEntries(fields.filter((field) => field.in === at).map((field) => [field.param, field.name]))
+	return {
+		body: op.body?.kind ?? null,
+		headers: by("header"),
+		method: name,
+		operation: op.id,
+		pathParams: path.map(([param]) => param.name),
+		query: by("query"),
+		response: op.success.kind,
+		stream: op.stream,
+	}
+}
+
+/** The method's godoc: its name and route and its stream's note, then the operation's summary and description. */
+function methodDoc(op: SdkOp, name: string, stream: GoStream | null): string[] {
+	const route = [`${name} calls ${op.method} ${op.path}.`, stream?.doc ?? ""].filter((part) => part !== "").join(" ")
+	const text = [route, op.summary, op.description].filter((part) => part !== "")
+	return lineComment(text.join("\n\n"), "//")
+}
+
+/** How the method of `op` answers, and its stream: null for an operation that answers once. */
+function answering(op: SdkOp, env: MethodEnv): { readonly shape: Shape; readonly stream: GoStream | null } {
+	if (op.stream !== null) {
+		const stream = op.stream === "sse" ? sseStream(op, env.at) : socketStream(op.stream)
+		return { shape: stream.shape, stream }
+	}
+	const schema = op.success.schema
+	const result = schema && goTypeOf(schema, { ...env.at, fieldName: "Response", parentName: op.id }).replace(/^\*/, "")
+	return { shape: shapeOf({ kind: op.success.kind, result }), stream: null }
+}
+
+/** The statements expanding the path, and the expression the call sends as its path. */
+type PathLines = { readonly lines: readonly string[]; readonly path: string }
+
+/** The statements before `c`: the path expanded from its params, or the template as it is. */
+function pathLines(op: SdkOp, locals: readonly [IRParam, string][], fail: string): PathLines {
+	if (locals.length === 0) return { lines: [], path: goString(op.path) }
+	const params = locals.map(([param, local]) => `${goString(param.name)}: ${local}`).join(", ")
+	return {
+		lines: [
+			`\tparams := map[string]string{${params}}`,
+			`\tpath, err := expandPath(${goString(op.path)}, params)`,
+			"\tif err != nil {",
+			`\t\treturn ${fail}`,
+			"\t}",
+		],
+		path: "path",
+	}
+}
+
+/** The operation's own headers: Accept for a binary or text answer (a per-call header still wins, G4). */
+function acceptOf(op: SdkOp): string {
+	const { contentType, kind } = op.success
+	if (kind !== "binary" && kind !== "text") return "map[string]string{}"
+	return `map[string]string{"Accept": ${goString(mediaEssence(contentType as string))}}`
+}
+
+/** The `call` literal's members: the route, the operation's headers, the body, and the targets a success stales. */
+function callMembers(op: SdkOp, path: PathLines, body: GoBody | undefined, client: string): string[] {
+	return [
+		`method: ${goString(op.method)}`,
+		`path: ${path.path}`,
+		`operation: ${goString(`${op.method} ${op.path}`)}`,
+		`headers: ${acceptOf(op)}`,
+		...(body ? [`body: ${body.send}`] : []),
+		...(op.invalidates.length > 0 ? [`invalidates: []string{${op.invalidates.map(goString).join(", ")}}`] : []),
+		`stale: ${client}.stale`,
+		...(path.lines.length > 0 ? ["params: params"] : []),
+	]
+}
+
+/**
+ * How a method's `Client.Safe()` twin answers, as the field of its name on the twin struct: `call` a `Result` of the
+ * answer, `none` one of `struct{}` (no body), `stream` one of the event stream opened on the call, `conn` the very
+ * method (a WebSocket or realtime connection). `params` are the types before `reqOpts`; `answer` is the `T` the field's
+ * type takes. The field is the normal method value under a generic wrapper (sdk-client.ts), so the one request path
+ * runs and the runtime moves only an answer (an error status, a `*DecodeError`) into `Err`.
+ */
+export type Twin = {
+	readonly kind: "call" | "conn" | "none" | "stream"
+	readonly params: readonly string[]
+	readonly answer: string
+}
+
+/** The twin of a method of `op` returning `returns`, taking `params` before its RequestOptions. */
+function twinOf(op: SdkOp, returns: string, params: readonly string[]): Twin {
+	const answered = returns.slice("(".length, -", error)".length)
+	if (op.stream === "ws" || op.stream === "realtime") return { answer: answered, kind: "conn", params }
+	if (op.stream === "sse")
+		return { answer: returns.slice("iter.Seq2[".length, -", error]".length), kind: "stream", params }
+	if (returns === "error") return { answer: "struct{}", kind: "none", params }
+	return { answer: answered, kind: "call", params }
+}
+
+/** The method of `op` named `name` on `receiver`, and its `<Op>Opts` and `<Op>Headers`. */
+export function goMethod(op: SdkOp, name: string, receiver: Receiver, env: MethodEnv): GoMethod {
+	const opts = env.at.names.claimConst(`${goExported(op.id)}Opts`)
+	const locals = new NameScope(METHOD_LOCALS)
+	const bodyLocal = op.body && locals.claim("body")
+	const body = op.body && goBody(op, op.body, { at: env.at, local: bodyLocal as string })
+	const pathLocals = pathParamsOf(op).map((param): [IRParam, string] => [param, locals.claim(goLocal(param.name))])
+	const { shape, stream } = answering(op, env)
+	const streamOpts = stream?.opts ?? null
+	const fields = optsFields(op, opts, env.at, streamOpts)
+	const path = pathLines(op, pathLocals, shape.fail)
+	const headers = responseHeaders(op, env.at)
+	const params = [
+		"ctx context.Context",
+		...pathLocals.map(([, local]) => `${local} string`),
+		...(body ? [`${bodyLocal} ${body.type}`] : []),
+		`opts *${opts}`,
+		"reqOpts ...RequestOption",
+	]
+	const lines = [
+		...methodDoc(op, name, stream),
+		`func (r *${receiver.type}) ${name}(${params.join(", ")}) ${shape.returns} {`,
+		...path.lines,
+		...(body ? body.lines(shape.fail) : []),
+		`\tc := &call{${callMembers(op, path, body, receiver.client).join(", ")}}`,
+		...optsLines(op, fields, streamOpts),
+		...shape.tail(receiver.client),
+		"}",
+	]
+	const decls: [string, string][] = [[opts, optsDecl(op, opts, fields, streamOpts)]]
+	if (headers) decls.push([headers.plan.type, headers.decl])
+	const call = {
+		...callOf(op, name, pathLocals, fields),
+		bodyType: body ? body.type : null,
+		opts,
+		parts: body?.parts ?? null,
+		responseHeaders: headers?.plan ?? null,
+		returns: shape.returns,
+	}
+	const types = ["context.Context", ...pathLocals.map(() => "string"), ...(body ? [body.type] : []), `*${opts}`]
+	const twin = twinOf(op, shape.returns, types)
+	return { call, decls, lines, twin }
+}

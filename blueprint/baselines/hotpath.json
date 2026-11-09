@@ -1,0 +1,17 @@
+{
+	"baselines": {
+		"bun 1.4": {
+			"chain": 2.06,
+			"not-found": 10.57,
+			"param": 1.81,
+			"scoped": 1.92,
+			"static": 1.44,
+			"body": 1.89,
+			"mw-stack": 1.93,
+			"mw-sync": 1.81,
+			"many-routes": 1.61,
+			"large-response": 1.01
+		}
+	},
+	"note": "app.fetch cost / minimal raw fetch handler, median of 3 runs of 15 interleaved samples, per runtime minor version. bun 1.4 recorded 2026-10-14 on this machine (AMD Ryzen 7 9800X3D, amd-pstate-epp, performance governor, boost on, taskset -c 2,3; no pinned CI runner yet). v0's ratios, recorded before _v0 was deleted (bit 20 e, v0 at 1a968f1); nothing regenerates them."
+}

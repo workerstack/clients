@@ -1,0 +1,15 @@
+import { honeyPlugin } from "@workerstack/backend/plugin"
+
+export default {
+	plugins: [
+		honeyPlugin({
+			app: "src/gen-app.ts",
+			codegen: {
+				manifest: true,
+				openApi: { title: "Honey Compose", version: "0.0.1" },
+				tree: true,
+				types: true,
+			},
+		}),
+	],
+}

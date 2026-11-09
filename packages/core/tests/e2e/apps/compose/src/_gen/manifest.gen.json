@@ -1,0 +1,214 @@
+{
+  "errors": [
+    {
+      "errorKey": "expired_token",
+      "status": 401,
+      "statusKey": "unauthorized"
+    },
+    {
+      "errorKey": "forbidden",
+      "status": 403,
+      "statusKey": "forbidden"
+    },
+    {
+      "errorKey": "invalid_token",
+      "status": 401,
+      "statusKey": "unauthorized"
+    },
+    {
+      "errorKey": "not_found",
+      "status": 404,
+      "statusKey": "not_found"
+    },
+    {
+      "errorKey": "rate_limited",
+      "status": 429,
+      "statusKey": "too_many_requests"
+    }
+  ],
+  "routes": [
+    {
+      "errors": [
+        "expired_token",
+        "invalid_token"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [],
+      "path": "/health"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "invalid_token"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [],
+      "path": "/docs"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "invalid_token"
+      ],
+      "input": {
+        "search": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "default": 1,
+              "type": "number"
+            }
+          }
+        }
+      },
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [],
+      "path": "/feed"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "forbidden",
+        "invalid_token"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [],
+      "path": "/account"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "forbidden",
+        "invalid_token"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "notifications": {
+              "type": "boolean"
+            },
+            "theme": {
+              "type": "string",
+              "enum": [
+                "dark",
+                "light"
+              ]
+            }
+          },
+          "required": [
+            "notifications",
+            "theme"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [],
+      "path": "/account/settings"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "forbidden",
+        "invalid_token",
+        "not_found"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [
+        "resourceId"
+      ],
+      "path": "/resources/:resourceId"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "forbidden",
+        "invalid_token",
+        "not_found"
+      ],
+      "meta": {},
+      "method": "DELETE",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "no_content": {}
+        }
+      },
+      "params": [
+        "resourceId"
+      ],
+      "path": "/resources/:resourceId"
+    },
+    {
+      "errors": [
+        "expired_token",
+        "forbidden",
+        "invalid_token",
+        "rate_limited"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "doc",
+                "image",
+                "video"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "params": [],
+      "path": "/resources"
+    }
+  ]
+}

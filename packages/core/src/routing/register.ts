@@ -1,0 +1,313 @@
+/**
+ * Route registration: the app graph every handle of one app shares, the routes and scopes
+ * registered into it, and mounting a sub-app. Records are per graph, keyed by `RouteId`; the
+ * tree holds ids only, so a sub-app mounted into two parents never shares a record.
+ */
+import { ERROR_META, type ErrorMetaEntry } from "../errors/errors.ts"
+import type { ErrorFactoryRecord } from "../errors/projector.ts"
+import type { InputSchemas, InputStep } from "../input/input.ts"
+import type { OutputSchemas } from "./output-types.ts"
+import type { MaybePromise, RuntimeMiddleware } from "../middleware/middleware.ts"
+import type { FinalizeHooks, FinalTable } from "./finalize.ts"
+import { describeMw, errorFactoryOf, errorsOf, scopeGuard } from "./middleware-chain.ts"
+import {
+	canonical,
+	expandOptional,
+	joinPatterns,
+	normalizePattern,
+	parsePattern,
+	type RouteId,
+	routeId,
+	type Segment,
+	splitRouteId,
+} from "./pattern.ts"
+import type { RouteRecord } from "./record.ts"
+import { type AppSettings, createSettings, type ErrorFactories } from "./settings.ts"
+import { cloneTree, createNode, insertLeaf, type RouteEntry, type TreeNode } from "./tree.ts"
+
+/** An app's graph slot: not exported from the package; finalize readers (tests, codegen) reach the graph through it. */
+export const GRAPH: unique symbol = /* @__PURE__ */ Symbol("honey.graph")
+
+/** A handle's view slot: what a handle-level helper (serving a document) reads its basePath off. */
+export const VIEW: unique symbol = /* @__PURE__ */ Symbol("honey.view")
+
+/** A preset's seed slot: what `honey(preset)` copies, read without importing the preset module. */
+export const SEED: unique symbol = /* @__PURE__ */ Symbol("honey.seed")
+
+/**
+ * The meta marker of a route an app serves about itself (its document, docs page or manifest).
+ * Such a route belongs to the app that registered it: mounting another app copies none of its
+ * served routes, a route tree leaves them out, and an app loaded from a tree registers its own.
+ */
+export const SERVED: unique symbol = /* @__PURE__ */ Symbol.for("honey.served")
+
+/** A registered route: what it was registered with, before finalize resolves it against the graph. */
+export type RouteHandler = RouteRecord & {
+	/** came with the loaded route tree: a registration of the same route replaces it */
+	readonly lt?: true
+	/** the chain middleware captured at registration, plus any mounting chain */
+	readonly cm: readonly RuntimeMiddleware[]
+	/** `.context()` values of the registering handle, merged under the mounting handle's */
+	readonly cv: Readonly<Record<string, unknown>> | null
+	/** error keys the route declared itself (`.errors()`, `.boundary()`) */
+	readonly dk: ReadonlySet<string>
+	/** the factory `.errors(factory, ...keys)` named; its keys come from it, not the app's */
+	readonly ef: ErrorFactories | null
+	/** The route's handler, called after its middleware and `.input()` step; on a WebSocket route, the upgrade. */
+	readonly fn: (ctx: object) => MaybePromise<Response>
+	/** the compiled `.input()` step, run after the middleware and before `fn`; `null` without `.input()` */
+	readonly in: InputStep | null
+	/** what `.input()` declares, as written: read by documentation, never at dispatch; `null` without it */
+	readonly iv: InputSchemas | null
+	/** what `.output()` declares, checked at finalize when the app's mode is on; `null` without it */
+	readonly out: OutputSchemas | null
+	/** the settings of the app the route was registered on */
+	readonly own: AppSettings<unknown>
+	/** route-level boundary key (`.boundary()`) */
+	readonly rb: string | null
+	/** route-level middleware (`.get(...).use(mw)`) */
+	readonly rm: readonly RuntimeMiddleware[]
+	/** explicit meta: chain `.meta()` overlaid by route `.meta()` */
+	readonly xm: Readonly<Record<string, unknown>> | null
+}
+
+/** What a builder hands over; the graph gives it its id and pattern. */
+export type RouteSource = Omit<RouteHandler, "id" | "mt" | "rp" | "sg">
+
+/** One `app.use(mw)`: the handle it returns has to register a route, or `mw` runs nowhere. */
+export type ChainNode = {
+	/** The middleware this `use(mw)` call added. */ readonly mw: RuntimeMiddleware
+	/** The node this one chains onto, or `null` at the root. */ readonly parent: ChainNode | null
+	/** Whether a route has been registered, mounted or served through this chain. */ used: boolean
+}
+
+/** A route builder still waiting for `.handler()`, reported at finalize. */
+export type PendingRoute = {
+	/** The route's methods (comma-separated when several) and full path, as the finalize error names them. */ readonly id: string
+}
+
+/** One path-scoped `use(path, mw)`. */
+export type ScopedEntry = {
+	/** the middleware behind a request-path check, for routes the scope covers only partly */
+	readonly guard: RuntimeMiddleware
+	/** The middleware as registered, for routes the scope covers entirely. */
+	readonly mw: RuntimeMiddleware
+	/** canonical full-path pattern, rebased against the handle's basePath */
+	readonly prefix: string
+	/** The scope prefix, parsed. */
+	readonly segs: readonly Segment[]
+}
+
+/**
+ * Everything one app registers: its routes, middleware chains, scopes and settings. Handles derived from one app share it.
+ */
+export type HoneyGraph = {
+	/** root wildcards a loaded app registered outside its tree: what its unserved leaves delegate to */
+	readonly catchAll: Map<RouteId, RouteHandler>
+	/** every `use(mw)` handle; one that never registers a route is reported at finalize */
+	readonly chains: ChainNode[]
+	/** bumped by every registration; finalize re-runs when it moves */
+	epoch: number
+	/** The compiled routing table of the last finalize; reused while `epoch` is unchanged. */
+	final: FinalTable | null
+	/** the error boundary and miss answer dispatch compiles into every chain, created once */
+	hooks: FinalizeHooks | null
+	/** Route builders still waiting for `.handler()`. */
+	readonly pending: Set<PendingRoute>
+	/** the route data of the tree `routeTree()` loaded; `null` while the app builds its own tree */
+	loaded: Readonly<Record<RouteId, RouteEntry>> | null
+	/** The routes this app runs, by route id: registered, mounted, or carried by a loaded tree. */
+	readonly records: Map<RouteId, RouteHandler>
+	/** The router tree: built as routes register, or the tree `routeTree()` loaded. */
+	root: TreeNode
+	/** path-scoped middleware, in registration order */
+	readonly scoped: ScopedEntry[]
+	/** chains of the handles that served a request: what 404 and 405 run when there are no routes */
+	readonly served: Set<readonly RuntimeMiddleware[]>
+	/** The app's settings, shared by every handle. */
+	readonly settings: AppSettings<unknown>
+	/** routes a loaded app registered that its tree lacks: the tree is stale, said at finalize */
+	readonly unexpected: Map<RouteId, RouteHandler>
+}
+
+/** What one handle contributes to the routes registered or mounted through it. */
+export type HandleView = {
+	/** The path prefix the handle's routes register under. */
+	readonly basePath: string
+	/** The middleware the handle's routes run first, in order. */
+	readonly chain: readonly RuntimeMiddleware[]
+	/** Meta set on the handle with `.meta(values)`, applied to every route it registers. */
+	readonly chainMeta: Readonly<Record<string, unknown>> | null
+	/** Values set on the handle with `.context()`, copied onto each request context. */
+	readonly contextValues: Readonly<Record<string, unknown>> | null
+	/** the `use(mw)` call that created this chain; `null` on the root handle */
+	readonly node: ChainNode | null
+}
+
+export const ROOT_VIEW: HandleView = /* @__PURE__ */ Object.freeze({
+	basePath: "/",
+	chain: [],
+	chainMeta: null,
+	contextValues: null,
+	node: null,
+})
+
+export function createGraph(): HoneyGraph {
+	return {
+		catchAll: new Map(),
+		chains: [],
+		epoch: 0,
+		final: null,
+		hooks: null,
+		loaded: null,
+		pending: new Set(),
+		records: new Map(),
+		root: createNode(),
+		scoped: [],
+		served: new Set(),
+		settings: createSettings(),
+		unexpected: new Map(),
+	}
+}
+
+/** Every `use()` on the way to a handle that registers, mounts or serves is in use. */
+export function markUsed(node: ChainNode | null): void {
+	let at = node
+	while (at !== null && !at.used) {
+		at.used = true
+		at = at.parent
+	}
+}
+
+/** A new `use(mw)` node under `parent`. */
+export function addChain(g: HoneyGraph, parent: ChainNode | null, mw: RuntimeMiddleware): ChainNode {
+	const node: ChainNode = { mw, parent, used: false }
+	g.chains.push(node)
+	return node
+}
+
+/** Throw the duplicate-route error when `g` already has a route at `method` and `segments`. */
+export function assertRouteFree(g: HoneyGraph, method: string, segments: readonly Segment[]): RouteId {
+	const id = routeId(method, canonical(segments))
+	if (g.records.get(id)?.lt === undefined && (g.records.has(id) || g.catchAll.has(id))) {
+		throw new Error(`Duplicate route: ${id}`)
+	}
+	return id
+}
+
+/** Whether a route's own meta marks it served: the app's own, never copied with it. */
+export function isServed(r: { readonly xm: Readonly<Record<string, unknown>> | null }): boolean {
+	return (r.xm as { [SERVED]?: unknown } | null)?.[SERVED] === true
+}
+
+/** Register one route at every leaf its pattern occupies (an optional last param places two). */
+export function addRoute(g: HoneyGraph, method: string, segments: readonly Segment[], source: RouteSource): RouteId {
+	const id = assertRouteFree(g, method, segments)
+	const record = { ...source, id, mt: null, rp: canonical(segments), sg: segments }
+	g.epoch++
+	/* a loaded app serves its own document beside its tree: on a copy, the loaded tree untouched */
+	const beside = g.loaded !== null && isServed(source) && !Object.hasOwn(g.loaded, id)
+	if (beside && Object.isFrozen(g.root)) g.root = cloneTree(g.root)
+	if (g.loaded === null || beside)
+		for (const variant of expandOptional(segments)) insertLeaf(g.root, variant, method, id)
+	else if (!Object.hasOwn(g.loaded, id)) {
+		/* a loaded app binds the routes its tree holds; a root wildcard it lacks is the catch-all */
+		if (segments.length === 1 && segments[0]?.k === "wildcard") g.catchAll.set(id, record)
+		else g.unexpected.set(id, record)
+		return id
+	}
+	g.records.set(id, record)
+	return id
+}
+
+/** Guard every request path under `path` (rebased on `basePath`) with `mw`, whichever handle registered the route. */
+export function addScope(g: HoneyGraph, basePath: string, path: string, mw: RuntimeMiddleware): void {
+	const prefix = joinPatterns(basePath, normalizePattern(path))
+	const segs = parsePattern(prefix)
+	g.scoped.push({ guard: scopeGuard(segs, mw), mw, prefix, segs })
+	g.epoch++
+}
+
+/** A builder registered or was abandoned on purpose: no longer pending. */
+export function settle(g: HoneyGraph, pending: PendingRoute, node: ChainNode | null): void {
+	g.pending.delete(pending)
+	markUsed(node)
+}
+
+/** `use(mw)` handles that never registered, mounted or served, and builders without `.handler()`. */
+export function assertNothingDiscarded(g: HoneyGraph): void {
+	const problems: string[] = []
+	for (const node of g.chains) {
+		if (node.used) continue
+		problems.push(
+			`app.use(${describeMw(node.mw)}) returned a handle that never registers a route, so the middleware runs nowhere. ` +
+				"use() does not change the handle it is called on: keep the returned value and register routes on it " +
+				"(`const authed = app.use(auth); authed.get(...)`), or chain it (`honey().use(mw).get(...)`).",
+		)
+	}
+	for (const p of g.pending)
+		problems.push(`${p.id} was declared but never got a .handler(), so the route is not registered.`)
+	if (problems.length > 0) throw new Error(`honey: ${problems.join("\n  ")}`)
+}
+
+/**
+ * Mount a sub-app: re-register its routes under the view's basePath, with the view's chain running
+ * before theirs and its context values and chain meta under theirs. Nothing is shared by
+ * reference, so routes the sub registers later stay its own; each record keeps the settings of the
+ * app it was registered on. The sub's scopes guard the paths it brought.
+ */
+export function mount(g: HoneyGraph, view: HandleView, sub: HoneyGraph): void {
+	if (sub === g) return
+	assertNothingDiscarded(sub)
+	const base = view.basePath
+	const at = (pattern: string): string => (base === "/" ? pattern : joinPatterns(base, pattern))
+	for (const [id, r] of sub.records) {
+		if (isServed(r)) continue
+		const { method, pattern } = splitRouteId(id)
+		addRoute(g, method, parsePattern(at(pattern)), {
+			...r,
+			cm: [...view.chain, ...r.cm],
+			cv: view.contextValues ? { ...view.contextValues, ...r.cv } : r.cv,
+			xm: view.chainMeta ? { ...view.chainMeta, ...r.xm } : r.xm,
+		})
+	}
+	g.settings.metaSpec.absorbed.push(sub.settings.metaSpec)
+	for (const entry of sub.scoped) {
+		const prefix = at(entry.prefix)
+		if (g.scoped.some((e) => e.mw === entry.mw && e.prefix === prefix)) continue
+		const segs = parsePattern(prefix)
+		g.scoped.push({ guard: scopeGuard(segs, entry.mw), mw: entry.mw, prefix, segs })
+	}
+	g.epoch++
+}
+
+/** The error keys a middleware chain declares, in run order. */
+export function chainErrorKeys(chain: readonly RuntimeMiddleware[]): string[] {
+	return chain.flatMap((mw) => errorsOf(mw) ?? [])
+}
+
+/** Each key's status key from the first factory whose ERROR_META knows it; `null` when none does. */
+export function statusKeysOf(
+	keys: readonly string[],
+	factories: readonly (ErrorFactoryRecord | null)[],
+): Record<string, string> | null {
+	const out: Record<string, string> = {}
+	for (const key of keys) {
+		const meta = factories.map((f) => f?.[ERROR_META]).find((m) => m !== undefined && Object.hasOwn(m, key))
+		if (meta !== undefined) out[key] = (meta[key] as ErrorMetaEntry).statusKey
+	}
+	return Object.keys(out).length === 0 ? null : out
+}
+
+/**
+ * What a middleware chain's factories say of the keys each middleware declares, the first in run order winning. A
+ * key it does not declare is never read off its factory, which carries honey's own keys at honey's statuses.
+ */
+export function chainErrorMeta(chain: readonly RuntimeMiddleware[]): ErrorFactoryRecord {
+	const meta: Record<string, ErrorMetaEntry> = Object.create(null)
+	for (const mw of chain) {
+		const own = (errorFactoryOf(mw) as ErrorFactoryRecord | undefined)?.[ERROR_META] ?? {}
+		for (const key of errorsOf(mw) ?? []) if (Object.hasOwn(own, key)) meta[key] ??= own[key] as ErrorMetaEntry
+	}
+	return { [ERROR_META]: meta }
+}

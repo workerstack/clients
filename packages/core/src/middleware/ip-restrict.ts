@@ -1,0 +1,164 @@
+/**
+ * `ipRestrict({ allowList, denyList })`: admit or refuse a request by `ctx.ip`, the platform peer
+ * (H23): no forwarding header can stand in for it, so behind a self-hosted proxy restrict at the
+ * proxy. Rules are addresses or CIDR ranges, IPv4 or IPv6, compared as numbers, so every spelling
+ * of one address (IPv4-mapped, zero-compressed, any case) is one address.
+ *
+ * The deny list is checked first; with an allow list, everything else is refused. Fails closed: no
+ * reported peer is 403 under either list.
+ */
+import { canonicalIp, parseIpv4, parseIpv6 } from "../context/peer.ts"
+import { HoneyError } from "../errors/error.ts"
+import { type MiddlewareFn, namedMiddleware } from "./middleware.ts"
+
+/** Options for `ipRestrict`: a non-empty `allowList`, a non-empty `denyList`, or both. `allowList: []` throws even beside a `denyList`. */
+export type IpRestrictOptions = {
+	/** Addresses and CIDR ranges admitted; with it, every other peer is refused. */
+	allowList?: readonly string[]
+	/** Addresses and CIDR ranges refused, checked before `allowList`. */
+	denyList?: readonly string[]
+}
+
+type Address = { readonly n: number; readonly v: 4 } | { readonly n: bigint; readonly v: 6 }
+
+type Range =
+	| { readonly base: number; readonly mask: number; readonly v: 4 }
+	| { readonly base: bigint; readonly mask: bigint; readonly v: 6 }
+
+const PREFIX_LENGTH = /^\d{1,3}$/
+
+function v4Range(n: number, prefix: number): Range {
+	/* a shift by 32 is a shift by 0 in JS: /0 is spelled out */
+	const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0
+	return { base: (n & mask) >>> 0, mask, v: 4 }
+}
+
+/** An address or CIDR rule, strict: no brackets, zone or port, a prefix that fits the family. */
+function parseRule(rule: string): Range | null {
+	const slash = rule.indexOf("/")
+	const text = slash === -1 ? rule : rule.slice(0, slash)
+	const bits = slash === -1 ? null : rule.slice(slash + 1)
+	if (bits !== null && !PREFIX_LENGTH.test(bits)) return null
+	if (!text.includes(":")) {
+		const n = parseIpv4(text)
+		const prefix = bits === null ? 32 : Number(bits)
+		return n === null || prefix > 32 ? null : v4Range(n, prefix)
+	}
+	const n = parseIpv6(text)
+	const prefix = bits === null ? 128 : Number(bits)
+	if (n === null || prefix > 128) return null
+	/* `::ffff:a.b.c.d/96` or longer is the IPv4 range it maps, which is how ctx.ip spells those peers */
+	if (n >> 32n === 0xffffn && prefix >= 96) return v4Range(Number(n & 0xffffffffn), prefix - 96)
+	const mask = ((1n << BigInt(prefix)) - 1n) << BigInt(128 - prefix)
+	return { base: n & mask, mask, v: 6 }
+}
+
+function rulesOf(list: readonly string[] | undefined, name: string): Range[] {
+	return (list ?? []).map((rule) => {
+		const range = parseRule(rule)
+		if (range === null) {
+			throw new TypeError(`ipRestrict: ${name} entry ${JSON.stringify(rule)} is not an IP address or CIDR range`)
+		}
+		return range
+	})
+}
+
+/** ctx.ip is canonical (dotted IPv4 or RFC 5952 IPv6), so it always parses. */
+function addressOf(ip: string): Address {
+	return ip.includes(":") ? { n: parseIpv6(ip) as bigint, v: 6 } : { n: parseIpv4(ip) as number, v: 4 }
+}
+
+function inRange(addr: Address, range: Range): boolean {
+	if (addr.v === 4) return range.v === 4 && (addr.n & range.mask) >>> 0 === range.base
+	return range.v === 6 && (addr.n & range.mask) === range.base
+}
+
+/**
+ * Whether `rule` is an address or CIDR range `ipRestrict` and {@link ipAllowed} can match: check a list with it
+ * before storing the list.
+ *
+ * @param rule An address or CIDR range, IPv4 or IPv6, with no brackets, zone or port.
+ * @returns `true` when the rule parses.
+ */
+export function isIpRule(rule: string): boolean {
+	return parseRule(rule) !== null
+}
+
+/** The stored lists {@link ipAllowed} checks an address against. */
+export type IpLists = {
+	/** Addresses and CIDR ranges admitted; when non-empty, every other address is refused. */
+	readonly allow?: readonly string[] | null
+	/** Addresses and CIDR ranges refused, checked before `allow`. */
+	readonly deny?: readonly string[] | null
+}
+
+/** The rules of `list` that parse: a stored rule that does not is skipped, never thrown over mid-request. */
+function storedRules(list: readonly string[] | null | undefined): Range[] {
+	return (list ?? []).map(parseRule).filter((range) => range !== null)
+}
+
+/**
+ * Whether `ip` passes `lists`, by `ipRestrict`'s rules: for lists read per request, as a tenant's stored ones,
+ * where `ipRestrict`'s fixed lists cannot go. The deny list is checked first; with an allow list, everything else
+ * is refused. A list that is null, missing or empty restricts nothing, unlike `ipRestrict`'s `allowList: []`, which
+ * throws because there the list is code.
+ *
+ * Fails closed: under any non-empty list, an `ip` that is null or no address is refused. A stored rule that does
+ * not parse never matches, so validate lists with {@link isIpRule} when they are saved.
+ *
+ * @param ip The client's address, as `ctx.ip` reports it; any spelling of one address is that address.
+ * @param lists The addresses and CIDR ranges allowed and denied.
+ * @returns `true` when the address passes.
+ *
+ * @example
+ * if (!ipAllowed(ctx.ip, { allow: key.allowedIps, deny: key.blockedIps })) {
+ * 	throw new HoneyError({ errorKey: "forbidden", status: "forbidden" })
+ * }
+ */
+export function ipAllowed(ip: string | null, lists: IpLists): boolean {
+	const restricted = (lists.allow?.length ?? 0) > 0 || (lists.deny?.length ?? 0) > 0
+	if (!restricted) return true
+	const canonical = ip === null ? null : canonicalIp(ip)
+	if (canonical === null) return false
+	const addr = addressOf(canonical)
+	if (storedRules(lists.deny).some((range) => inRange(addr, range))) return false
+	if ((lists.allow?.length ?? 0) === 0) return true
+	return storedRules(lists.allow).some((range) => inRange(addr, range))
+}
+
+function forbidden(): never {
+	throw new HoneyError({ errorKey: "forbidden", status: "forbidden" })
+}
+
+/**
+ * Middleware that answers 403 `forbidden` to a peer on `denyList`, or off `allowList` when there is
+ * one. It reads only `ctx.ip`, so behind a self-hosted reverse proxy it sees the proxy's address.
+ * It fails closed: a request with no reported peer is refused under either list. Throws `TypeError`
+ * for an empty `allowList`, for no rules at all, or for a rule that is not an IP address or CIDR range.
+ */
+export function ipRestrict(options: IpRestrictOptions): MiddlewareFn<
+	{
+		/** The platform-reported peer address, or `null` when none is reported. */ readonly ip: string | null
+	},
+	{},
+	"forbidden"
+> {
+	if (options.allowList?.length === 0) {
+		throw new TypeError(
+			"ipRestrict: `allowList: []` would refuse every request; remove the middleware or list addresses",
+		)
+	}
+	const deny = rulesOf(options.denyList, "denyList")
+	const allow = rulesOf(options.allowList, "allowList")
+	if (deny.length === 0 && allow.length === 0)
+		throw new TypeError("ipRestrict: pass a non-empty `allowList` or `denyList`")
+	const mw: MiddlewareFn<{ readonly ip: string | null }, {}, "forbidden"> = (ctx, next) => {
+		if (ctx.ip === null) return forbidden()
+		const addr = addressOf(ctx.ip)
+		if (deny.some((range) => inRange(addr, range))) return forbidden()
+		if (allow.length > 0 && !allow.some((range) => inRange(addr, range))) return forbidden()
+		return next()
+	}
+	mw.errors = ["forbidden"]
+	return namedMiddleware("ipRestrict", mw)
+}

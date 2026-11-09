@@ -1,0 +1,168 @@
+/**
+ * `proxy(config)`: a route handler that forwards the request to an upstream and streams its answer
+ * back, mounted like any other: `app.all("/api/*rest").handler(proxy({ destination }))`. Plain code
+ * reached through `@workerstack/backend/proxy`, no slot and no builder method (H23): core never imports
+ * it. The answer is the passthrough brand, since the upstream decides its status and type.
+ *
+ * Both ways, hop-by-hop headers are dropped and the forwarding headers describe the client as the
+ * platform reported it (headers.ts). Behind `requestId()` the request's id goes on under that
+ * middleware's header, replacing the client's. The URL is the normalized path, the deadlines and
+ * failure mapping are upstream.ts's. Every method but GET and HEAD forwards its body. The call
+ * follows `ctx.signal`: a disconnect, `timeout()` or shutdown cancels it and its body. Redirects go
+ * back to the client, never followed. On the Node bridge the answer is a HoneyResponse, so the
+ * header middleware in front of the route stay on the plain map.
+ */
+import { type HoneyContext, REQUEST, TRACE } from "../context/context.ts"
+import { createHoneyResponse, isNodeOutbound } from "../response/builder.ts"
+import { headersToRecord, HoneyOutHeaders } from "../response/out-headers.ts"
+import type { TypedResponse } from "../response/response.ts"
+import { searchOfUrl } from "../routing/request-path.ts"
+import { clientHeaders, upstreamHeaders } from "./headers.ts"
+import { forwardBody, msOf, timeoutError, withIdleTimeout, within } from "./upstream.ts"
+
+/** Default time allowed until the upstream's response headers arrive. */
+const DEFAULT_TIMEOUT_MS = 60_000
+
+/** Options for `proxy`: where to forward, and how to adjust the request and the answer. */
+export type ProxyConfig<TCtx> = {
+	/**
+	 * Where the request goes: `fetch`, a Workers service binding, a Durable Object stub, anything
+	 * that answers a Response. `url` is the normalized path and query (after `rewriteUrl`), `init`
+	 * the method, headers, body, signal and `redirect: "manual"` the framework prepared. A network
+	 * failure the runtime reports is a 502, a `TimeoutError` a 504; any other throw, a bug here
+	 * included, a 500.
+	 */
+	destination: (ctx: TCtx, url: string, init: RequestInit) => Promise<Response> | Response
+	/**
+	 * Whether the answer's body is already decoded, as `fetch()` always returns it. When true (the
+	 * default) an encoded answer loses `Content-Encoding` and `Content-Length`, so the headers
+	 * describe the bytes the client gets. False when destination returns bytes still encoded.
+	 */
+	decoded?: boolean
+	/** Add `X-Forwarded-For`, `-Proto` and `-Host`. Default true; the client's own are dropped either way. */
+	forwardedHeaders?: boolean
+	/**
+	 * Most milliseconds the upstream may stay silent while the body streams. Omitted or not
+	 * positive: no limit (an SSE stream may idle). A stall aborts the upstream and errors the body.
+	 * Off for a WebSocket upgrade.
+	 */
+	idleTimeout?: number | ((ctx: TCtx) => number)
+	/**
+	 * Runs on the answer before the client gets it, its headers mutable. Return a Response to
+	 * replace it. Not called for a 101 upgrade, which is the runtime's.
+	 */
+	onResponse?: (ctx: TCtx, response: Response) => Promise<Response | void> | Response | void
+	/** Run last on the forwarded headers, so it may set any of them: a record of entries, or an edit. */
+	requestHeaders?: Record<string, string> | ((ctx: TCtx, headers: Headers) => void)
+	/** Rewrite the normalized path and query before destination sees it. */
+	rewriteUrl?: (ctx: TCtx, url: string) => string
+	/**
+	 * Most milliseconds to wait for the answer's headers; later is a 504. Default 60 000; not
+	 * positive is no limit. The body is `idleTimeout`'s. Off for a WebSocket upgrade.
+	 */
+	timeout?: number | ((ctx: TCtx) => number)
+}
+
+/** What the handler reads off the route's ctx, whatever else the app put on it. */
+type ProxyCtx = {
+	readonly ip: string | null
+	readonly path: string
+	readonly req: Request
+	readonly signal: AbortSignal
+}
+
+function isNullBody(status: number): boolean {
+	return status === 101 || status === 103 || status === 204 || status === 205 || status === 304
+}
+
+/** The client's copy of the upstream answer, its headers cleaned and mutable for onResponse. */
+function answerFor(
+	response: Response,
+	body: ReadableStream<Uint8Array> | null,
+	decoded: boolean,
+	nodeOut: boolean,
+): Response {
+	const init = { status: response.status, statusText: response.statusText }
+	const stream = isNullBody(response.status) ? null : body
+	if (nodeOut) {
+		const headers = new HoneyOutHeaders(headersToRecord(response.headers))
+		clientHeaders(headers, decoded)
+		return createHoneyResponse({ ...init, headers: headers.toRecord(), stream })
+	}
+	const headers = new Headers(response.headers)
+	clientHeaders(headers, decoded)
+	return new Response(stream, { ...init, headers })
+}
+
+function applyRequestHeaders<TCtx>(edit: ProxyConfig<TCtx>["requestHeaders"], ctx: TCtx, headers: Headers): void {
+	if (typeof edit === "function") return edit(ctx, headers)
+	for (const [name, value] of Object.entries(edit ?? {})) headers.set(name, value)
+}
+
+type Send = (call: () => Promise<Response> | Response) => Promise<Response> | Response
+
+/** An untraced request's call: made as it is, its headers as they came. */
+const untraced: Send = (call) => call()
+
+/**
+ * How the call is made: on a traced request inside its `http.proxy` span, the upstream getting the
+ * request's trace, never the caller's (a trusted caller's tracestate goes on with it).
+ */
+function traced(ctx: unknown, method: string, headers: Headers): Send {
+	const outbound = (ctx as HoneyContext)[TRACE]?.outbound("http.proxy", method)
+	if (outbound === undefined) return untraced
+	if (outbound.traceparent === null) headers.delete("traceparent")
+	else headers.set("traceparent", outbound.traceparent)
+	if (outbound.tracestate === undefined) headers.delete("tracestate")
+	else headers.set("tracestate", outbound.tracestate)
+	return (call) => outbound.send(call)
+}
+
+/**
+ * A route handler that forwards each request to `config.destination` and streams the upstream's answer back. It declares
+ * the errors it answers with, `bad_gateway` (502) and `gateway_timeout` (504), on each route it handles.
+ */
+export function proxy<TCtx>(config: ProxyConfig<TCtx>): (ctx: TCtx) => Promise<TypedResponse> {
+	const decoded = config.decoded !== false
+	const forwarded = config.forwardedHeaders !== false
+	const handler = async (ctx: TCtx): Promise<TypedResponse> => {
+		const { ip, path, req, signal } = ctx as unknown as ProxyCtx
+		const websocket = req.headers.get("upgrade")?.trim().toLowerCase() === "websocket"
+		const pathQuery = path + searchOfUrl(req.url)
+		const url = config.rewriteUrl ? config.rewriteUrl(ctx, pathQuery) : pathQuery
+		const headers = upstreamHeaders(req, { client: forwarded ? ip : undefined, websocket })
+		/* requestHeaders below still has the last word on these */
+		const requestId = (ctx as unknown as HoneyContext)[REQUEST].requestId
+		if (requestId !== undefined) headers.set(requestId.header, requestId.id)
+		const send = traced(ctx, req.method, headers)
+		const body = await forwardBody(req)
+		/* no body, or bytes whose length fetch() computes itself */
+		if (!(body instanceof ReadableStream)) headers.delete("content-length")
+		applyRequestHeaders(config.requestHeaders, ctx, headers)
+		const upstream = new AbortController()
+		const init: RequestInit & { duplex?: "half" } = {
+			body: body ?? undefined,
+			headers,
+			method: req.method,
+			redirect: "manual",
+			signal: AbortSignal.any([signal, upstream.signal]),
+		}
+		/* a streamed request body needs it on Node; Workers imply it */
+		if (body instanceof ReadableStream) init.duplex = "half"
+		const headerMs = websocket ? undefined : msOf(config.timeout, ctx, DEFAULT_TIMEOUT_MS)
+		const response = await within({ client: signal, headerMs, upstream }, () =>
+			send(() => config.destination(ctx, url, init)),
+		)
+		if (response.status === 101) return response as TypedResponse
+		const idleMs = websocket ? undefined : msOf(config.idleTimeout, ctx)
+		const stream =
+			response.body !== null && idleMs !== undefined
+				? withIdleTimeout(response.body, idleMs, () => upstream.abort(timeoutError()))
+				: response.body
+		const answer = answerFor(response, stream, decoded, isNodeOutbound(req))
+		const replaced = config.onResponse ? await config.onResponse(ctx, answer) : undefined
+		return (replaced ?? answer) as TypedResponse
+	}
+	handler.errors = ["bad_gateway", "gateway_timeout"]
+	return handler
+}

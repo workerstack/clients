@@ -1,0 +1,224 @@
+/**
+ * The WebSocket route builder: what `ws(app, path)` returns. A ws route is an ordinary route record
+ * with method `WS`, so the chain, the scopes, meta and error declarations work as on any route; its
+ * handler is the upgrade itself. The origin check and the chain run first, so a refused upgrade is
+ * answered before any 101 (H18.12). `.input()` takes the non-body sources (an upgrade is a bodyless
+ * GET) and validates them after the chain, so a refused request answers 400 before any 101.
+ */
+import { type HoneyContext, REQUEST } from "../context/context.ts"
+import { HoneyError } from "../errors/error.ts"
+import type { MiddlewareFn, RuntimeMiddleware } from "../middleware/middleware.ts"
+import type { WSAdapter, WSHandler } from "../ws/contract.ts"
+import { originAllowed, validateOriginPolicy, type WSOriginPolicy } from "../ws/origin.ts"
+import { createWsSession } from "../ws/session.ts"
+import {
+	compileInput,
+	type InferInputMap,
+	type InferParams,
+	type InputStep,
+	type KnownParams,
+	type NonBodyInput,
+} from "../input/input.ts"
+import { joinPatterns, parsePattern } from "./pattern.ts"
+import { addRoute, type HandleView, type HoneyGraph, type PendingRoute, settle } from "./register.ts"
+import type { HoneyMeta } from "./app-types.ts"
+import type { ErrorFactories } from "./settings.ts"
+import type { ParamsFromPath } from "./types.ts"
+
+/** The ctx a ws route's callbacks receive: the chain's ctx with the route's params, unless `.input()` typed them. */
+export type WSRouteCtx<TCtx, TPath extends string> = TCtx extends { readonly params: infer P }
+	? string extends keyof P
+		? TCtx & {
+				/** The matched route's path params, typed from its pattern. */ readonly params: ParamsFromPath<TPath>
+			}
+		: TCtx
+	: TCtx & {
+			/** The matched route's path params, typed from its pattern. */ readonly params: ParamsFromPath<TPath>
+		}
+
+/** The ctx after `.input()`: ctx.input, and ctx.params with each param the declaration types by its schema. */
+type WithInput<TCtx, TSchemas, TPath extends string> = (TSchemas extends { readonly params?: infer P }
+	? [NonNullable<P>] extends [never]
+		? TCtx
+		: Omit<TCtx, "params"> & {
+				/** The path's params, each one `.input({ params })` declares as its schema produced it. */ readonly params: InferParams<
+					TSchemas,
+					TPath
+				>
+			}
+	: TCtx) & {
+	/** Validated search, headers and cookies of the upgrade request. */ readonly input: InferInputMap<TSchemas>
+}
+
+/** What a WebSocket route builder carries at runtime. */
+type WSBuilderState = {
+	/** Error keys the route declares itself. */
+	readonly errorKeys: ReadonlySet<string>
+	/** The factory `.errors(factory, ...keys)` named. */
+	readonly errorSource: ErrorFactories | null
+	/** The app graph the route registers into. */
+	readonly graph: HoneyGraph
+	/** `.input()`: the schemas as written (for documentation) and the step they compile to */
+	readonly input: {
+		/** The schemas as written, kept for documentation. */ readonly schemas: NonBodyInput
+		/** The compiled validation step run on the upgrade request. */ readonly step: InputStep
+	} | null
+	/** Explicit meta: chain `.meta()` overlaid by route `.meta()`. */
+	readonly meta: Readonly<Record<string, unknown>> | null
+	/** Route-level middleware, run after the chain and the scopes. */
+	readonly middlewares: readonly RuntimeMiddleware[]
+	/** The origins allowed to upgrade; `null`: same origin, or any origin without `Cookie` or `Authorization`. */
+	readonly origins: WSOriginPolicy | null
+	/** The handle `.handler()` returns. */
+	readonly parent: unknown
+	/** The route's canonical full pattern. */
+	readonly path: string
+	/** The graph's entry for this builder: `.handler()` removes it, and one left at finalize is an error. */
+	readonly pending: PendingRoute
+	/** What the route takes from the handle that started it: base path, chain, context values and meta. */
+	readonly view: HandleView
+}
+
+const NO_ADAPTER =
+	"honey: a WebSocket route was requested but no adapter is set: call app.wsAdapter(adapter), or serve(app) on Node or Bun"
+
+/** The route's terminal: check the origin, then hand the request to the serving app's adapter. */
+function upgrader(callbacks: WSHandler<unknown>, policy: WSOriginPolicy | null, route: string) {
+	return async (ctx: object): Promise<Response> => {
+		const context = ctx as HoneyContext<unknown>
+		const req = context.req
+		const url = new URL(req.url)
+		const credentialed = req.headers.has("cookie") || req.headers.has("authorization")
+		/* the full origin, scheme + host + port, as the adapter's canonical URL spells it */
+		if (!originAllowed(policy, req.headers.get("origin"), url.origin, credentialed)) {
+			throw new HoneyError({ errorKey: "forbidden", status: "forbidden" })
+		}
+		/* the serving app's adapter: dispatch puts it on the request state of a ws request */
+		const adapter = (context[REQUEST] as { ws?: WSAdapter | null }).ws
+		if (adapter == null) throw new Error(NO_ADAPTER)
+		const reconnectToken = url.searchParams.get("reconnect_token")
+		const handler = createWsSession({ callbacks, ctx, log: context[REQUEST].logger, reconnectToken, route })
+		return (await adapter.upgrade(req, context.env, handler)).response
+	}
+}
+
+/** The builtins the build drops from a WebSocket route (`ws: false`): an upgrade has none of them. */
+type HttpOnlyMeta = "deprecated" | "invalidate" | "mcp" | "security"
+
+/** What a WebSocket route's `.meta()` takes: an HTTP route's meta, the HTTP-only builtins refused. */
+export type WsMeta<TMeta = never> = Omit<HoneyMeta<[TMeta] extends [never] ? {} : TMeta>, HttpOnlyMeta> & {
+	readonly [K in HttpOnlyMeta]?: never
+}
+
+/**
+ * Builds a WebSocket route: declare errors, input, meta, origins and middleware, then register it with `.handler()`.
+ */
+export class WSRouteBuilder<TCtx, TPath extends string, TParent> {
+	readonly #s: WSBuilderState
+
+	/** Takes the builder state; `ws(app, path)` creates builders for you. */
+	constructor(state: WSBuilderState) {
+		this.#s = state
+	}
+
+	#next<C = TCtx>(changes: Partial<WSBuilderState>): WSRouteBuilder<C, TPath, TParent> {
+		return new WSRouteBuilder<C, TPath, TParent>({ ...this.#s, ...changes })
+	}
+
+	/**
+	 * Declare error keys this route may throw, built from `factory` instead of the app's.
+	 * With any key declared, `ctx.errors` holds only declared keys, and a thrown `HoneyError` with another key
+	 * (honey's own keys excepted) answers as the boundary error, or a 500.
+	 */
+	errors(
+		factory: Record<string, (...args: never[]) => unknown>,
+		...keys: string[]
+	): WSRouteBuilder<TCtx, TPath, TParent>
+	/**
+	 * Declare keys of the app's error factory that this route may throw.
+	 * With any key declared, `ctx.errors` holds only declared keys, and a thrown `HoneyError` with another key
+	 * (honey's own keys excepted) answers as the boundary error, or a 500.
+	 */
+	errors(...keys: string[]): WSRouteBuilder<TCtx, TPath, TParent>
+	errors(...args: unknown[]): WSRouteBuilder<TCtx, TPath, TParent> {
+		const named = typeof args[0] === "object" && args[0] !== null ? (args[0] as ErrorFactories) : null
+		const keys = (named === null ? args : args.slice(1)) as string[]
+		return this.#next({ errorKeys: new Set([...this.#s.errorKeys, ...keys]), errorSource: named })
+	}
+
+	/** Validate the upgrade request's search, headers and cookies onto ctx.input, and the params it names onto ctx.params. */
+	input<const TSchemas extends NonBodyInput>(
+		schemas: TSchemas & KnownParams<TSchemas, TPath>,
+	): WSRouteBuilder<WithInput<TCtx, TSchemas, TPath>, TPath, TParent> {
+		return this.#next<WithInput<TCtx, TSchemas, TPath>>({
+			input: { schemas, step: compileInput(schemas, ["GET"], this.#s.path) },
+		})
+	}
+
+	/** Set the route's meta, merged over the chain's. `deprecated`, `invalidate`, `mcp` and `security` are type errors. */
+	meta<TRouteMeta extends WsMeta<TParent extends { readonly $meta: infer TMeta } ? TMeta : never>>(
+		meta: TRouteMeta,
+	): WSRouteBuilder<TCtx, TPath, TParent> {
+		return this.#next({ meta: { ...this.#s.meta, ...meta } })
+	}
+
+	/**
+	 * Browser origins allowed to open this socket: `"*"`, a list of origins, or a predicate.
+	 * Same-origin (scheme, host and port) always passes. Without it, a cross-origin upgrade that
+	 * carries `Cookie` or `Authorization` gets 403.
+	 */
+	origins(policy: WSOriginPolicy): WSRouteBuilder<TCtx, TPath, TParent> {
+		return this.#next({ origins: validateOriginPolicy(policy) })
+	}
+
+	/** Route-level middleware, after the chain and the scopes, before the upgrade. */
+	use<TAdds>(mw: MiddlewareFn<TCtx, TAdds>): WSRouteBuilder<TCtx & TAdds, TPath, TParent> {
+		return this.#next<TCtx & TAdds>({ middlewares: [...this.#s.middlewares, mw as unknown as RuntimeMiddleware] })
+	}
+
+	/** Register the route with its connection callbacks and return the app. */
+	handler(callbacks: WSHandler<WSRouteCtx<TCtx, TPath>>): TParent {
+		const s = this.#s
+		settle(s.graph, s.pending, s.view.node)
+		addRoute(s.graph, "WS", parsePattern(s.path), {
+			cm: s.view.chain,
+			cv: s.view.contextValues,
+			dk: s.errorKeys,
+			ef: s.errorSource,
+			fn: upgrader(callbacks as WSHandler<unknown>, s.origins, s.path),
+			in: s.input?.step ?? null,
+			iv: s.input?.schemas ?? null,
+			out: null,
+			own: s.graph.settings,
+			rb: null,
+			rm: s.middlewares,
+			xm: s.meta,
+		})
+		return s.parent as TParent
+	}
+}
+
+/** The builder `ws(app, path)` starts on `view`'s handle, pending until `.handler()`. */
+export function startWsRoute<TCtx, TPath extends string, TParent>(
+	graph: HoneyGraph,
+	view: HandleView,
+	parent: TParent,
+	path: string,
+): WSRouteBuilder<TCtx, TPath, TParent> {
+	const fullPath = joinPatterns(view.basePath, path)
+	const pending: PendingRoute = { id: `WS ${fullPath}` }
+	graph.pending.add(pending)
+	return new WSRouteBuilder({
+		errorKeys: new Set(),
+		errorSource: null,
+		graph,
+		input: null,
+		meta: view.chainMeta,
+		middlewares: [],
+		origins: null,
+		parent,
+		path: fullPath,
+		pending,
+		view,
+	})
+}

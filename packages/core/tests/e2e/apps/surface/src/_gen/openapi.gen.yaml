@@ -1,0 +1,1459 @@
+openapi: "3.1.0"
+info:
+  title: Honey Surface
+  version: "1.0.0"
+paths:
+  /in/all/{resourceId}:
+    put:
+      x-honey-route: "PUT /in/all/:resourceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceInAllRequest"
+        required: true
+      parameters:
+        - in: path
+          name: resourceId
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: if-match
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: force
+          required: false
+          schema:
+            type: boolean
+        - in: query
+          name: version
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplaceInAllResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/cookies:
+    get:
+      x-honey-route: GET /in/cookies
+      parameters:
+        - in: cookie
+          name: locale
+          required: true
+          schema:
+            type: string
+        - in: cookie
+          name: sid
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListInCookiesResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/file:
+    post:
+      x-honey-route: POST /in/file
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateInFileRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/CreateInFileRequest"
+        required: true
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInFileResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/form:
+    post:
+      tags:
+        - input
+      operationId: input.createForm
+      x-honey-route: POST /in/form
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/CreateInFormRequest"
+        required: true
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInFormResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/headers:
+    get:
+      x-honey-route: GET /in/headers
+      parameters:
+        - in: header
+          name: x-api-key
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-request-id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListInHeadersResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/json:
+    post:
+      tags:
+        - input
+      operationId: input.createJson
+      x-honey-route: POST /in/json
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInJsonRequest"
+        required: true
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInJsonResponse201"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/none:
+    get:
+      tags:
+        - input
+      operationId: input.none
+      x-honey-route: GET /in/none
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListInNoneResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/params/{orgId}/members/{memberId}:
+    get:
+      x-honey-route: "GET /in/params/:orgId/members/:memberId"
+      parameters:
+        - in: path
+          name: orgId
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetInParamsMemberResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /in/search:
+    get:
+      tags:
+        - input
+      operationId: input.search
+      x-honey-route: GET /in/search
+      parameters:
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: page
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: q
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListInSearchResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /methods/resource:
+    get:
+      tags:
+        - methods
+      operationId: resources.list
+      x-honey-route: GET /methods/resource
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMethodsResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+    post:
+      tags:
+        - methods
+      operationId: resources.create
+      x-honey-route: POST /methods/resource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMethodRequest"
+        required: true
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInJsonResponse201"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /methods/resource/{id}:
+    put:
+      tags:
+        - methods
+      operationId: resources.update
+      x-honey-route: "PUT /methods/resource/:id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMethodRequest"
+        required: true
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplaceMethodsResourceResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+    patch:
+      tags:
+        - methods
+      operationId: resources.patch
+      x-honey-route: "PATCH /methods/resource/:id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMethodsResourceRequest"
+        required: true
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInJsonResponse201"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+    delete:
+      tags:
+        - methods
+      operationId: resources.delete
+      x-honey-route: "DELETE /methods/resource/:id"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/binary:
+    get:
+      x-honey-route: GET /out/binary
+      responses:
+        "200":
+          description: ok
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/ListOutBinaryResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/csv:
+    get:
+      x-honey-route: GET /out/csv
+      responses:
+        "200":
+          description: ok
+          content:
+            text/csv:
+              schema:
+                $ref: "#/components/schemas/ListOutCsvResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/html:
+    get:
+      x-honey-route: GET /out/html
+      responses:
+        "200":
+          description: ok
+          content:
+            text/html:
+              schema:
+                $ref: "#/components/schemas/ListOutCsvResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/multi-status:
+    post:
+      x-honey-route: POST /out/multi-status
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOutMultiStatuRequest"
+        required: true
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOutMultiStatuResponse201"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOutMultiStatuResponse409"
+      x-honey-errors:
+        conflict:
+          status: 409
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/no-content/{id}:
+    delete:
+      x-honey-route: "DELETE /out/no-content/:id"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteOutNoContentResponse404"
+          description: not_found
+          x-honey-error: true
+      x-honey-errors:
+        not_found:
+          status: 404
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/sse:
+    get:
+      x-honey-route: GET /out/sse
+      responses:
+        "200":
+          description: ok
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ListOutCsvResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/text:
+    get:
+      x-honey-route: GET /out/text
+      responses:
+        "200":
+          description: ok
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/ListOutCsvResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /out/xml:
+    get:
+      x-honey-route: GET /out/xml
+      responses:
+        "200":
+          description: ok
+          content:
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/ListOutCsvResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /rs/upload:
+    post:
+      x-honey-route: POST /rs/upload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRsRequest"
+        required: true
+      responses:
+        "202":
+          description: accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateRsResponse202"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /status/accepted:
+    post:
+      x-honey-route: POST /status/accepted
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStatuRequest"
+        required: true
+      responses:
+        "202":
+          description: accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateStatuResponse202"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /status/created:
+    post:
+      x-honey-route: POST /status/created
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStatuRequest_aa6c2c"
+        required: true
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateInJsonResponse201"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /status/no-content:
+    delete:
+      x-honey-route: DELETE /status/no-content
+      responses:
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /status/ok:
+    get:
+      x-honey-route: GET /status/ok
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListStatusResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /stream/filtered:
+    get:
+      x-honey-route: GET /stream/filtered
+      parameters:
+        - in: query
+          name: channel
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: since
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ListOutCsvResponse200"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err400ValidationError"
+          description: validation_error
+          x-honey-error: true
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Err401Unauthorized"
+          description: unauthorized
+          x-honey-error: true
+      x-honey-errors:
+        unauthorized:
+          status: 401
+        validation_error:
+          status: 400
+  /ws/chat/{channelId}:
+    get:
+      x-websocket: true
+      tags:
+        - websocket
+      operationId: ws.chat
+      x-honey-route: "WS /ws/chat/:channelId"
+      parameters:
+        - in: path
+          name: channelId
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+  /ws/echo:
+    get:
+      x-websocket: true
+      tags:
+        - websocket
+      operationId: ws.echo
+      x-honey-route: WS /ws/echo
+      responses:
+        "101":
+          description: WebSocket upgrade
+  /ws/reconnect:
+    get:
+      x-websocket: true
+      tags:
+        - websocket
+      operationId: ws.reconnect
+      x-honey-route: WS /ws/reconnect
+      responses:
+        "101":
+          description: WebSocket upgrade
+  /ws/room:
+    get:
+      x-websocket: true
+      tags:
+        - websocket
+      operationId: ws.joinRoom
+      x-honey-route: WS /ws/room
+      parameters:
+        - in: query
+          name: roomId
+          required: true
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+tags:
+  - name: input
+  - name: methods
+  - name: websocket
+components:
+  schemas:
+    ReplaceInAllRequest:
+      type: object
+      properties:
+        data:
+          type: object
+          propertyNames:
+            type: string
+          additionalProperties: {}
+      required:
+        - data
+    ReplaceInAllResponse200:
+      type: object
+      properties:
+        etag:
+          type: string
+        version:
+          type: number
+      required:
+        - etag
+        - version
+      additionalProperties: false
+    Err400ValidationError:
+      properties:
+        error_key:
+          enum:
+            - validation_error
+          type: string
+        fields:
+          additionalProperties:
+            items:
+              properties:
+                error_key:
+                  type: string
+                message:
+                  type: string
+                path:
+                  type: string
+              required:
+                - error_key
+                - message
+                - path
+              type: object
+            type: array
+          type: object
+        message:
+          type: string
+        status:
+          enum:
+            - 400
+          type: integer
+        status_key:
+          type: string
+        success:
+          const: false
+        vars:
+          additionalProperties:
+            type:
+              - number
+              - string
+          type: object
+      required:
+        - error_key
+        - fields
+        - message
+        - status
+        - status_key
+        - success
+      type: object
+    Err401Unauthorized:
+      properties:
+        error_key:
+          enum:
+            - unauthorized
+          type: string
+        fields:
+          additionalProperties:
+            items:
+              properties:
+                error_key:
+                  type: string
+                message:
+                  type: string
+                path:
+                  type: string
+              required:
+                - error_key
+                - message
+                - path
+              type: object
+            type: array
+          type: object
+        message:
+          type: string
+        status:
+          enum:
+            - 401
+          type: integer
+        status_key:
+          type: string
+        success:
+          const: false
+        vars:
+          additionalProperties:
+            type:
+              - number
+              - string
+          type: object
+      required:
+        - error_key
+        - fields
+        - message
+        - status
+        - status_key
+        - success
+      type: object
+    ListInCookiesResponse200:
+      type: object
+      properties:
+        locale:
+          type: string
+        valid:
+          type: boolean
+      required:
+        - locale
+        - valid
+      additionalProperties: false
+    CreateInFileRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        upload:
+          type: string
+          format: binary
+          contentEncoding: binary
+      required:
+        - title
+        - upload
+    CreateInFileResponse200:
+      type: object
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+      required:
+        - name
+        - title
+      additionalProperties: false
+    CreateInFormRequest:
+      type: object
+      properties:
+        password:
+          type: string
+        username:
+          type: string
+      required:
+        - password
+        - username
+    CreateInFormResponse200:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+        - token
+      additionalProperties: false
+    ListInHeadersResponse200:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+      required:
+        - accepted
+      additionalProperties: false
+    CreateInJsonRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+      required:
+        - email
+        - name
+    CreateInJsonResponse201:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+      additionalProperties: false
+    ListInNoneResponse200:
+      type: object
+      properties:
+        ping:
+          type: string
+          const: pong
+      required:
+        - ping
+      additionalProperties: false
+    GetInParamsMemberResponse200:
+      type: object
+      properties:
+        memberId:
+          type: string
+        orgId:
+          type: string
+      required:
+        - memberId
+        - orgId
+      additionalProperties: false
+    ListInSearchResponse200:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: string
+      required:
+        - results
+      additionalProperties: false
+    ListMethodsResponse200:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+      required:
+        - items
+      additionalProperties: false
+    CreateMethodRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    ReplaceMethodsResourceResponse200:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+      additionalProperties: false
+    UpdateMethodsResourceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+    ListOutBinaryResponse200: {}
+    ListOutCsvResponse200:
+      type: string
+    CreateOutMultiStatuRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+      required:
+        - slug
+    CreateOutMultiStatuResponse201:
+      type: object
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+      required:
+        - id
+        - slug
+      additionalProperties: false
+    CreateOutMultiStatuResponse409:
+      type: object
+      properties:
+        existing:
+          type: string
+        message:
+          type: string
+      required:
+        - existing
+        - message
+      additionalProperties: false
+    DeleteOutNoContentResponse404:
+      properties:
+        error_key:
+          enum:
+            - not_found
+          type: string
+        fields:
+          additionalProperties:
+            items:
+              properties:
+                error_key:
+                  type: string
+                message:
+                  type: string
+                path:
+                  type: string
+              required:
+                - error_key
+                - message
+                - path
+              type: object
+            type: array
+          type: object
+        message:
+          type: string
+        status:
+          enum:
+            - 404
+          type: integer
+        status_key:
+          type: string
+        success:
+          const: false
+        vars:
+          additionalProperties:
+            type:
+              - number
+              - string
+          type: object
+      required:
+        - error_key
+        - fields
+        - message
+        - status
+        - status_key
+        - success
+      type: object
+    CreateRsRequest:
+      type: object
+      properties:
+        chunks:
+          type: number
+        fileName:
+          type: string
+      required:
+        - chunks
+        - fileName
+    CreateRsResponse202:
+      type: object
+      properties:
+        uploadId:
+          type: string
+      required:
+        - uploadId
+      additionalProperties: false
+    CreateStatuRequest:
+      type: object
+      properties:
+        task:
+          type: string
+      required:
+        - task
+    CreateStatuResponse202:
+      type: object
+      properties:
+        jobId:
+          type: string
+      required:
+        - jobId
+      additionalProperties: false
+    CreateStatuRequest_aa6c2c:
+      type: object
+      properties:
+        x:
+          type: string
+      required:
+        - x
+    ListStatusResponse200:
+      type: object
+      properties:
+        v:
+          type: number
+      required:
+        - v
+      additionalProperties: false
