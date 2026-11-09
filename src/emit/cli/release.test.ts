@@ -20,6 +20,7 @@ import { shop } from "./__fixtures__/shop.ts"
 import { toolBin, withTools } from "./__fixtures__/tools.ts"
 import { CHANNELS } from "./__fixtures__/release.ts"
 import { yamlValue } from "./__fixtures__/yaml.ts"
+import { installgenCommand } from "./install.ts"
 import { type GoCliOptions, generateGoCli } from "./module.ts"
 import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts"
 
@@ -123,7 +124,7 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - name: Check every file the install scripts fetch for this tag
-        run: npx --yes @lovrozagar/installgen@0.3.0 check --default-version "$GITHUB_REF_NAME"
+        run: ${installgenCommand()} check --default-version "$GITHUB_REF_NAME"
       - name: Check latest reads this tag
         shell: bash
         env:
@@ -134,7 +135,7 @@ jobs:
             echo "$GITHUB_REF_NAME is a prerelease: latest stays on the last release"
             exit 0
           fi
-          url="$(npx --yes @lovrozagar/installgen@0.3.0 check --list | awk '$1 == "latest" { print $2 }')"
+          url="$(${installgenCommand()} check --list | awk '$1 == "latest" { print $2 }')"
           latest="$(curl -fsSL --retry 3 "$url" | tr -d '[:space:]')"
           if [ "$latest" != "$GITHUB_REF_NAME" ]; then
             echo "::error::$url reads '$latest', not $GITHUB_REF_NAME"

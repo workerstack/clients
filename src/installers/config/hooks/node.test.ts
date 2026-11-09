@@ -22,12 +22,11 @@ function capture(): { register: RegisterHooks; hooks: () => Hooks } {
 }
 
 describe("registerNodeHook", () => {
-	test("maps the package name to the running package", () => {
+	test("maps the package name to the running package, its format left to Node (index.ts from source, index.js built)", () => {
 		const { register, hooks } = capture()
 		registerNodeHook("file:///pkg/dist/index.js", register)
 		expect(hooks().resolve?.(PACKAGE_NAME, context, unreachable)).toEqual({
 			url: "file:///pkg/dist/index.js",
-			format: "module",
 			shortCircuit: true,
 		})
 	})

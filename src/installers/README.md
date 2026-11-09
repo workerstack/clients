@@ -2,7 +2,7 @@
 
 Generate `curl -fsSL <url> | sh` and `irm <url> | iex` installers for the prebuilt binaries of your CLI. You keep your release pipeline, your file names and your host; installgen writes the two scripts that find the right binary, verify it, install it without admin rights and put it on `PATH`.
 
-Package: [`@lovrozagar/installgen`](https://www.npmjs.com/package/@lovrozagar/installgen). The CLI binary is `installgen`.
+Package: [`@workerstack/clients`](https://www.npmjs.com/package/@workerstack/clients), library at `@workerstack/clients/installers`. The CLI binary is `installgen`. installgen was `@lovrozagar/installgen` up to 0.3.0.
 
 ```console
 $ curl -fsSL https://dl.example.com/my-cli/install.sh | sh
@@ -63,19 +63,19 @@ installgen takes your prebuilt binaries under your own names, on any https host,
 
 ## Install
 
-installgen runs on Node 22.18 or later (23.6 or later on Node 23) and on Bun. It has no runtime dependencies.
+installgen runs on Node 22.18 or later (23.6 or later on Node 23) and on Bun.
 
 ```bash
-bun add -d @lovrozagar/installgen   # then: bunx installgen <command>
+bun add -d @workerstack/clients   # then: bunx installgen <command>
 ```
 
 Zero-install, from any directory:
 
 ```bash
-bunx @lovrozagar/installgen build
+bunx --package @workerstack/clients installgen build
 ```
 
-`bunx` honors the bin's `#!/usr/bin/env node` shebang, so these run on Node. `bunx --bun @lovrozagar/installgen` runs them on Bun, which also loads a `.ts` config on a Node older than 22.18.
+`bunx` honors the bin's `#!/usr/bin/env node` shebang, so these run on Node. `bunx --bun --package @workerstack/clients installgen` runs them on Bun, which also loads a `.ts` config on a Node older than 22.18.
 
 ## Quick start
 
@@ -88,7 +88,7 @@ Set baseUrl and assetPath for your releases, then run `installgen build`.
 The preset is a complete config for the archive names `goreleaser init` writes:
 
 ```ts
-import { defineConfig, type Arch, type Os } from "@lovrozagar/installgen"
+import { defineConfig, type Arch, type Os } from "@workerstack/clients/installers"
 
 const osName: Record<Os, string> = { linux: "Linux", darwin: "Darwin", windows: "Windows" }
 const archName: Record<Arch, string> = { amd64: "x86_64", arm64: "arm64" }
@@ -120,7 +120,7 @@ powershell -c "irm https://dl.example.com/my-cli/install.ps1 | iex"
 
 ## Config
 
-`installgen.config.ts` default-exports `defineConfig({ ... })`. `defineConfig` returns its argument; it is there for the types. A config with no runtime import works too: `import type { InstallgenConfig } from "@lovrozagar/installgen"` and `export default { ... } satisfies InstallgenConfig`.
+`installgen.config.ts` default-exports `defineConfig({ ... })`. `defineConfig` returns its argument; it is there for the types. A config with no runtime import works too: `import type { InstallgenConfig } from "@workerstack/clients/installers"` and `export default { ... } satisfies InstallgenConfig`.
 
 ### Props
 
@@ -139,7 +139,7 @@ powershell -c "irm https://dl.example.com/my-cli/install.ps1 | iex"
 | `envPrefix`       | `string`                            | `name` uppercased, non-alphanumerics → `_`  | The prefix of the end-user overrides: `my-cli` → `MY_CLI_VERSION`.                                                           |
 | `modifyPath`      | `boolean`                           | `true`                                      | Whether the scripts add the install dir to `PATH`.                                                                           |
 | `message`         | `string`                            | none                                        | Printed after a successful install. ASCII only.                                                                              |
-| `scriptUrls`      | `{ sh: string; ps1: string }`       | `baseUrl/install.sh`, `baseUrl/install.ps1` | Where you serve the scripts; the scripts print them in their hints.                                                          |
+| `scriptUrls`      | `ScriptUrls`                        | `baseUrl/install.sh`, `baseUrl/install.ps1` | Where you serve the scripts; the scripts print them in their hints.                                                          |
 | `outDir`          | `string`                            | `"installers"`                              | Where `installgen build` writes. Not `dist/`: `goreleaser release --clean` wipes it.                                         |
 
 `Os` is `"linux" | "darwin" | "windows"`, `Arch` is `"amd64" | "arm64"` (Go's names), and `Platform` is `` `${Os}/${Arch}` ``. Every value that reaches a script must be ASCII: Windows PowerShell 5.1 reads a script with no charset as ISO-8859-1.
@@ -166,12 +166,12 @@ A known false positive: the mangle check reads every literal piece of a path, so
 
 `installgen` looks for `installgen.config.ts`, `.mts`, `.js` and `.mjs` in the current directory, in that order; `-c <path>` names another file. It never searches parent directories.
 
-The config's `import ... from "@lovrozagar/installgen"` resolves to the running installgen, so it works with no local install. On Node that is a `module.registerHooks` resolve hook, removed again once the config is loaded; on Bun a `Bun.plugin` module.
+The config's `import ... from "@workerstack/clients/installers"` resolves to the running installgen, so it works with no local install. On Node that is a `module.registerHooks` resolve hook, removed again once the config is loaded; on Bun a `Bun.plugin` module.
 
 Node runs a `.ts` config by stripping its types, which has limits:
 
-- Node 22.18 or later, or 23.6 or later on 23. Older versions fail with a hint to run `bunx --bun @lovrozagar/installgen` or upgrade Node.
-- Type-only imports need `type`: write `import { defineConfig, type Arch } from "@lovrozagar/installgen"`. Without it Node fails with "does not provide an export named".
+- Node 22.18 or later, or 23.6 or later on 23. Older versions fail with a hint to run `bunx --bun --package @workerstack/clients installgen` or upgrade Node.
+- Type-only imports need `type`: write `import { defineConfig, type Arch } from "@workerstack/clients/installers"`. Without it Node fails with "does not provide an export named".
 - No `enum`, `namespace` or parameter properties: Node fails with `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`.
 - In a CommonJS project, where the nearest `package.json` has `"type": "commonjs"`, a `.ts` config fails with "Unexpected token 'export'". Rename it to `installgen.config.mts`. `installgen init` writes `.mts` unless the nearest `package.json` has `"type": "module"`.
 
@@ -203,7 +203,7 @@ A usage error exits 2; any other error prints one `error:` line and exits 1.
 $ installgen init --preset github
 ```
 
-Writes a preset as your config: `raw` (the default: raw binaries on your own host), `goreleaser` (`goreleaser init` archive names under the tag), or `github` (GitHub Releases, reading the latest version through `releases/latest/download/`). It refuses to overwrite an existing config without `--force`. The presets are in [`packages/core/examples`](packages/core/examples).
+Writes a preset as your config: `raw` (the default: raw binaries on your own host), `goreleaser` (`goreleaser init` archive names under the tag), or `github` (GitHub Releases, reading the latest version through `releases/latest/download/`). It refuses to overwrite an existing config without `--force`. The presets are in [`assets/installers/examples`](../../assets/installers/examples).
 
 ### `installgen build`
 
@@ -386,13 +386,13 @@ What the scripts guarantee themselves: every value from your config is single-qu
 
 ## Library exports
 
-`@lovrozagar/installgen` exports `defineConfig`, `generateInstallers`, `InstallgenError` and the types `InstallgenConfig`, `SignatureConfig`, `PathContext`, `ChecksumsContext`, `BundleContext`, `VersionToken`, `TagToken`, `Os`, `Arch`, `Platform`, `Rendered` and `RenderOptions`.
+`@workerstack/clients/installers` exports `defineConfig`, `generateInstallers`, `InstallgenError` and the types `InstallgenConfig`, `SignatureConfig`, `PathContext`, `ChecksumsContext`, `BundleContext`, `VersionToken`, `TagToken`, `Os`, `Arch`, `Platform`, `ScriptUrls`, `Rendered` and `RenderOptions`.
 
 `generateInstallers(config, { defaultVersion })` returns `{ sh, ps1 }`, the scripts `installgen build` would write, for a generator that places files itself. A script is absent when no platform needs it, and a config `build` refuses throws `InstallgenError` with the same message.
 
 ```ts
 import { writeFileSync } from "node:fs"
-import { generateInstallers } from "@lovrozagar/installgen"
+import { generateInstallers } from "@workerstack/clients/installers"
 
 const { sh, ps1 } = generateInstallers({
 	name: "my-cli",
@@ -407,21 +407,17 @@ if (ps1) writeFileSync("install.ps1", ps1)
 
 ## Develop
 
-Requires [Bun](https://bun.sh) 1.4.4 (the root `packageManager`) and Node 22.18 or later.
+installgen lives in `@workerstack/clients` under `src/installers` (code, `templates/`, `examples/`) and `tests/installers`. From the package root:
 
 ```bash
 bun install
-bun run fmt          # oxfmt, rewrites in place (CI runs fmt:check)
-bun run lint         # oxlint
-bun run typecheck
-bun run test         # tsc, then vitest with 100% per-file coverage
-bun run test:e2e     # also the Docker runners: dash, bash, zsh, busybox and pwsh
-bun run verify       # every gate; stamps the commit when they all pass
+bun run test         # vitest with 100% per-file coverage, installgen's suites included
+INSTALLGEN_E2E_DOCKER=1 bunx vitest run tests/installers src/installers   # also the Docker runners: dash, bash, zsh, busybox and pwsh
 ```
 
-The e2e suites serve real releases from a local server and run the generated scripts as `curl … | sh` and `irm … | iex`. `INSTALLGEN_E2E_SHELLS` lists the host shells (default `sh`; `sh,pwsh` adds a host PowerShell), and `INSTALLGEN_E2E_DOCKER=1` adds the Docker runners plus shellcheck and PSScriptAnalyzer on the rendered scripts. The rendered examples are checked in under `packages/core/tests/golden`; refresh them with `UPDATE_GOLDEN=1 bun run test`.
+The e2e suites serve real releases from a local server and run the generated scripts as `curl … | sh` and `irm … | iex`. `INSTALLGEN_E2E_SHELLS` lists the host shells (default `sh`; `sh,pwsh` adds a host PowerShell), and `INSTALLGEN_E2E_DOCKER=1` adds the Docker runners plus shellcheck and PSScriptAnalyzer on the rendered scripts. The rendered examples are checked in under `tests/installers/golden`; refresh them with `UPDATE_GOLDEN=1 bunx vitest run tests/installers/examples.test.ts`.
 
-Release: bump `packages/core/package.json`, commit, tag `vX.Y.Z` matching that version, and push the tag. `.github/workflows/release.yml` publishes `@lovrozagar/installgen` to npm through GitHub Actions OIDC trusted publishing. npm saves a trusted publisher only for a package that exists, so the first version publishes with a short-lived granular token in the `NPM_TOKEN` repo secret; after it, save the trusted publisher and delete the secret. Never `npm publish` from a laptop.
+installgen releases with `@workerstack/clients`: its version is the clients version.
 
 ## License
 

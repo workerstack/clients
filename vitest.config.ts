@@ -167,6 +167,8 @@ export default defineConfig(({ mode }) =>
 							"src/**/__fixtures__/**",
 							"src/runtime/**",
 							"src/_tokenizer/**",
+							/* docs beside the code (installgen's README and CHANGELOG): not source, so not parsed for coverage */
+							"src/**/*.md",
 						],
 						include: ["src/**"],
 						provider: "v8",

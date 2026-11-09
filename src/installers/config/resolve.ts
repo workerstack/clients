@@ -26,8 +26,7 @@ const TAG_PREFIX = /^[A-Za-z0-9._-]*$/
 /* Each segment of installDir after ~/: rendered into sh and ps1 paths and shell profile lines */
 const DIR_SEGMENT = /^[A-Za-z0-9._ -]+$/
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/
-const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"])
-const SENTINELS = new RegExp(`(${VERSION_SENTINEL}|${TAG_SENTINEL})`)
+const LOOPBACK: readonly string[] = ["127.0.0.1", "localhost", "[::1]"]
 const MANGLED = /installgen(version|tag)/
 /* the issuer of the OIDC token a GitHub Actions run signs with */
 const GITHUB_ACTIONS_ISSUER = "https://token.actions.githubusercontent.com"
@@ -63,7 +62,7 @@ function checkUrl(field: string, url: string): boolean {
 		// reported below
 	}
 	if (parsed?.protocol === "https:" && parsed.host !== "") return true
-	if (parsed?.protocol === "http:" && LOOPBACK.has(parsed.hostname)) return false
+	if (parsed?.protocol === "http:" && LOOPBACK.includes(parsed.hostname)) return false
 	return fail(`config.${field} must be an https URL (http is allowed only on loopback), got ${JSON.stringify(url)}`)
 }
 
@@ -82,7 +81,7 @@ function noSentinel(field: string, value: string | undefined): void {
 /** Splits on the exact sentinels; a sentinel a string method rewrote is still recognizable in a literal piece. */
 function split(field: string, platform: Platform, path: string): Segment[] {
 	const segments: Segment[] = []
-	for (const piece of path.split(SENTINELS)) {
+	for (const piece of path.split(new RegExp(`(${VERSION_SENTINEL}|${TAG_SENTINEL})`))) {
 		if (piece === VERSION_SENTINEL) segments.push({ kind: "version" })
 		else if (piece === TAG_SENTINEL) segments.push({ kind: "tag" })
 		else if (piece !== "") {
@@ -111,15 +110,21 @@ function checkIdentity(field: string, identity: string): void {
 	}
 }
 
-function evaluate(
+/** What a path function sees: the platform's os and arch, plus the tokens and the paths resolved before it. */
+interface Ctx {
+	readonly os: Os
+	readonly arch: Arch
+}
+
+function evaluate<C extends Ctx>(
 	field: string,
 	fn: (ctx: object) => unknown,
-	platform: Platform,
-	ctx: object,
+	ctx: C,
 	check: (field: string, out: string) => void = checkRelative,
 ): string {
 	const out = fn(ctx)
-	if (typeof out !== "string") return fail(`config.${field} must return a string, got ${typeof out} for ${platform}`)
+	if (typeof out !== "string")
+		return fail(`config.${field} must return a string, got ${typeof out} for ${ctx.os}/${ctx.arch}`)
 	check(field, out)
 	return out
 }
@@ -172,31 +177,34 @@ function platformsOf(config: Raw): readonly Platform[] {
 const key = (segments: readonly Segment[]) =>
 	segments.map((s) => (s.kind === "literal" ? `L${s.value}` : s.kind)).join("\0")
 
+const osOf = (platform: Platform): Os => platform.split("/")[0] as Os
+
 /* GoReleaser universal_binaries: one asset serves both macOS architectures */
-const universal = (a: Platform, b: Platform) => a.startsWith("darwin/") && b.startsWith("darwin/")
+const universal = (a: Platform, b: Platform) => osOf(a) === "darwin" && osOf(b) === "darwin"
 
-export function resolveConfig(input: InstallgenConfig): ResolvedConfig {
-	if (typeof input !== "object" || input === null) return fail("config must be an object")
-	const config = input as unknown as Raw
+interface PathFunctions {
+	assetPath: (ctx: object) => unknown
+	checksumsPath: ((ctx: object) => unknown) | undefined
+	signature: Signature | undefined
+	binaryInArchive: ((ctx: object) => unknown) | undefined
+}
 
-	const name = required(string(config, "name"), "name", "a string")
-	if (!NAME.test(name)) fail(`config.name must match ${NAME.source}, got ${JSON.stringify(name)}`)
-
-	const baseUrl = required(string(config, "baseUrl"), "baseUrl", "a string").replace(/\/+$/, "")
-	const https = checkUrl("baseUrl", baseUrl)
-
+function pathFunctionsOf(config: Raw): PathFunctions {
 	const assetPath = required(func(config, "assetPath"), "assetPath", "a function")
 	const checksumsPath = func(config, "checksumsPath")
 	const signature = signatureOf(config, checksumsPath !== undefined)
 	const binaryInArchive = func(config, "binaryInArchive")
+	return { assetPath, checksumsPath, signature, binaryInArchive }
+}
 
-	const latestPath = string(config, "latestPath") ?? "latest"
-	checkRelative("latestPath", latestPath)
-
+function tagPrefixOf(config: Raw): string {
 	const tagPrefix = string(config, "tagPrefix") ?? "v"
 	if (!TAG_PREFIX.test(tagPrefix))
 		fail(`config.tagPrefix must match ${TAG_PREFIX.source}, got ${JSON.stringify(tagPrefix)}`)
+	return tagPrefix
+}
 
+function installDirOf(config: Raw, name: string): string {
 	const installDir = string(config, "installDir") ?? `~/.${name}/bin`
 	const dirSegments = installDir.split("/").slice(1)
 	if (
@@ -208,31 +216,46 @@ export function resolveConfig(input: InstallgenConfig): ResolvedConfig {
 				`(no "." or ".." segments), got ${JSON.stringify(installDir)}`,
 		)
 	}
+	return installDir
+}
 
+function envPrefixOf(config: Raw, name: string): string {
 	const derived = name.toUpperCase().replace(/[^A-Z0-9]/g, "_")
 	const envPrefix = string(config, "envPrefix") ?? (/^[0-9]/.test(derived) ? `_${derived}` : derived)
 	if (!ENV_PREFIX.test(envPrefix))
 		fail(`config.envPrefix must match ${ENV_PREFIX.source}, got ${JSON.stringify(envPrefix)}`)
+	return envPrefix
+}
 
-	const modifyPathRaw = config.modifyPath ?? true
-	const modifyPath = typeof modifyPathRaw === "boolean" ? modifyPathRaw : fail("config.modifyPath must be a boolean")
-
-	const message = string(config, "message")
-
+function outDirOf(config: Raw): string {
 	const outDir = string(config, "outDir") ?? "installers"
 	if (outDir === "") fail("config.outDir must not be empty")
+	return outDir
+}
 
-	let scriptUrls = { sh: `${baseUrl}/install.sh`, ps1: `${baseUrl}/install.ps1` }
-	if (config.scriptUrls !== undefined) {
-		if (typeof config.scriptUrls !== "object" || config.scriptUrls === null) fail("config.scriptUrls must be an object")
-		const urls = config.scriptUrls as Raw
-		const sh = required(string(urls, "sh"), "scriptUrls.sh", "a string")
-		const ps1 = required(string(urls, "ps1"), "scriptUrls.ps1", "a string")
-		checkUrl("scriptUrls.sh", sh)
-		checkUrl("scriptUrls.ps1", ps1)
-		scriptUrls = { sh, ps1 }
-	}
+function scriptUrlsOf(config: Raw, baseUrl: string): { sh: string; ps1: string } {
+	if (config.scriptUrls === undefined) return { sh: `${baseUrl}/install.sh`, ps1: `${baseUrl}/install.ps1` }
+	if (typeof config.scriptUrls !== "object" || config.scriptUrls === null) fail("config.scriptUrls must be an object")
+	const urls = config.scriptUrls as Raw
+	const sh = required(string(urls, "sh"), "scriptUrls.sh", "a string")
+	const ps1 = required(string(urls, "ps1"), "scriptUrls.ps1", "a string")
+	checkUrl("scriptUrls.sh", sh)
+	checkUrl("scriptUrls.ps1", ps1)
+	return { sh, ps1 }
+}
 
+/** The settings after the path functions, validated in the order a config's errors are reported. */
+function settingsOf(config: Raw, name: string, baseUrl: string) {
+	const latestPath = string(config, "latestPath") ?? "latest"
+	checkRelative("latestPath", latestPath)
+	const tagPrefix = tagPrefixOf(config)
+	const installDir = installDirOf(config, name)
+	const envPrefix = envPrefixOf(config, name)
+	const modifyPathRaw = config.modifyPath ?? true
+	const modifyPath = typeof modifyPathRaw === "boolean" ? modifyPathRaw : fail("config.modifyPath must be a boolean")
+	const message = string(config, "message")
+	const outDir = outDirOf(config)
+	const scriptUrls = scriptUrlsOf(config, baseUrl)
 	for (const [field, value] of [
 		["name", name],
 		["baseUrl", baseUrl],
@@ -247,72 +270,79 @@ export function resolveConfig(input: InstallgenConfig): ResolvedConfig {
 	] as const) {
 		noSentinel(field, value)
 	}
+	return { latestPath, tagPrefix, installDir, envPrefix, modifyPath, message, outDir, scriptUrls }
+}
 
-	const platforms: ResolvedPlatform[] = []
-	const assets = new Map<string, Platform>()
-	for (const platform of platformsOf(config)) {
-		const [os, arch] = platform.split("/") as [Os, Arch]
-		const ctx = { version: versionToken, tag: tagToken, os, arch }
-
-		const assetRaw = evaluate("assetPath", assetPath, platform, ctx)
-		const asset = split("assetPath", platform, assetRaw)
-		if (asset.every((s) => s.kind === "literal")) {
-			fail(`config.assetPath for ${platform} must contain the version or tag token, got ${JSON.stringify(assetRaw)}`)
-		}
-		const prior = assets.get(key(asset))
-		if (prior !== undefined && !universal(prior, platform)) {
-			fail(`config.assetPath gives ${prior} and ${platform} the same asset ${JSON.stringify(assetRaw)}`)
-		}
-		assets.set(key(asset), platform)
-
-		const checksumsRaw =
-			checksumsPath && evaluate("checksumsPath", checksumsPath, platform, { ...ctx, asset: assetRaw })
-		let resolvedSignature: ResolvedSignature | undefined
-		if (signature && checksumsRaw !== undefined) {
-			const bundleRaw = signature.bundlePath
-				? evaluate("signature.bundlePath", signature.bundlePath, platform, {
-						...ctx,
-						asset: assetRaw,
-						checksums: checksumsRaw,
-					})
-				: `${checksumsRaw}.sigstore.json`
-			resolvedSignature = {
-				bundle: split("signature.bundlePath", platform, bundleRaw),
-				identity: split(
-					"signature.identity",
-					platform,
-					evaluate("signature.identity", signature.identity, platform, ctx, checkIdentity),
-				),
-				issuer: signature.issuer,
-			}
-		}
-
-		platforms.push({
+function resolveSignature(
+	signature: Signature,
+	ctx: Ctx & { readonly asset: string },
+	checksumsRaw: string,
+): ResolvedSignature {
+	const platform: Platform = `${ctx.os}/${ctx.arch}`
+	const bundleRaw = signature.bundlePath
+		? evaluate("signature.bundlePath", signature.bundlePath, { ...ctx, checksums: checksumsRaw })
+		: `${checksumsRaw}.sigstore.json`
+	const { asset: _, ...pathCtx } = ctx
+	return {
+		bundle: split("signature.bundlePath", platform, bundleRaw),
+		identity: split(
+			"signature.identity",
 			platform,
-			os,
-			arch,
-			asset,
-			format: formatOf(assetRaw),
-			checksums: checksumsRaw === undefined ? undefined : split("checksumsPath", platform, checksumsRaw),
-			signature: resolvedSignature,
-			binaryInArchive:
-				binaryInArchive &&
-				split("binaryInArchive", platform, evaluate("binaryInArchive", binaryInArchive, platform, ctx)),
-		})
+			evaluate("signature.identity", signature.identity, pathCtx, checkIdentity),
+		),
+		issuer: signature.issuer,
 	}
+}
+
+function resolvePlatform(platform: Platform, fns: PathFunctions, assets: Map<string, Platform>): ResolvedPlatform {
+	const [os, arch] = platform.split("/") as [Os, Arch]
+	const ctx = { version: versionToken, tag: tagToken, os, arch }
+
+	const assetRaw = evaluate("assetPath", fns.assetPath, ctx)
+	const asset = split("assetPath", platform, assetRaw)
+	if (asset.every((s) => s.kind === "literal")) {
+		fail(`config.assetPath for ${platform} must contain the version or tag token, got ${JSON.stringify(assetRaw)}`)
+	}
+	const prior = assets.get(key(asset))
+	if (prior !== undefined && !universal(prior, platform)) {
+		fail(`config.assetPath gives ${prior} and ${platform} the same asset ${JSON.stringify(assetRaw)}`)
+	}
+	assets.set(key(asset), platform)
+
+	const checksumsRaw = fns.checksumsPath && evaluate("checksumsPath", fns.checksumsPath, { ...ctx, asset: assetRaw })
+	const signature =
+		fns.signature && checksumsRaw !== undefined
+			? resolveSignature(fns.signature, { ...ctx, asset: assetRaw }, checksumsRaw)
+			: undefined
 
 	return {
-		name,
-		baseUrl,
-		https,
-		latestPath,
-		tagPrefix,
-		installDir: installDir.slice(2),
-		envPrefix,
-		modifyPath,
-		message,
-		scriptUrls,
-		outDir,
-		platforms,
+		platform,
+		os,
+		arch,
+		asset,
+		format: formatOf(assetRaw),
+		checksums: checksumsRaw === undefined ? undefined : split("checksumsPath", platform, checksumsRaw),
+		signature,
+		binaryInArchive:
+			fns.binaryInArchive && split("binaryInArchive", platform, evaluate("binaryInArchive", fns.binaryInArchive, ctx)),
 	}
+}
+
+export function resolveConfig(input: InstallgenConfig): ResolvedConfig {
+	if (typeof input !== "object" || input === null) return fail("config must be an object")
+	const config = input as unknown as Raw
+
+	const name = required(string(config, "name"), "name", "a string")
+	if (!NAME.test(name)) fail(`config.name must match ${NAME.source}, got ${JSON.stringify(name)}`)
+
+	const baseUrl = required(string(config, "baseUrl"), "baseUrl", "a string").replace(/\/+$/, "")
+	const https = checkUrl("baseUrl", baseUrl)
+
+	const fns = pathFunctionsOf(config)
+	const settings = settingsOf(config, name, baseUrl)
+
+	const assets = new Map<string, Platform>()
+	const platforms = platformsOf(config).map((platform) => resolvePlatform(platform, fns, assets))
+
+	return { name, baseUrl, https, ...settings, installDir: settings.installDir.slice(2), platforms }
 }

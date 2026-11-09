@@ -3,9 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "vitest"
+import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts"
 import type { InstallgenConfig, PathContext } from "../config/define-config.ts"
 import { resolveConfig } from "../config/resolve.ts"
-import { assertStructure } from "../../tests/support/structure.ts"
+import { assertStructure } from "../../../tests/installers/support/structure.ts"
 import { placeholders, readTemplates, render } from "./render.ts"
 
 const base = {
@@ -18,23 +19,29 @@ const base = {
 
 const resolve = (overrides: Partial<InstallgenConfig> = {}) => resolveConfig({ ...base, ...overrides })
 
-function shSyntaxOk(script: string): void {
+/** `sh -n` over the script: its exit status and what it reported. */
+function shSyntax(script: string): { status: number | null; stderr: string } {
 	const dir = mkdtempSync(join(tmpdir(), "installgen-render-"))
 	try {
 		writeFileSync(join(dir, "install.sh"), script)
 		const result = spawnSync("sh", ["-n", join(dir, "install.sh")], { encoding: "utf8" })
-		expect(result.status, result.stderr).toBe(0)
+		return { status: result.status, stderr: result.stderr }
 	} finally {
 		rmSync(dir, { recursive: true, force: true })
 	}
 }
 
 describe("render", () => {
-	test("renders both scripts that meet the structural contract, https", () => {
-		const out = render(resolve(), {})
-		assertStructure(out, true)
-		shSyntaxOk(out.sh as string)
-	})
+	test(
+		"renders both scripts that meet the structural contract, https",
+		() => {
+			const out = render(resolve(), {})
+			assertStructure(out, true)
+			const syntax = shSyntax(out.sh as string)
+			expect(syntax.status, syntax.stderr).toBe(0)
+		},
+		SPAWN_TIMEOUT,
+	)
 
 	test("loopback http baseUrl: no https-only flags", () => {
 		const out = render(resolve({ baseUrl: "http://127.0.0.1:8080" }), {})
@@ -69,7 +76,9 @@ describe("render", () => {
 			/unknown placeholder @@NOPE@@ in install\.sh/,
 		)
 	})
+})
 
+describe("render", () => {
 	test("a script is skipped when its OS has no platforms", () => {
 		const unix = render(resolve({ platforms: ["linux/amd64", "darwin/arm64"] }), {})
 		expect(unix.sh).toBeDefined()
@@ -139,7 +148,9 @@ describe("placeholder values", () => {
 			].join("\n"),
 		)
 	})
+})
 
+describe("placeholder values", () => {
 	test("ps1", () => {
 		const values = placeholders(resolve({ message: "It's done", modifyPath: false }), {})
 		expect(values.ps1).toMatchObject({
@@ -171,7 +182,9 @@ describe("placeholder values", () => {
 			].join("\n"),
 		)
 	})
+})
 
+describe("placeholder values", () => {
 	test("the ps1 install dir is one quoted literal per segment, joined natively", () => {
 		expect(dir("~/My Tools/bin")).toBe(
 			"[IO.Path]::Combine([string[]](@([Environment]::GetFolderPath('UserProfile')) + @('My Tools', 'bin')))",

@@ -4,9 +4,10 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, test } from "vitest"
-import type { InstallgenConfig } from "../src/config/define-config.ts"
-import { resolveConfig } from "../src/config/resolve.ts"
-import { render } from "../src/render/render.ts"
+import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
+import type { InstallgenConfig } from "../../src/installers/config/define-config.ts"
+import { resolveConfig } from "../../src/installers/config/resolve.ts"
+import { render } from "../../src/installers/render/render.ts"
 import { assertStructure } from "./support/structure.ts"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -17,26 +18,32 @@ const PSSA_VERSION = "1.23.0"
 
 /* The examples are what `installgen init --preset` writes; their renders are checked in as golden files. */
 describe.each(["raw", "goreleaser", "github"])("examples/%s.config.ts", (example) => {
-	test("renders to the golden install.sh and install.ps1", async () => {
-		const { default: config } = (await import(`../examples/${example}.config.ts`)) as { default: InstallgenConfig }
-		const out = render(resolveConfig(config), {})
-		assertStructure(out, true)
-		const dir = join(HERE, "golden", example)
-		for (const [file, content] of [
-			["install.sh", out.sh],
-			["install.ps1", out.ps1],
-		] as const) {
-			const path = join(dir, file)
-			if (UPDATE) {
-				mkdirSync(dir, { recursive: true })
-				writeFileSync(path, content ?? "")
+	test(
+		"renders to the golden install.sh and install.ps1",
+		async () => {
+			const { default: config } = (await import(`../../assets/installers/examples/${example}.config.ts`)) as {
+				default: InstallgenConfig
 			}
-			expect(existsSync(path), `${path} is missing; run UPDATE_GOLDEN=1 bun run test`).toBe(true)
-			expect(content, `${path} is stale; run UPDATE_GOLDEN=1 bun run test`).toBe(readFileSync(path, "utf8"))
-		}
-		const syntax = spawnSync("sh", ["-n", join(dir, "install.sh")], { encoding: "utf8" })
-		expect(syntax.status, syntax.stderr).toBe(0)
-	})
+			const out = render(resolveConfig(config), {})
+			assertStructure(out, true)
+			const dir = join(HERE, "golden", example)
+			for (const [file, content] of [
+				["install.sh", out.sh],
+				["install.ps1", out.ps1],
+			] as const) {
+				const path = join(dir, file)
+				if (UPDATE) {
+					mkdirSync(dir, { recursive: true })
+					writeFileSync(path, content ?? "")
+				}
+				expect(existsSync(path), `${path} is missing; run UPDATE_GOLDEN=1 bun run test`).toBe(true)
+				expect(content, `${path} is stale; run UPDATE_GOLDEN=1 bun run test`).toBe(readFileSync(path, "utf8"))
+			}
+			const syntax = spawnSync("sh", ["-n", join(dir, "install.sh")], { encoding: "utf8" })
+			expect(syntax.status, syntax.stderr).toBe(0)
+		},
+		SPAWN_TIMEOUT,
+	)
 })
 
 /* A config whose literals hold everything a shell treats specially, signed, rendered beside the goldens for the linters */
@@ -65,20 +72,24 @@ function lintDir(): string {
 }
 
 describe.runIf(DOCKER)("static analysis of the rendered scripts", () => {
-	test("shellcheck -s sh finds nothing", () => {
-		const dir = lintDir()
-		try {
-			const files = ["raw", "goreleaser", "github", "hostile"].map((d) => `${d}/install.sh`)
-			const r = spawnSync(
-				"docker",
-				["run", "--rm", "-v", `${dir}:/mnt`, "-w", "/mnt", "koalaman/shellcheck:stable", "-s", "sh", ...files],
-				{ encoding: "utf8" },
-			)
-			expect(r.status, r.stdout + r.stderr).toBe(0)
-		} finally {
-			rmSync(dir, { recursive: true, force: true })
-		}
-	})
+	test(
+		"shellcheck -s sh finds nothing",
+		() => {
+			const dir = lintDir()
+			try {
+				const files = ["raw", "goreleaser", "github", "hostile"].map((d) => `${d}/install.sh`)
+				const r = spawnSync(
+					"docker",
+					["run", "--rm", "-v", `${dir}:/mnt`, "-w", "/mnt", "koalaman/shellcheck:stable", "-s", "sh", ...files],
+					{ encoding: "utf8" },
+				)
+				expect(r.status, r.stdout + r.stderr).toBe(0)
+			} finally {
+				rmSync(dir, { recursive: true, force: true })
+			}
+		},
+		SPAWN_TIMEOUT,
+	)
 
 	test("PSScriptAnalyzer finds nothing, PSUseCompatibleSyntax 5.1 and 7.0 included", () => {
 		const dir = lintDir()
