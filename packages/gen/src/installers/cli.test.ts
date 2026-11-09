@@ -2,17 +2,17 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { PassThrough } from "node:stream"
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest"
-import { publish, startServer, type TestServer } from "../tests/support/server.ts"
-import { run, start, type Io, type Proc } from "./cli.ts"
-import type { InstallgenConfig } from "./config/define-config.ts"
+import { publish, startServer, type TestServer } from "../../tests/installers/support/server.ts"
+import { capture, config, configSource, errno, fakeProc } from "./__fixtures__/cli.ts"
+import { run, start } from "./cli.ts"
 import { resolveConfig } from "./config/resolve.ts"
 import { render } from "./render/render.ts"
 
-const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..")
+const HERE = dirname(fileURLToPath(import.meta.url))
+/* the clients package, whose manifest the installgen bin reports its version from */
+const PACKAGE_DIR = join(HERE, "../..")
 const VERSION = (JSON.parse(readFileSync(join(PACKAGE_DIR, "package.json"), "utf8")) as { version: string }).version
-const NODE = { runtime: "node", nodeVersion: "26.0.0" } as const
 
 const dirs: string[] = []
 function sandbox(files: Record<string, string> = {}): string {
@@ -28,51 +28,11 @@ afterEach(() => {
 	for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
 
-interface Captured {
-	io: Io
-	out: () => string
-	err: () => string
-}
-
-function capture(cwd: string, options: { isTTY?: boolean; env?: Record<string, string> } = {}): Captured {
-	const out: string[] = []
-	const err: string[] = []
-	return {
-		io: {
-			cwd,
-			env: options.env ?? {},
-			stdout: (t) => void out.push(t),
-			stderr: (t) => void err.push(t),
-			isTTY: options.isTTY ?? false,
-			runtime: NODE,
-		},
-		out: () => out.join(""),
-		err: () => err.join(""),
-	}
-}
-
 async function cli(argv: string[], cwd: string, options: { isTTY?: boolean; env?: Record<string, string> } = {}) {
 	const c = capture(cwd, options)
 	const code = await run(argv, c.io)
 	return { code, out: c.out(), err: c.err() }
 }
-
-/* A plain .mjs config: it needs no package import, so it loads in-process (tests/bin.test.ts covers the hook) */
-const configSource = (baseUrl: string, extra = "") => `export default {
-	name: "my-cli",
-	baseUrl: ${JSON.stringify(baseUrl)},
-	assetPath: ({ tag, version, os, arch }) => \`\${tag}/my-cli_\${version}_\${os}_\${arch}\${os === "windows" ? ".zip" : ".tar.gz"}\`,
-	checksumsPath: ({ tag }) => \`\${tag}/checksums.txt\`,
-	${extra}
-}
-`
-/* the same config as an object, for publish() and expected renders */
-const config = {
-	name: "my-cli",
-	assetPath: ({ tag, version, os, arch }) =>
-		`${tag}/my-cli_${version}_${os}_${arch}${os === "windows" ? ".zip" : ".tar.gz"}`,
-	checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
-} satisfies Omit<InstallgenConfig, "baseUrl">
 
 describe("usage", () => {
 	test.each([["--help"], ["-h"]])("%s prints usage and exits 0", async (flag) => {
@@ -116,7 +76,8 @@ describe("usage", () => {
 	})
 })
 
-const example = (preset: string) => readFileSync(join(PACKAGE_DIR, "examples", `${preset}.config.ts`), "utf8")
+const example = (preset: string) =>
+	readFileSync(join(HERE, "../../assets/installers/examples", `${preset}.config.ts`), "utf8")
 
 describe("init", () => {
 	test("writes the raw preset as .mts where no package.json says type module", async () => {
@@ -185,10 +146,9 @@ describe("build", () => {
 		expect(readFileSync(join(dir, "installers/install.sh"), "utf8")).toBe(expected.sh)
 		expect(readFileSync(join(dir, "installers/install.ps1"), "utf8")).toBe(expected.ps1)
 		/* Windows has no Unix modes */
-		if (process.platform !== "win32") {
-			expect(statSync(join(dir, "installers/install.sh")).mode & 0o777).toBe(0o755)
-			expect(statSync(join(dir, "installers/install.ps1")).mode & 0o777).toBe(0o644)
-		}
+		const unix = process.platform !== "win32"
+		const mode = (file: string) => statSync(join(dir, "installers", file)).mode & 0o777
+		expect(unix ? [mode("install.sh"), mode("install.ps1")] : []).toEqual(unix ? [0o755, 0o644] : [])
 		expect(r.out).toContain(join("installers", "install.sh"))
 		expect(r.out).toContain(join("installers", "install.ps1"))
 		expect(r.err).not.toContain("warning")
@@ -217,7 +177,9 @@ describe("build", () => {
 		expect(r.code).toBe(1)
 		expect(r.err).toMatch(/error: the default version must match/)
 	})
+})
 
+describe("build", () => {
 	test("no checksumsPath: the build warns", async () => {
 		const dir = sandbox({
 			"installgen.config.mjs": `export default { name: "my-cli", baseUrl: "https://dl.example.com", assetPath: ({ version, os, arch }) => \`\${version}/\${os}-\${arch}\` }\n`,
@@ -268,30 +230,35 @@ describe("build", () => {
 	})
 })
 
-describe("check", () => {
-	let server: TestServer
-	let n = 0
+/* each check describe serves its own releases; they run in order, so one server is up at a time */
+let server: TestServer
+let n = 0
+function serving(): void {
 	beforeAll(async () => {
 		server = await startServer()
 	})
 	afterAll(async () => {
 		await server.close()
 	})
+}
 
-	function released(options: { noHead?: boolean } = {}) {
-		const prefix = `/check${++n}`
-		const rel = publish(server, { prefix, config, versions: ["1.2.3"] })
-		if (options.noHead) {
-			for (const p of rel.resolved.platforms) {
-				const path = `${prefix}/${rel.asset(p.platform, "1.2.3")}`
-				const served = server.get(path)
-				if (served) server.set(path, { ...served, noHead: true })
-			}
+function released(options: { noHead?: boolean } = {}) {
+	const prefix = `/check${++n}`
+	const rel = publish(server, { prefix, config, versions: ["1.2.3"] })
+	if (options.noHead) {
+		for (const p of rel.resolved.platforms) {
+			const path = `${prefix}/${rel.asset(p.platform, "1.2.3")}`
+			const served = server.get(path)
+			if (served) server.set(path, { ...served, noHead: true })
 		}
-		const dir = sandbox({ "installgen.config.mjs": configSource(rel.baseUrl) })
-		return { rel, prefix, dir }
 	}
-	const requests = (prefix: string) => server.log.filter((r) => r.path.startsWith(`${prefix}/`))
+	const dir = sandbox({ "installgen.config.mjs": configSource(rel.baseUrl) })
+	return { rel, prefix, dir }
+}
+const requests = (prefix: string) => server.log.filter((r) => r.path.startsWith(`${prefix}/`))
+
+describe("check", () => {
+	serving()
 
 	test("passes when every asset and checksum entry exists, resolving latest, with HEAD", async () => {
 		const { prefix, dir } = released()
@@ -342,6 +309,10 @@ describe("check", () => {
 		)
 		expect(r.out).toContain("2 problems")
 	})
+})
+
+describe("check", () => {
+	serving()
 
 	test("a missing checksums file is listed for every platform that uses it", async () => {
 		const { prefix, dir } = released()
@@ -392,6 +363,10 @@ describe("check", () => {
 		expect(r.code).toBe(1)
 		expect(r.err).toMatch(/invalid default version "1\.2\.3;x"/)
 	})
+})
+
+describe("check", () => {
+	serving()
 
 	test("an empty tagPrefix: v-less versions", async () => {
 		const prefix = `/check${++n}`
@@ -425,6 +400,10 @@ describe("check", () => {
 		expect(r.out).toContain(`linux/amd64 ${rel.baseUrl}/{tag}/my-cli_{version}_linux_amd64.tar.gz`)
 		expect(r.out).toContain(`linux/amd64 ${rel.baseUrl}/{tag}/checksums.txt`)
 	})
+})
+
+describe("check", () => {
+	serving()
 
 	test("a signed release: the bundle is probed, and a missing one is listed", async () => {
 		const prefix = `/check${++n}`
@@ -507,32 +486,6 @@ describe("terminal output", () => {
 		expect(r.err).toContain("✗")
 	})
 })
-
-const errno = (code: string) => Object.assign(new Error(`write ${code}`), { code })
-
-/* a process whose stdout fails on its first write the way a closed pipe does */
-function fakeProc(cwd: string, error: NodeJS.ErrnoException | undefined) {
-	const written: string[] = []
-	const exits: number[] = []
-	const stdout = new PassThrough()
-	stdout.write = ((chunk: string) => {
-		written.push(String(chunk))
-		if (error) stdout.emit("error", error)
-		return true
-	}) as typeof stdout.write
-	const stderr = new PassThrough()
-	const errs: string[] = []
-	stderr.write = ((chunk: string) => (errs.push(String(chunk)), true)) as typeof stderr.write
-	const proc: Proc = {
-		stdout,
-		stderr,
-		cwd: () => cwd,
-		env: {},
-		exitCode: undefined,
-		exit: (code) => void exits.push(code ?? 0),
-	}
-	return { proc, written, exits, errs }
-}
 
 describe("start", () => {
 	test("EPIPE on stdout (| head) stops writing and exits quietly with the current code", async () => {

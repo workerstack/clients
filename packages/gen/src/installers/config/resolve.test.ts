@@ -68,7 +68,9 @@ describe("defaults", () => {
 		expect(r.baseUrl).toBe("https://dl.example.com/my-cli")
 		expect(r.scriptUrls.sh).toBe("https://dl.example.com/my-cli/install.sh")
 	})
+})
 
+describe("defaults", () => {
 	test("explicit optional props are kept", () => {
 		const r = resolveConfig({
 			...base,
@@ -259,7 +261,9 @@ describe("validation errors", () => {
 		const config = { ...base, ...overrides } as InstallgenConfig
 		expect(() => resolveConfig(config)).toThrow(new RegExp(field))
 	})
+})
 
+describe("validation errors", () => {
 	test("an assetPath without a version or tag token", () => {
 		expect(() => resolveConfig({ ...base, assetPath: ({ os, arch }) => `latest/${os}-${arch}` })).toThrow(
 			/assetPath.*linux\/amd64.*version or tag/,
@@ -314,7 +318,9 @@ describe("validation errors", () => {
 			/binaryInArchive.*linux\/amd64.*mangled/,
 		)
 	})
+})
 
+describe("validation errors", () => {
 	test("legit paths containing installgen are not mangled", () => {
 		const r = resolveConfig({
 			...base,
@@ -372,7 +378,9 @@ describe("validation errors", () => {
 	])("a valid installDir %j", (installDir, rel) => {
 		expect(resolveConfig({ ...base, installDir }).installDir).toBe(rel)
 	})
+})
 
+describe("validation errors", () => {
 	test.each(["v*", "$", "'", "v ", " ", "v/"])("an invalid tagPrefix %j", (tagPrefix) => {
 		expect(() => resolveConfig({ ...base, tagPrefix })).toThrow(/tagPrefix/)
 	})
@@ -431,16 +439,16 @@ describe("validation errors", () => {
 	})
 })
 
-describe("signature", () => {
-	const ISSUER = "https://token.actions.githubusercontent.com"
-	const signed = {
-		...base,
-		checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
-		signature: {
-			identity: ({ tag }) => `https://github.com/acme/my-cli/.github/workflows/release.yml@refs/tags/${tag}`,
-		},
-	} satisfies InstallgenConfig
+const ISSUER = "https://token.actions.githubusercontent.com"
+const signed = {
+	...base,
+	checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
+	signature: {
+		identity: ({ tag }) => `https://github.com/acme/my-cli/.github/workflows/release.yml@refs/tags/${tag}`,
+	},
+} satisfies InstallgenConfig
 
+describe("signature", () => {
 	test("the bundle defaults to the checksums path + .sigstore.json, the issuer to GitHub Actions'", () => {
 		const r = resolveConfig(signed)
 		for (const p of r.platforms) {
@@ -472,7 +480,9 @@ describe("signature", () => {
 	test("unset signature resolves to undefined", () => {
 		for (const p of resolveConfig(base).platforms) expect(p.signature).toBeUndefined()
 	})
+})
 
+describe("signature", () => {
 	test.each([
 		["not an object", { signature: "x" }, /signature must be an object/],
 		["null", { signature: null }, /signature must be an object/],

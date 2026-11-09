@@ -11,6 +11,7 @@ export type {
 	Os,
 	PathContext,
 	Platform,
+	ScriptUrls,
 	SignatureConfig,
 	TagToken,
 	VersionToken,

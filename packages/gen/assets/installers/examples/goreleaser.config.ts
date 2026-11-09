@@ -1,4 +1,4 @@
-import { defineConfig, type Arch, type Os } from "@lovrozagar/installgen"
+import { defineConfig, type Arch, type Os } from "@workerstack/clients/installers"
 
 /*
  * GoReleaser's `goreleaser init` archive names, uploaded to your own host under the tag:

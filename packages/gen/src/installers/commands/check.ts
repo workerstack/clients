@@ -1,4 +1,4 @@
-import type { ResolvedConfig, Segment } from "../config/types.ts"
+import type { ResolvedConfig, ResolvedPlatform, Segment } from "../config/types.ts"
 import { InstallgenError } from "../errors.ts"
 import type { Ui } from "../ui.ts"
 import { loadResolved, warnUnverified, type ConfigOptions } from "./build.ts"
@@ -45,10 +45,105 @@ function normalize(raw: string, tagPrefix: string, what: string): string {
 	return version
 }
 
+type Get = (url: string, init?: RequestInit) => Promise<Response>
+
+interface Probes {
+	/** undefined when the file is there, else the row that says why not. */
+	exists(url: string): Promise<string | undefined>
+	/** One fetch per checksums URL, shared by every platform that lists it. */
+	checksums(url: string): Promise<Probe>
+}
+
+function probesFor(get: Get): Probes {
+	const sums = new Map<string, Promise<Probe>>()
+	return {
+		/* HEAD first; hosts that refuse it get a one-byte ranged GET */
+		async exists(url) {
+			try {
+				const head = await get(url, { method: "HEAD" })
+				if (head.ok) return undefined
+				const ranged = await get(url, { headers: { range: "bytes=0-0" } })
+				await ranged.arrayBuffer()
+				return ranged.ok ? undefined : `missing ${url} (${ranged.status})`
+			} catch (error) {
+				return `unreachable ${url}: ${failure(error)}`
+			}
+		},
+		checksums(url) {
+			let probe = sums.get(url)
+			if (probe === undefined) {
+				probe = get(url).then(
+					async (res): Promise<Probe> =>
+						res.ok ? { ok: true, body: await res.text() } : { ok: false, reason: `missing ${url} (${res.status})` },
+					(error: unknown): Probe => ({ ok: false, reason: `unreachable ${url}: ${failure(error)}` }),
+				)
+				sums.set(url, probe)
+			}
+			return probe
+		},
+	}
+}
+
+interface Release {
+	resolved: ResolvedConfig
+	version: string
+	tag: string
+	probes: Probes
+	ui: Ui
+}
+
+/** The checksum row of one platform: what it found, or undefined after reporting the problem. */
+async function checksumRow(
+	platform: ResolvedPlatform["platform"],
+	checksums: readonly Segment[],
+	asset: string,
+	run: Release,
+): Promise<string | undefined> {
+	const { resolved, version, tag, probes, ui } = run
+	const sumsUrl = `${resolved.baseUrl}/${expand(checksums, version, tag)}`
+	const file = asset.slice(asset.lastIndexOf("/") + 1)
+	const probe = await probes.checksums(sumsUrl)
+	if (!probe.ok) ui.bad(platform, probe.reason)
+	else if (findChecksum(probe.body, file) === undefined) ui.bad(platform, `no checksum for ${file} in ${sumsUrl}`)
+	else return "sha256 listed"
+	return undefined
+}
+
+/** Checks one platform's files, reports each problem as a row, and returns how many there were. */
+async function checkPlatform(p: ResolvedPlatform, run: Release): Promise<number> {
+	const { resolved, version, tag, probes, ui } = run
+	const asset = expand(p.asset, version, tag)
+	const assetUrl = `${resolved.baseUrl}/${asset}`
+	const found: string[] = []
+	let problems = 0
+	const missing = await probes.exists(assetUrl)
+	if (missing === undefined) found.push(assetUrl)
+	else {
+		problems++
+		ui.bad(p.platform, missing)
+	}
+	if (p.checksums !== undefined) {
+		const row = await checksumRow(p.platform, p.checksums, asset, run)
+		if (row === undefined) problems++
+		else found.push(row)
+	}
+	if (p.signature !== undefined) {
+		const missingBundle = await probes.exists(`${resolved.baseUrl}/${expand(p.signature.bundle, version, tag)}`)
+		if (missingBundle === undefined) found.push("signature bundle")
+		else {
+			problems++
+			ui.bad(p.platform, missingBundle)
+		}
+	}
+	const expected = 1 + (p.checksums === undefined ? 0 : 1) + (p.signature === undefined ? 0 : 1)
+	if (found.length === expected) ui.ok(p.platform, found.join(", "))
+	return problems
+}
+
 export async function check(options: CheckOptions, ui: Ui): Promise<number> {
 	const resolved = await loadResolved(options)
 	const doFetch = options.fetch ?? fetch
-	const get = (url: string, init: RequestInit = {}) =>
+	const get: Get = (url, init = {}) =>
 		doFetch(url, { redirect: "follow", signal: AbortSignal.timeout(TIMEOUT_MS), ...init })
 
 	if (options.list) {
@@ -58,68 +153,10 @@ export async function check(options: CheckOptions, ui: Ui): Promise<number> {
 	warnUnverified(resolved, ui)
 
 	const version = await resolveVersion(resolved, options.defaultVersion, get, ui)
-	const tag = resolved.tagPrefix + version
-
-	/* HEAD first; hosts that refuse it get a one-byte ranged GET */
-	const exists = async (url: string): Promise<string | undefined> => {
-		try {
-			const head = await get(url, { method: "HEAD" })
-			if (head.ok) return undefined
-			const ranged = await get(url, { headers: { range: "bytes=0-0" } })
-			await ranged.arrayBuffer()
-			return ranged.ok ? undefined : `missing ${url} (${ranged.status})`
-		} catch (error) {
-			return `unreachable ${url}: ${failure(error)}`
-		}
-	}
-	const sums = new Map<string, Promise<Probe>>()
-	const checksums = (url: string) => {
-		let probe = sums.get(url)
-		if (probe === undefined) {
-			probe = get(url).then(
-				async (res): Promise<Probe> =>
-					res.ok ? { ok: true, body: await res.text() } : { ok: false, reason: `missing ${url} (${res.status})` },
-				(error: unknown): Probe => ({ ok: false, reason: `unreachable ${url}: ${failure(error)}` }),
-			)
-			sums.set(url, probe)
-		}
-		return probe
-	}
+	const run: Release = { resolved, version, tag: resolved.tagPrefix + version, probes: probesFor(get), ui }
 
 	let problems = 0
-	for (const p of resolved.platforms) {
-		const asset = expand(p.asset, version, tag)
-		const assetUrl = `${resolved.baseUrl}/${asset}`
-		const found: string[] = []
-		const missing = await exists(assetUrl)
-		if (missing === undefined) found.push(assetUrl)
-		else {
-			problems++
-			ui.bad(p.platform, missing)
-		}
-		if (p.checksums !== undefined) {
-			const sumsUrl = `${resolved.baseUrl}/${expand(p.checksums, version, tag)}`
-			const file = asset.slice(asset.lastIndexOf("/") + 1)
-			const probe = await checksums(sumsUrl)
-			if (!probe.ok) {
-				problems++
-				ui.bad(p.platform, probe.reason)
-			} else if (findChecksum(probe.body, file) === undefined) {
-				problems++
-				ui.bad(p.platform, `no checksum for ${file} in ${sumsUrl}`)
-			} else found.push("sha256 listed")
-		}
-		if (p.signature !== undefined) {
-			const missingBundle = await exists(`${resolved.baseUrl}/${expand(p.signature.bundle, version, tag)}`)
-			if (missingBundle === undefined) found.push("signature bundle")
-			else {
-				problems++
-				ui.bad(p.platform, missingBundle)
-			}
-		}
-		const expected = 1 + (p.checksums === undefined ? 0 : 1) + (p.signature === undefined ? 0 : 1)
-		if (found.length === expected) ui.ok(p.platform, found.join(", "))
-	}
+	for (const p of resolved.platforms) problems += await checkPlatform(p, run)
 	if (problems === 0) ui.info(`all ${resolved.platforms.length} platforms ok for ${version}`)
 	else ui.info(`${problems} problem${problems === 1 ? "" : "s"}`)
 	return problems

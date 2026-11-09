@@ -34,7 +34,10 @@ export function init(options: InitOptions, ui: Ui): void {
 		throw new InstallgenError(`${existing} already exists; pass --force to overwrite it`)
 	}
 	const file = isModuleProject(options.cwd) ? "installgen.config.ts" : "installgen.config.mts"
-	const example = readFileSync(new URL(`../../examples/${options.preset}.config.ts`, import.meta.url), "utf8")
+	const example = readFileSync(
+		new URL(`../../../assets/installers/examples/${options.preset}.config.ts`, import.meta.url),
+		"utf8",
+	)
 	writeFileSync(join(options.cwd, file), example)
 	ui.ok("wrote", `${file} (preset ${options.preset})`)
 	ui.info(`Set baseUrl and assetPath for your releases, then run \`installgen build\`.`)

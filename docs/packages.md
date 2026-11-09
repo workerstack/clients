@@ -69,10 +69,11 @@ generator.
 
 ## @workerstack/clients
 
-| Export                     | What it holds                                                                                                                                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@workerstack/clients`     | `generated`, `writeTarget`, `TARGETS`, `targetOptionSchemas`, `METADATA_FIELDS`: a run as data, its files and packages; `generateRouteTree`, `generateTypes`, `extractTypes` for the build plugin |
-| `@workerstack/clients/cli` | the `honey-clients` command's `main`                                                                                                                                                              |
+| Export                            | What it holds                                                                                                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@workerstack/clients`            | `generated`, `writeTarget`, `TARGETS`, `targetOptionSchemas`, `METADATA_FIELDS`: a run as data, its files and packages; `generateRouteTree`, `generateTypes`, `extractTypes` for the build plugin |
+| `@workerstack/clients/installers` | installgen: `defineConfig`, `generateInstallers`, `InstallgenError` and the config types, for the `install.sh` and `install.ps1` the `installgen` bin writes and checks                           |
+| `@workerstack/clients/cli`        | the `honey-clients` command's `main`                                                                                                                                                              |
 
 The SDK, CLI and MCP generators run through `honey-clients generate` ([code generation](codegen.md)).
 

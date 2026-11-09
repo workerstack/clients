@@ -30,7 +30,7 @@ describe("config types", () => {
 	})
 
 	test("string methods on a token are type errors", () => {
-		defineConfig({
+		const config = defineConfig({
 			name: "app",
 			baseUrl: "https://dl.example.com",
 			assetPath: ({ version, tag }) => {
@@ -41,10 +41,11 @@ describe("config types", () => {
 				return `${tag}/${version}`
 			},
 		})
+		expectTypeOf(config).toEqualTypeOf<InstallgenConfig>()
 	})
 
 	test("os and arch only take the supported names", () => {
-		defineConfig({
+		const config = defineConfig({
 			name: "app",
 			baseUrl: "https://dl.example.com",
 			assetPath: ({ version, os, arch }) => {
@@ -55,8 +56,11 @@ describe("config types", () => {
 				return `${version}/${mac}-${x64}`
 			},
 		})
+		expectTypeOf(config).toEqualTypeOf<InstallgenConfig>()
 	})
+})
 
+describe("config types", () => {
 	test("Platform rejects unknown pairs", () => {
 		expectTypeOf<"linux/amd64">().toExtend<Platform>()
 		expectTypeOf<"windows/arm64">().toExtend<Platform>()

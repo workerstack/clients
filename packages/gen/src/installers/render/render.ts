@@ -3,6 +3,7 @@ import type { ResolvedConfig, ResolvedPlatform, Segment } from "../config/types.
 import { InstallgenError } from "../errors.ts"
 import { psLiteral, psString, shLiteral, shWord } from "./quote.ts"
 
+/** How `generateInstallers` renders beyond the config itself. */
 export interface RenderOptions {
 	/** Baked in as the version to install when neither the argument nor `<PREFIX>_VERSION` names one. */
 	defaultVersion?: string | undefined
@@ -13,8 +14,11 @@ export interface Templates {
 	ps1: string
 }
 
+/** The scripts a config needs: each is absent when none of its platforms needs that script. */
 export interface Rendered {
+	/** `install.sh`, for the linux and darwin platforms; served for `curl -fsSL <url> | sh`. */
 	sh?: string
+	/** `install.ps1`, for the windows platforms; served for `irm <url> | iex`. */
 	ps1?: string
 }
 
@@ -24,7 +28,8 @@ const VERSION = /^[A-Za-z0-9._+-]+$/
 const NON_ASCII = /[\u0080-\uffff]/
 const PLACEHOLDER = /@@([A-Z0-9_]+)@@/g
 
-const readTemplate = (file: string) => readFileSync(new URL(`../../templates/${file}`, import.meta.url), "utf8")
+const readTemplate = (file: string) =>
+	readFileSync(new URL(`../../../assets/installers/templates/${file}`, import.meta.url), "utf8")
 
 export function readTemplates(): Templates {
 	return { sh: readTemplate("install.sh"), ps1: readTemplate("install.ps1") }

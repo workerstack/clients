@@ -1,4 +1,4 @@
-import { defineConfig } from "@lovrozagar/installgen"
+import { defineConfig } from "@workerstack/clients/installers"
 
 /*
  * Raw binaries on your own host:

@@ -4,9 +4,10 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterAll, describe, expect, test } from "vitest"
-import { run } from "../src/cli.ts"
+import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
+import { run } from "../../src/installers/cli.ts"
 
-const BIN = join(dirname(fileURLToPath(import.meta.url)), "../bin/installgen.js")
+const BIN = join(dirname(fileURLToPath(import.meta.url)), "../../bin/installgen.js")
 const sink = () => {}
 const dirs: string[] = []
 afterAll(() => {
@@ -14,7 +15,7 @@ afterAll(() => {
 })
 
 /* The only spawns: the real bin, the real Node loader, the self-resolve hook. cli.test.ts carries coverage. */
-describe("bin/installgen.js", () => {
+describe("bin/installgen.js", { timeout: SPAWN_TIMEOUT }, () => {
 	test("--help", () => {
 		const r = spawnSync(process.execPath, [BIN, "--help"], { encoding: "utf8" })
 		expect(r.status, r.stderr).toBe(0)
@@ -53,7 +54,9 @@ describe("bin/installgen.js", () => {
 		expect(code).toBe(0)
 		const r = spawnSync(process.execPath, [BIN, "build"], { cwd: dir, encoding: "utf8" })
 		expect(r.status, r.stderr).toBe(0)
-		if (process.platform !== "win32") expect(statSync(join(dir, "installers/install.sh")).mode & 0o777).toBe(0o755)
+		/* Windows has no exec bit to set, so there the mode is whatever the filesystem reports */
+		const mode = statSync(join(dir, "installers/install.sh")).mode & 0o777
+		expect(mode).toBe(process.platform === "win32" ? mode : 0o755)
 		expect(readFileSync(join(dir, "installers/install.ps1"), "utf8")).toContain("my-cli_Windows_")
 		const syntax = spawnSync("sh", ["-n", join(dir, "installers/install.sh")], { encoding: "utf8" })
 		expect(syntax.status, syntax.stderr).toBe(0)
