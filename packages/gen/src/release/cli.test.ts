@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process"
-import { resolve } from "node:path"
+import { readFileSync, realpathSync } from "node:fs"
+import { join, resolve } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { main } from "../cli.ts"
@@ -44,18 +45,30 @@ describe("release --help", () => {
 	it.each(["--help", "-h"])("prints the usage on stdout for %s and exits 0", async (flag) => {
 		expect(await captured((io) => release([flag], io))).toEqual({ status: 0, stderr: "", stdout: USAGE })
 	})
+
+	it("lists codegen and toolchains with what each does", () => {
+		expect(USAGE).toContain(
+			"  codegen --config <path>\n      run the config's codegen from the repo root, as bump does before it decides\n",
+		)
+		expect(USAGE).toContain(
+			"  toolchains --config <path>\n      print the config's toolchains, one per line: the system.config.ts names its codegen needs\n",
+		)
+	})
 })
 
 describe("release --config", () => {
-	it.each(["bump", "sync", "bootstrap"])("is required by %s, which says so naming itself", async (command) => {
-		const result = await captured((io) => release([command, ...(command === "bootstrap" ? ["--all"] : [])], io))
+	it.each(["bump", "sync", "bootstrap", "codegen", "toolchains"])(
+		"is required by %s, which says so naming itself",
+		async (command) => {
+			const result = await captured((io) => release([command, ...(command === "bootstrap" ? ["--all"] : [])], io))
 
-		expect(result).toEqual({
-			status: 1,
-			stderr: `honey-clients: release ${command}: --config <path> is required\n`,
-			stdout: "",
-		})
-	})
+			expect(result).toEqual({
+				status: 1,
+				stderr: `honey-clients: release ${command}: --config <path> is required\n`,
+				stdout: "",
+			})
+		},
+	)
 
 	it("names a value flag given no value as bootstrap's usage mistake", async () => {
 		const result = await captured((io) => release(["bootstrap", "--config"], io))
@@ -89,6 +102,65 @@ describe("release --config", () => {
 	})
 })
 
+describe("release toolchains", () => {
+	it.each([
+		[["go", "rust", "uv", "ruff"], "go\nrust\nuv\nruff\n"],
+		[undefined, ""],
+	])("prints %j one name per line", { timeout: SPAWN_TIMEOUT }, async (toolchains, stdout) => {
+		const root = await acme({ ...CONFIG, ...(toolchains === undefined ? {} : { toolchains }) })
+
+		expect(await captured((io) => release(["toolchains", "--config", configOf(root)], io))).toEqual({
+			status: 0,
+			stderr: "",
+			stdout,
+		})
+	})
+
+	it.each(["codegen", "toolchains"])("prints only its own usage for %s --help", async (command) => {
+		for (const flag of ["--help", "-h"]) {
+			const result = await captured((io) => release([command, flag], io))
+
+			expect(result.status).toBe(0)
+			expect(result.stdout).toMatch(new RegExp(`^usage: honey-clients release ${command} --config <path>\\n {6}\\S`))
+		}
+	})
+
+	it("names a --config given no value and an unknown flag as its usage mistakes", async () => {
+		expect((await captured((io) => release(["toolchains", "--config"], io))).stderr).toBe(
+			"honey-clients: release toolchains: --config requires a value\n",
+		)
+		expect((await captured((io) => release(["toolchains", "--config", "--help"], io))).stderr).toBe(
+			"honey-clients: release toolchains: --config requires a value\n",
+		)
+		expect((await captured((io) => release(["toolchains", "--only", "x"], io))).stderr).toBe(
+			"honey-clients: release toolchains: unknown flag: --only\n",
+		)
+	})
+})
+
+describe("release codegen", () => {
+	it("runs the config's codegen from the repo root and exits 0", { timeout: SPAWN_TIMEOUT }, async () => {
+		const root = await acme()
+		writeAll(root, { "codegen.mjs": 'import { writeFileSync } from "node:fs"\nwriteFileSync("ran", process.cwd())\n' })
+
+		const result = await captured((io) => release(["codegen", "--config", configOf(root)], io))
+
+		expect(result).toEqual({ status: 0, stderr: "", stdout: "" })
+		expect(readFileSync(join(root, "ran"), "utf8")).toBe(realpathSync(root))
+	})
+
+	it("exits 1 naming the codegen when it fails", { timeout: SPAWN_TIMEOUT }, async () => {
+		const root = await acme({ ...CONFIG, codegen: ["node", "fail.mjs"] })
+		writeAll(root, { "fail.mjs": "process.exit(1)\n" })
+
+		expect(await captured((io) => release(["codegen", "--config", configOf(root)], io))).toEqual({
+			status: 1,
+			stderr: "honey-clients: codegen (node fail.mjs) exited 1\n",
+			stdout: "",
+		})
+	})
+})
+
 /* throws `value` as it is, no Error around it */
 function raise(value: string): never {
 	throw value
@@ -101,7 +173,7 @@ describe("honey-clients main", () => {
 			const result = await captured((io) => main(["release"], io))
 
 			expect(result).toEqual({ status: 1, stderr: USAGE, stdout: "" })
-			expect(usage()).toContain("release bump|sync|bootstrap --config <path>")
+			expect(usage()).toContain("release bump|sync|bootstrap|codegen|toolchains --config <path>")
 		},
 		SPAWN_TIMEOUT,
 	)

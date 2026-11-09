@@ -111,6 +111,37 @@ describe("loadPackages spec and codegen", () => {
 	})
 })
 
+/* acme's release with `toolchains` set as given, or left out when undefined */
+async function withToolchains(toolchains: unknown) {
+	const root = await repo()
+	product(root, [{ name: "sdk", repo: "acme/sdk" }])
+	writeConfig(root, {
+		codegen: CODEGEN,
+		homepage: HOMEPAGE,
+		packages: [{ commitMessage: "c", description: "d", name: "sdk", repo: "acme/sdk", topics: ["acme"] }],
+		project: "acme",
+		spec: SPEC,
+		...(toolchains === undefined ? {} : { toolchains }),
+	})
+	return readRelease(configOf(root), {})
+}
+
+describe("loadRelease toolchains", () => {
+	it("loads none when the config lists none", { timeout: SPAWN_TIMEOUT }, async () => {
+		expect((await withToolchains(undefined)).toolchains).toEqual([])
+	})
+
+	it("loads the listed names in the config's order", { timeout: SPAWN_TIMEOUT }, async () => {
+		expect((await withToolchains(["go", "ruff"])).toolchains).toEqual(["go", "ruff"])
+	})
+
+	it("refuses a name that is no system.config.ts dep slug, naming the config", { timeout: SPAWN_TIMEOUT }, async () => {
+		await expect(withToolchains(["Go 1.27"])).rejects.toThrow(
+			"acme-release/release.config.ts is invalid:\n  toolchains.0: a toolchain is a system.config.ts dep name (a lowercase slug)",
+		)
+	})
+})
+
 describe("loadPackages homepage, description and topics", () => {
 	it(
 		"gives each package the release's homepage, its description and its topics",
