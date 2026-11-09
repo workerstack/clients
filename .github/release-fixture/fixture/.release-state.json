@@ -1,0 +1,11 @@
+{
+	"hand": "8d1bcb1b0fefa6c86d446d03c1f2ac9add3c76ea98ba0bd7db01ddd996b82532",
+	"output": "a9f7dcee3eba6e61f72e465581969d9900213023905a7034be638b3dbd411aad",
+	"publishedAt": "2026-11-09T05:31:07.379Z",
+	"spec": {
+		"commit": "1752c97a70d035174679b0379a242b4749078de2",
+		"path": ".github/release-fixture/openapi.json",
+		"sha": "a9f7dcee3eba6e61f72e465581969d9900213023905a7034be638b3dbd411aad"
+	},
+	"version": "1.0.0"
+}
