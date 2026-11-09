@@ -8,7 +8,7 @@
  * absent is reported skipped, never killed; where the toolchain is required (HONEY_REQUIRE_GO, HONEY_REQUIRE_RUST,
  * HONEY_REQUIRE_PYTHON, HONEY_REQUIRE_TOOLCHAINS) its absence fails the run instead.
  *
- *     bun packages/gen/tests/structure/mutation-harness.ts
+ *     bun tests/structure/mutation-harness.ts
  */
 import { spawnSync } from "node:child_process"
 import { createRequire } from "node:module"

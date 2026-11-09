@@ -13,7 +13,7 @@ import { generateJavaSdk, javaCallPlans } from "./sdk.ts"
 
 /** The five e2e apps, whose emitted documents declare no operationId. */
 const APPS = ["compose", "defaults", "gateway", "kitchen", "surface"] as const
-const REPO = join(import.meta.dirname, "../../../../..")
+const REPO = join(import.meta.dirname, "../../..")
 
 /** An e2e app's emitted OpenAPI document. */
 const appSpec = (app: string) =>

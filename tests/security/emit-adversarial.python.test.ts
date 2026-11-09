@@ -23,7 +23,7 @@ import { guardNamed } from "../structure/mutation-harness.guards.ts"
 const PY = withPython()
 const FLOOR = withPython(PY_FLOOR)
 
-const REPO = resolve(import.meta.dirname, "../../../..")
+const REPO = resolve(import.meta.dirname, "../..")
 
 const mutant = guardNamed(process.env.HONEY_MUTANT)
 if (mutant !== undefined) {
@@ -35,19 +35,19 @@ if (mutant !== undefined) {
 
 /* imported after the mock: each reaches sdk.ts and so transport.ts, so a mutant's runtime is what is gated */
 const { compiledPython } = (await import(
-	resolve(REPO, "packages/gen/src/emit/python/__fixtures__/compiled.ts")
+	resolve(REPO, "src/emit/python/__fixtures__/compiled.ts")
 )) as typeof import("../../src/emit/python/__fixtures__/compiled.ts")
 const { drivenPythonSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/python/__fixtures__/driven.ts")
+	resolve(REPO, "src/emit/python/__fixtures__/driven.ts")
 )) as typeof import("../../src/emit/python/__fixtures__/driven.ts")
 const { consume, seen } = (await import(
-	resolve(REPO, "packages/gen/src/emit/python/__fixtures__/consumer.ts")
+	resolve(REPO, "src/emit/python/__fixtures__/consumer.ts")
 )) as typeof import("../../src/emit/python/__fixtures__/consumer.ts")
 const { FIXTURES } = (await import(
-	resolve(REPO, "packages/gen/src/emit/python/__fixtures__/documents.ts")
+	resolve(REPO, "src/emit/python/__fixtures__/documents.ts")
 )) as typeof import("../../src/emit/python/__fixtures__/documents.ts")
 const { generatePythonSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/python/sdk.ts")
+	resolve(REPO, "src/emit/python/sdk.ts")
 )) as typeof import("../../src/emit/python/sdk.ts")
 
 /* one client holds both styles, the normal methods and their `safe` mirror (bit 21 i2) */

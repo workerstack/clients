@@ -23,7 +23,10 @@ function naming(text: string): string[] {
 		maxBuffer: 64 * 1024 * 1024,
 	})
 		.split("\0")
-		.filter((file) => file !== "" && readFileSync(join(GEN, file), "latin1").includes(text))
+		.filter(
+			(file) =>
+				/^(?:src|tests|scripts|lint|bin)\//.test(file) && readFileSync(join(GEN, file), "latin1").includes(text),
+		)
 }
 
 describe("the file-uploads extension's two modules", () => {

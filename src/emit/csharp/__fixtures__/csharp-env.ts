@@ -21,7 +21,7 @@ import {
 } from "../../shared/__fixtures__/installs.ts"
 
 /** The pin file, at the repo root. */
-const globalJson = () => resolve(import.meta.dirname, "../../../../../../global.json")
+const globalJson = () => resolve(import.meta.dirname, "../../../../global.json")
 
 /* this dir, repo-relative, as the install line names it from the repo's top level */
 

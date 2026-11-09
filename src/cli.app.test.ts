@@ -29,7 +29,7 @@ import { appProject, backend } from "./ir/__fixtures__/app-project.ts"
 import { SPAWN_TIMEOUT } from "./gen/__fixtures__/spawn-timeout.ts"
 
 const BIN = resolve(import.meta.dirname, "../bin/honey-clients.js")
-const REPO = resolve(import.meta.dirname, "../../..")
+const REPO = resolve(import.meta.dirname, "..")
 const PINNED_BUN = withPinnedBun()
 const MARK = markOf()
 const HONEY = 'import { honey } from "@workerstack/backend"\n'

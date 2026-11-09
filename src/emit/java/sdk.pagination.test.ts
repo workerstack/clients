@@ -10,7 +10,7 @@ import { FIXTURES, type FixtureKey, type JavaFixture } from "./__fixtures__/docu
 import { generateJavaSdk } from "./sdk.ts"
 
 const APPS = ["compose", "defaults", "gateway", "kitchen", "surface"] as const
-const REPO = join(import.meta.dirname, "../../../../..")
+const REPO = join(import.meta.dirname, "../../..")
 /** A pagination surface's words, in any casing: a pager, a next page, auto-paging. */
 const PAGINATION = /paginat|pager\b|nextpage|hasnextpage|autopag|iteratepages|pageiterator|listall/i
 

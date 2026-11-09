@@ -56,7 +56,7 @@ function parsedToml(text: string): unknown {
 describe("the Python classifiers (plan 39 8.4)", () => {
 	it("span the floor requires-python names, which CI installs, to the version .python-version pins", () => {
 		const minor = (version: string) => Number(version.split(".")[1])
-		const pinned = readFileSync(join(import.meta.dirname, "../../../../../.python-version"), "utf8").trim()
+		const pinned = readFileSync(join(import.meta.dirname, "../../../.python-version"), "utf8").trim()
 		const versions = PYTHON_CLASSIFIERS.flatMap(
 			(line) => /^Programming Language :: Python :: (3\.\d+)$/.exec(line)?.[1] ?? [],
 		)

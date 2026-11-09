@@ -83,7 +83,7 @@ describe("Python runs through python-env.ts only", () => {
 	})
 })
 
-const REPO = join(GEN, "../..")
+const REPO = GEN
 const WORKFLOW = readFileSync(join(REPO, ".github/workflows/ci.yml"), "utf8")
 const FIXTURE_DIR = join(GEN, "src/emit/python/__fixtures__")
 const TOOLS = join(FIXTURE_DIR, "tools.txt")

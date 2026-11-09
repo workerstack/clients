@@ -78,8 +78,8 @@ describe("Rust runs through rust-env.ts only", () => {
 	})
 })
 
-const WORKFLOW = readFileSync(join(GEN, "../../.github/workflows/ci.yml"), "utf8")
-const TOML = readFileSync(join(GEN, "../../rust-toolchain.toml"), "utf8")
+const WORKFLOW = readFileSync(join(GEN, ".github/workflows/ci.yml"), "utf8")
+const TOML = readFileSync(join(GEN, "rust-toolchain.toml"), "utf8")
 /* the step that installs what the file pins: rustup reads the file for a bare install, and the default follows it */
 const PIN_DEFAULT = `rustup default "$(sed -n 's/^channel = "\\(.*\\)"$/\\1/p' rust-toolchain.toml)"`
 const FLOOR_INSTALL = `rustup toolchain install ${RUST_FLOOR} --profile minimal --component clippy`

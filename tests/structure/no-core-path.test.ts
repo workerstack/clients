@@ -1,6 +1,6 @@
 /**
  * gen stands alone (roadmap 5 slice 4): no file of this package reaches packages/core by path, so the package works
- * the same once it is its own repo (github.com/workerstack/clients) and backend arrives from npm. backend is
+ * the same in its own repo (github.com/workerstack/clients), with backend from npm. backend is
  * reached by its package name, `@workerstack/backend`, and its published exports only.
  */
 import { execFileSync } from "node:child_process"
@@ -11,8 +11,10 @@ import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
 
 const GEN = resolve(import.meta.dirname, "../..")
 const SELF = "tests/structure/no-core-path.test.ts"
-/* docs tooling that reads backend's README beside the repo's docs until slice 5 splits the docs between the repos */
-const TOOLING = ["src/emit/shared/__fixtures__/docs-blocks.ts"]
+/* the boundaries rule's test spells an escape into a sibling package on purpose, as the input it must refuse */
+const TOOLING = ["lint/boundaries.test.ts"]
+/* the package's code; the blueprint and the lessons are history and name the old layout */
+const CODE = /^(?:src|tests|scripts|lint|bin)\//
 /* `packages/core`, or a relative step into the sibling: `../core`, `../../core/src`, `resolve(GEN, "../core")` */
 const CROSSING = /packages\/core\b|\.\.\/core\b/
 
@@ -23,7 +25,7 @@ function files(): string[] {
 		encoding: "utf8",
 		maxBuffer: 64 * 1024 * 1024,
 	})
-	return out.split("\0").filter((file) => file !== "" && file !== SELF && !TOOLING.includes(file))
+	return out.split("\0").filter((file) => CODE.test(file) && file !== SELF && !TOOLING.includes(file))
 }
 
 /** `<file>:<line> reaches packages/core by path: …` for each crossing in `file`. */

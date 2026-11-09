@@ -16,7 +16,7 @@ import { type Reply, served } from "../../src/emit/shared/__fixtures__/recording
 import type { Call, Setup } from "../integration/conformance/matrix.ts"
 import { guardNamed } from "../structure/mutation-harness.guards.ts"
 
-const REPO = resolve(import.meta.dirname, "../../../..")
+const REPO = resolve(import.meta.dirname, "../..")
 
 /* a C# guard named by HONEY_MUTANT reruns this file with its module's guard switched off (the harness's mock) */
 const mutant = guardNamed(process.env.HONEY_MUTANT)
@@ -29,16 +29,16 @@ if (mutant !== undefined) {
 
 /* imported after the mock: each reaches sdk.ts and so transport.ts, so a mutant's runtime is what is built and driven */
 const { compiledCSharp, compiledFixture } = (await import(
-	resolve(REPO, "packages/gen/src/emit/csharp/__fixtures__/compiled.ts")
+	resolve(REPO, "src/emit/csharp/__fixtures__/compiled.ts")
 )) as typeof import("../../src/emit/csharp/__fixtures__/compiled.ts")
 const { drivenCSharpSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/csharp/__fixtures__/driven.ts")
+	resolve(REPO, "src/emit/csharp/__fixtures__/driven.ts")
 )) as typeof import("../../src/emit/csharp/__fixtures__/driven.ts")
 const { clientOf, program } = (await import(
-	resolve(REPO, "packages/gen/src/emit/csharp/__fixtures__/consumer.ts")
+	resolve(REPO, "src/emit/csharp/__fixtures__/consumer.ts")
 )) as typeof import("../../src/emit/csharp/__fixtures__/consumer.ts")
 const { generateCSharpSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/csharp/sdk.ts")
+	resolve(REPO, "src/emit/csharp/sdk.ts")
 )) as typeof import("../../src/emit/csharp/sdk.ts")
 
 /** Whether .NET is here: a missing SDK fails where it is required and skips elsewhere (csharp-env). */

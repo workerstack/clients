@@ -76,7 +76,7 @@ export function dotnetInstall(version: string): string {
 	return [
 		`V=${version}`,
 		`D="$HOME/.cache/honey-tmp/dotnet"`,
-		`F="$(git rev-parse --show-toplevel)/packages/gen/src/emit/csharp/__fixtures__"`,
+		`F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__"`,
 		`T="$D/toolchain/$V"`,
 		`mkdir -p "$D/dl" "$D/home" "$D/tmp"`,
 		`curl -fsSL -o ${tarball} "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-${DOTNET_RID}.tar.gz"`,
@@ -118,7 +118,7 @@ export function javaInstall(): string {
 		`echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done`,
 	].join(" && ")
 	return [
-		`P="$(git rev-parse --show-toplevel)/packages/gen/src/emit/java/__fixtures__/java-pins.json"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json"`,
 		`D="$HOME/.cache/honey-tmp/java"`,
 		`G="$(jq -r .googleJavaFormat.version "$P")"`,
 		`W="$(jq -r .gradle.version "$P")"`,
@@ -136,7 +136,7 @@ export function javaInstall(): string {
  */
 export function toolsInstall(): string {
 	return [
-		`P="$(git rev-parse --show-toplevel)/packages/gen/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/honey-tmp/tools" && mkdir -p "$D/dl"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/honey-tmp/tools" && mkdir -p "$D/dl"`,
 		`for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")"`,
 		`curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c -`,
 		`rm -rf "$D/$R" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial"`,
@@ -150,7 +150,7 @@ export function toolsInstall(): string {
  */
 export function jsrCliInstall(): string {
 	return [
-		`P="$(git rev-parse --show-toplevel)/packages/gen/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/honey-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/honey-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl"`,
 		`curl -fsSL -o "$D/dl/$R.zip" "$(jq -r .url "$P")" && echo "$(jq -r .sha256 "$P")  $D/dl/$R.zip" | sha256sum -c -`,
 		`rm -rf "$D/$R" "$D/$R.partial" && mkdir -p "$D/$R.partial" && unzip -q "$D/dl/$R.zip" -d "$D/$R.partial"`,
 		`chmod +x "$D/$R.partial/$(jq -r .bin "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$R.zip"`,
@@ -160,7 +160,7 @@ export function jsrCliInstall(): string {
 /** The command that installs the pinned MCP clients, from anywhere in the repo: verified by npm ci, kept whole or not at all. */
 export function clientsInstall(): string {
 	return [
-		`P="$(git rev-parse --show-toplevel)/packages/gen/src/emit/mcp/__fixtures__" && D="$HOME/.cache/honey-tmp/mcp-clients"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/honey-tmp/mcp-clients"`,
 		`rm -rf "$D.partial" && mkdir -p "$D.partial" && cp "$P/client-pins.json" "$D.partial/package.json"`,
 		`cp "$P/client-lock.json" "$D.partial/package-lock.json"`,
 		`(cd "$D.partial" && npm ci --ignore-scripts --no-audit --no-fund)`,

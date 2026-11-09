@@ -6,7 +6,7 @@
  * drops what nothing reaches: every version already tested stays, and the floors in `sdk-cargo.ts` (Fb7)
  * stay the lock's. Run it after changing a dependency:
  *
- *     bun packages/gen/scripts/rust-lock.ts
+ *     bun scripts/rust-lock.ts
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"

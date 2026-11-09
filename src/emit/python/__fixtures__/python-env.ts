@@ -15,7 +15,7 @@ import { join, resolve as resolvePath } from "node:path"
 import { PY_FLOOR, pythonInstall, uvInstall } from "../../shared/__fixtures__/installs.ts"
 
 /** `file` at the repo root. */
-const atRoot = (file: string) => resolvePath(import.meta.dirname, "../../../../../..", file)
+const atRoot = (file: string) => resolvePath(import.meta.dirname, "../../../..", file)
 
 /** `pattern`'s first group in `<repo>/<file>`; throws naming the file when it does not match. */
 function pinIn(file: string, pattern: RegExp, what: string): string {

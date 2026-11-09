@@ -16,7 +16,7 @@ import { ceilingOf, countTokens, markAllMcp } from "./capture-token-budget.ts"
 import { runtimeBytes } from "./sdk-budget.ts"
 import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 
-const REPO = resolve(import.meta.dirname, "../../..")
+const REPO = resolve(import.meta.dirname, "..")
 const SLOW = { timeout: 120_000 }
 
 /*

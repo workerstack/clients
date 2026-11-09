@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path"
 import { generated, type GenerateRun } from "../../../index.ts"
 
 /** The repository root, whose node_modules holds the workspace's copy of the peer. */
-export const REPO = /* @__PURE__ */ resolve(import.meta.dirname, "../../../../../..")
+export const REPO = /* @__PURE__ */ resolve(import.meta.dirname, "../../../..")
 
 /** Every file kind the TS target writes: the realtime runtime (SSE and WebSocket with it), a webhook event, TanStack. */
 export const DOCUMENT = {

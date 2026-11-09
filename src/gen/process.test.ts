@@ -15,11 +15,7 @@ const MARK = markOf()
 describe("the generate CLI's child (phase h)", () => {
 	it("starts the package's own bin on this runtime", () => {
 		const [command, bin] = cliInvocation()
-		expect([command, bin.endsWith("/packages/gen/bin/honey-clients.js"), existsSync(bin)]).toEqual([
-			process.execPath,
-			true,
-			true,
-		])
+		expect([command, bin.endsWith("/bin/honey-clients.js"), existsSync(bin)]).toEqual([process.execPath, true, true])
 	})
 
 	it("names how a child ended: its signal, else its exit code", () => {

@@ -20,7 +20,7 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 
 const GO = withGo()
 const SLOW = { timeout: 600_000 }
-const REPO = resolve(import.meta.dirname, "../../..")
+const REPO = resolve(import.meta.dirname, "..")
 
 /*
  * G14 analog (bit 17), locked at phase i at the exact measured bytes (zero headroom, as Java's 149,981), over every

@@ -81,7 +81,7 @@ export const RUST = [
 export const TOOLCHAIN_PROJECTS = { go: GO, python: PYTHON, csharp: CSHARP, java: JAVA, rust: RUST } as const
 
 /** The default run's test files: the `unit` project's, less every toolchain project's. */
-export const DEFAULT_RUN = ["src/**/*.test.ts", "tests/**/*.test.ts", "scripts/**/*.test.ts"]
+export const DEFAULT_RUN = ["src/**/*.test.ts", "tests/**/*.test.ts", "scripts/**/*.test.ts", "lint/**/*.test.ts"]
 
 /** A target's harness files: its conformance runner and its harness legs. */
 const harnessOf = (target: string) => [

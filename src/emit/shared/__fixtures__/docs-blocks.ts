@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
 
-export const REPO = /* @__PURE__ */ resolve(import.meta.dirname, "../../../../../..")
+export const REPO = /* @__PURE__ */ resolve(import.meta.dirname, "../../../..")
 export const DOCS = /* @__PURE__ */ join(REPO, "docs")
 
 /** A fenced block: its page and line, its info string (`ts`, `ts run`, `go`, …) and its code. */
@@ -43,13 +43,8 @@ export function blocksOf(page: string, markdown: string): Block[] {
 	return blocks
 }
 
-/** The READMEs and the packaging doc, outside docs/ but compiled with it (bit 20 d). */
-export const READMES = [
-	"README.md",
-	"packages/core/README.md",
-	"packages/gen/README.md",
-	"packages/core/docs/packaging.md",
-]
+/** The README, outside docs/ but compiled with it (bit 20 d). */
+export const READMES = ["README.md"]
 
 /** Every page's blocks: docs/ and the READMEs. */
 export const allBlocks = (pages: readonly string[] = [...pagesUnder(), ...READMES]): Block[] =>

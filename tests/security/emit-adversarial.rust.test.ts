@@ -20,7 +20,7 @@ import { guardNamed } from "../structure/mutation-harness.guards.ts"
 const RUST = withRust()
 const FLOOR = withRust(RUST_FLOOR)
 
-const REPO = resolve(import.meta.dirname, "../../../..")
+const REPO = resolve(import.meta.dirname, "../..")
 
 const mutant = guardNamed(process.env.HONEY_MUTANT)
 if (mutant !== undefined) {
@@ -32,10 +32,10 @@ if (mutant !== undefined) {
 
 /* imported after the mock: compiled.ts and driven.ts reach sdk.ts and so http.ts, so a mutant's runtime is what compiles */
 const { compiledRust } = (await import(
-	resolve(REPO, "packages/gen/src/emit/rust/__fixtures__/compiled.ts")
+	resolve(REPO, "src/emit/rust/__fixtures__/compiled.ts")
 )) as typeof import("../../src/emit/rust/__fixtures__/compiled.ts")
 const { drivenRustSdk } = (await import(
-	resolve(REPO, "packages/gen/src/emit/rust/__fixtures__/driven.ts")
+	resolve(REPO, "src/emit/rust/__fixtures__/driven.ts")
 )) as typeof import("../../src/emit/rust/__fixtures__/driven.ts")
 
 describe.skipIf(!RUST)("gen adversarial: the Rust SDK emitter", () => {

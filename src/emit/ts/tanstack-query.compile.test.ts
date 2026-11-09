@@ -3,7 +3,7 @@
  * consumer's own tree and inherits their compiler flags, so the flag set here is the one
  * `tests/e2e/strict-consumer/tsconfig.json` uses — every strictness flag we could plausibly meet.
  *
- * It writes under `packages/gen/.tmp/`, inside the repository and gitignored, NOT under
+ * It writes under `.tmp/`, inside the repository and gitignored, NOT under
  * `~/.cache/honey-tmp` like the behavior fixture: `@tanstack/query-core` is a devDependency of this package,
  * so only a project inside the workspace resolves it, and a type-only import that silently failed to
  * resolve would make this leg prove nothing. The leg asserts it resolved.

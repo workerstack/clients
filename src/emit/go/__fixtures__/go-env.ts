@@ -11,7 +11,7 @@ import { join, resolve } from "node:path"
 
 /** The pinned Go version, as `.go-version` at the repo root holds it (`1.27.2`). */
 export function pinnedGo(): string {
-	return readFileSync(resolve(import.meta.dirname, "../../../../../../.go-version"), "utf8").trim()
+	return readFileSync(resolve(import.meta.dirname, "../../../../.go-version"), "utf8").trim()
 }
 
 /**

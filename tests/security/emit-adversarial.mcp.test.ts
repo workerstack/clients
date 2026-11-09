@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest"
 import { type Reply, served } from "../../src/emit/shared/__fixtures__/recording-server.ts"
 import { guardNamed } from "../structure/mutation-harness.guards.ts"
 
-const REPO = resolve(import.meta.dirname, "../../../..")
+const REPO = resolve(import.meta.dirname, "../..")
 
 const mutant = guardNamed(process.env.HONEY_MUTANT)
 if (mutant !== undefined) {
@@ -25,20 +25,20 @@ if (mutant !== undefined) {
 
 /* imported after the mock: the emitter reaches runtime.ts and literal.ts, so a mutant's server is what is gated */
 const { generateMcpServer } = (await import(
-	resolve(REPO, "packages/gen/src/emit/mcp/server.ts")
+	resolve(REPO, "src/emit/mcp/server.ts")
 )) as typeof import("../../src/emit/mcp/server.ts")
 const { literal } = (await import(
-	resolve(REPO, "packages/gen/src/emit/mcp/literal.ts")
+	resolve(REPO, "src/emit/mcp/literal.ts")
 )) as typeof import("../../src/emit/mcp/literal.ts")
 const { exchangeEach, initialize, request, written } = (await import(
-	resolve(REPO, "packages/gen/src/emit/mcp/__fixtures__/written.ts")
+	resolve(REPO, "src/emit/mcp/__fixtures__/written.ts")
 )) as typeof import("../../src/emit/mcp/__fixtures__/written.ts")
 const { toolsOf } = (await import(
-	resolve(REPO, "packages/gen/src/emit/mcp/tools.ts")
+	resolve(REPO, "src/emit/mcp/tools.ts")
 )) as typeof import("../../src/emit/mcp/tools.ts")
-const { toIR } = (await import(resolve(REPO, "packages/gen/src/ir/build.ts"))) as typeof import("../../src/ir/build.ts")
+const { toIR } = (await import(resolve(REPO, "src/ir/build.ts"))) as typeof import("../../src/ir/build.ts")
 const { failures } = (await import(
-	resolve(REPO, "packages/gen/src/emit/shared/__fixtures__/escape-oracle.ts")
+	resolve(REPO, "src/emit/shared/__fixtures__/escape-oracle.ts")
 )) as typeof import("../../src/emit/shared/__fixtures__/escape-oracle.ts")
 
 const SLOW = { timeout: 120_000 }
