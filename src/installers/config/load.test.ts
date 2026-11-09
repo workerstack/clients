@@ -4,16 +4,17 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { afterEach, describe, expect, test } from "vitest"
+import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts"
 import type { BunBuild, BunLike } from "./hooks/bun.ts"
 import type { RegisterHooks } from "./hooks/node.ts"
 import { CONFIG_FILES, detectRuntime, loadConfig, type RuntimeInfo } from "./load.ts"
 
-const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), "../..")
-const DIST = join(PACKAGE_DIR, "dist")
+/* this directory's source: Node strips its types, so the subprocesses run the loader a checkout runs */
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 const NODE: RuntimeInfo = { runtime: "node", nodeVersion: "26.0.0" }
 
-const TS_CONFIG = `import { defineConfig } from "@lovrozagar/installgen"
+const TS_CONFIG = `import { defineConfig } from "@workerstack/clients/installers"
 
 export default defineConfig({
 	name: "demo",
@@ -22,7 +23,7 @@ export default defineConfig({
 })
 `
 
-const SATISFIES_CONFIG = `import type { InstallgenConfig } from "@lovrozagar/installgen"
+const SATISFIES_CONFIG = `import type { InstallgenConfig } from "@workerstack/clients/installers"
 
 export default {
 	name: "demo",
@@ -31,7 +32,7 @@ export default {
 } satisfies InstallgenConfig
 `
 
-const MJS_CONFIG = `import { defineConfig } from "@lovrozagar/installgen"
+const MJS_CONFIG = `import { defineConfig } from "@workerstack/clients/installers"
 
 export default defineConfig({
 	name: "demo",
@@ -40,7 +41,7 @@ export default defineConfig({
 })
 `
 
-/* Fixtures live outside the repo: inside it, package self-reference resolves @lovrozagar/installgen and hides a broken hook. */
+/* Fixtures live outside the repo: inside it, package self-reference resolves @workerstack/clients/installers and hides a broken hook. */
 const dirs: string[] = []
 function fixture(files: Record<string, string>): string {
 	const dir = mkdtempSync(join(tmpdir(), "installgen-load-"))
@@ -127,7 +128,9 @@ describe("loading in-process", () => {
 		})
 		expect(urls).toEqual([pathToFileURL(join(cwd, "installgen.config.ts")).href])
 	})
+})
 
+describe("loading in-process", () => {
 	test("a missing default export errors clearly", async () => {
 		const cwd = fixture({ "installgen.config.mjs": "" })
 		await expect(loadConfig({ cwd, runtime: NODE, importModule: async () => ({ config: {} }) })).rejects.toThrow(
@@ -192,7 +195,7 @@ describe("node version gate", () => {
 		await expect(
 			loadConfig({ cwd, runtime: { runtime: "node", nodeVersion: "22.17.0" }, importModule }),
 		).rejects.toThrow(
-			/TypeScript config needs Node >= 22\.18.*22\.17\.0.*bunx --bun @lovrozagar\/installgen.*upgrade Node/,
+			/TypeScript config needs Node >= 22\.18.*22\.17\.0.*bunx --bun --package @workerstack\/clients installgen.*upgrade Node/,
 		)
 	})
 
@@ -297,67 +300,92 @@ describe("bun runtime", () => {
 			"plugin:installgen-self",
 			pathToFileURL(join(cwd, "installgen.config.ts")).href,
 		])
-		expect(modules.get("@lovrozagar/installgen")?.()).toEqual({ exports: self, loader: "object" })
+		expect(modules.get("@workerstack/clients/installers")?.()).toEqual({ exports: self, loader: "object" })
 		expect(loaded.config).toEqual({ name: "bun" })
 	})
 })
 
-/* The real runtimes, against the built package: v8 cannot see these, the in-process cases above carry coverage. */
-describe("subprocess, against dist", () => {
-	const driver = `
-		import { detectRuntime, loadConfig } from ${JSON.stringify(pathToFileURL(join(DIST, "config/load.js")).href)}
-		import { resolveConfig } from ${JSON.stringify(pathToFileURL(join(DIST, "config/resolve.js")).href)}
+/* The real runtimes, against the source: v8 cannot see these, the in-process cases above carry coverage. */
+const driver = `
+		import { detectRuntime, loadConfig } from ${JSON.stringify(pathToFileURL(join(HERE, "load.ts")).href)}
+		import { resolveConfig } from ${JSON.stringify(pathToFileURL(join(HERE, "resolve.ts")).href)}
 		try {
 			await loadConfig({ cwd: process.cwd(), runtime: detectRuntime() })
 			const { config } = await loadConfig({ cwd: process.cwd(), runtime: detectRuntime() })
 			const resolved = resolveConfig(config)
-			const after = await import("@lovrozagar/installgen").then(() => "resolved", (error) => error.code)
+			const after = await import("@workerstack/clients/installers").then(() => "resolved", (error) => error.code)
 			console.log(JSON.stringify({ name: resolved.name, platforms: resolved.platforms.length, format: resolved.platforms[0].format, after }))
 		} catch (error) {
 			console.log(JSON.stringify({ error: error.message }))
 		}
 	`
-	function run(command: string[], cwd: string): Record<string, unknown> {
-		const scripts = fixture({ "driver.mjs": driver })
-		const [bin, ...args] = command as [string, ...string[]]
-		const result = spawnSync(bin, [...args, join(scripts, "driver.mjs")], { cwd, encoding: "utf8" })
-		expect(result.status, result.stderr).toBe(0)
-		return JSON.parse(result.stdout.trim().split("\n").at(-1) ?? "") as Record<string, unknown>
-	}
-	/* Node's hook is gone after each load; Bun's plugin cannot be removed */
-	const runtimes = [
-		["node", ["node"], "ERR_MODULE_NOT_FOUND"],
-		["bun --bun", ["bun", "--bun"], "resolved"],
-	] as const
+function run(command: string[], cwd: string): Record<string, unknown> {
+	const scripts = fixture({ "driver.mjs": driver })
+	const [bin, ...args] = command as [string, ...string[]]
+	const result = spawnSync(bin, [...args, join(scripts, "driver.mjs")], { cwd, encoding: "utf8" })
+	expect(result.status, result.stderr).toBe(0)
+	return JSON.parse(result.stdout.trim().split("\n").at(-1) ?? "") as Record<string, unknown>
+}
+/* Node's hook is gone after each load; Bun's plugin cannot be removed */
+const runtimes = [
+	["node", ["node"], "ERR_MODULE_NOT_FOUND"],
+	["bun --bun", ["bun", "--bun"], "resolved"],
+] as const
 
-	test.each(runtimes)("a .ts config importing @lovrozagar/installgen loads twice under %s", (_name, command, after) => {
-		const cwd = fixture({ "installgen.config.ts": TS_CONFIG })
-		expect(run([...command], cwd)).toEqual({ name: "demo", platforms: 6, format: "tar.gz", after })
-	})
+describe("subprocess, against the source", () => {
+	test.each(runtimes)(
+		"a .ts config importing @workerstack/clients/installers loads twice under %s",
+		(_name, command, after) => {
+			const cwd = fixture({ "installgen.config.ts": TS_CONFIG })
+			expect(run([...command], cwd)).toEqual({ name: "demo", platforms: 6, format: "tar.gz", after })
+		},
+		SPAWN_TIMEOUT,
+	)
 
-	test.each(runtimes)("the .mjs form loads under %s", (_name, command, after) => {
-		const cwd = fixture({ "installgen.config.mjs": MJS_CONFIG })
-		expect(run([...command], cwd)).toEqual({ name: "demo", platforms: 6, format: "raw", after })
-	})
+	test.each(runtimes)(
+		"the .mjs form loads under %s",
+		(_name, command, after) => {
+			const cwd = fixture({ "installgen.config.mjs": MJS_CONFIG })
+			expect(run([...command], cwd)).toEqual({ name: "demo", platforms: 6, format: "raw", after })
+		},
+		SPAWN_TIMEOUT,
+	)
 
-	test.each(runtimes)("the satisfies form loads under %s", (_name, command, after) => {
-		const cwd = fixture({ "installgen.config.ts": SATISFIES_CONFIG })
-		expect(run([...command], cwd)).toEqual({ name: "demo", platforms: 6, format: "raw", after })
-	})
+	test.each(runtimes)(
+		"the satisfies form loads under %s",
+		(_name, command, after) => {
+			const cwd = fixture({ "installgen.config.ts": SATISFIES_CONFIG })
+			expect(run([...command], cwd)).toEqual({ name: "demo", platforms: 6, format: "raw", after })
+		},
+		SPAWN_TIMEOUT,
+	)
 
-	test("a CommonJS package.json + .ts gives the .mts hint under node", () => {
-		const cwd = fixture({
-			"package.json": '{ "name": "cjs-project", "type": "commonjs" }\n',
-			"installgen.config.ts": TS_CONFIG,
-		})
-		expect(run(["node"], cwd).error).toMatch(/loaded as CommonJS.*rename it to installgen\.config\.mts/)
-	})
+	test(
+		"a CommonJS package.json + .ts gives the .mts hint under node",
+		() => {
+			const cwd = fixture({
+				"package.json": '{ "name": "cjs-project", "type": "commonjs" }\n',
+				"installgen.config.ts": TS_CONFIG,
+			})
+			expect(run(["node"], cwd).error).toMatch(/loaded as CommonJS.*rename it to installgen\.config\.mts/)
+		},
+		SPAWN_TIMEOUT,
+	)
 
-	test("the same config renamed to .mts loads in that CommonJS project", () => {
-		const cwd = fixture({
-			"package.json": '{ "name": "cjs-project", "type": "commonjs" }\n',
-			"installgen.config.mts": TS_CONFIG,
-		})
-		expect(run(["node"], cwd)).toEqual({ name: "demo", platforms: 6, format: "tar.gz", after: "ERR_MODULE_NOT_FOUND" })
-	})
+	test(
+		"the same config renamed to .mts loads in that CommonJS project",
+		() => {
+			const cwd = fixture({
+				"package.json": '{ "name": "cjs-project", "type": "commonjs" }\n',
+				"installgen.config.mts": TS_CONFIG,
+			})
+			expect(run(["node"], cwd)).toEqual({
+				name: "demo",
+				platforms: 6,
+				format: "tar.gz",
+				after: "ERR_MODULE_NOT_FOUND",
+			})
+		},
+		SPAWN_TIMEOUT,
+	)
 })

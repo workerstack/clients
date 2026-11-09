@@ -34,7 +34,7 @@ export interface LoadOptions {
 	/** `-c`: relative to `cwd`. */
 	configPath?: string | undefined
 	runtime: RuntimeInfo
-	/** The running package's entry, which the config's `@lovrozagar/installgen` import resolves to. */
+	/** The running package's entry, which the config's `@workerstack/clients/installers` import resolves to. */
 	selfUrl?: string
 	importModule?: Importer
 	/** Node's `module.registerHooks`. */
@@ -71,19 +71,40 @@ function stripsTypes(version: string): boolean {
 	return major > 23
 }
 
+/** Node before 22.18 (23.6 on 23) cannot import a .ts config: say so before the import fails obscurely. */
+function assertStripsTypes(runtime: LoadOptions["runtime"], ext: string): void {
+	if (runtime.runtime === "node" && (ext === ".ts" || ext === ".mts") && !stripsTypes(runtime.nodeVersion)) {
+		throw new InstallgenError(
+			`a TypeScript config needs Node >= 22.18 (23.6 on Node 23; this is ${runtime.nodeVersion}); ` +
+				"run `bunx --bun --package @workerstack/clients installgen` instead, or upgrade Node",
+		)
+	}
+}
+
+/** The error a failed config import becomes: a rename hint when Node read an ESM config as CommonJS. */
+function loadError(path: string, error: unknown): InstallgenError {
+	const ext = extname(path)
+	const message = error instanceof Error ? error.message : String(error)
+	if (CJS_SYNTAX.test(message) && (ext === ".ts" || ext === ".js")) {
+		const rename = `${basename(path, ext)}.m${ext.slice(1)}`
+		return new InstallgenError(
+			`${path} was loaded as CommonJS: the nearest package.json has no "type": "module"; rename it to ${rename}`,
+			{ cause: error },
+		)
+	}
+	return new InstallgenError(`failed to load ${path}: ${message}`, { cause: error })
+}
+
 export async function loadConfig(options: LoadOptions): Promise<LoadedConfig> {
 	const path = find(options.cwd, options.configPath)
 	const ext = extname(path)
 	const { runtime } = options
 	const importModule = options.importModule ?? ((url) => import(url) as Promise<Record<string, unknown>>)
-	const selfUrl = options.selfUrl ?? new URL("../index.js", import.meta.url).href
+	/* the sibling entry in this module's own form: index.ts from a checkout's source, index.js from an install */
+	const selfUrl =
+		options.selfUrl ?? new URL(`../index${extname(new URL(import.meta.url).pathname)}`, import.meta.url).href
 
-	if (runtime.runtime === "node" && (ext === ".ts" || ext === ".mts") && !stripsTypes(runtime.nodeVersion)) {
-		throw new InstallgenError(
-			`a TypeScript config needs Node >= 22.18 (23.6 on Node 23; this is ${runtime.nodeVersion}); ` +
-				"run `bunx --bun @lovrozagar/installgen` instead, or upgrade Node",
-		)
-	}
+	assertStripsTypes(runtime, ext)
 
 	/* Bun's plugin stays for the process; Node's hook goes once the config is imported */
 	let hook: ReturnType<RegisterHooks> | undefined
@@ -94,15 +115,7 @@ export async function loadConfig(options: LoadOptions): Promise<LoadedConfig> {
 	try {
 		mod = await importModule(pathToFileURL(path).href)
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error)
-		if (CJS_SYNTAX.test(message) && (ext === ".ts" || ext === ".js")) {
-			const rename = `${basename(path, ext)}.m${ext.slice(1)}`
-			throw new InstallgenError(
-				`${path} was loaded as CommonJS: the nearest package.json has no "type": "module"; rename it to ${rename}`,
-				{ cause: error },
-			)
-		}
-		throw new InstallgenError(`failed to load ${path}: ${message}`, { cause: error })
+		throw loadError(path, error)
 	} finally {
 		hook?.deregister()
 	}

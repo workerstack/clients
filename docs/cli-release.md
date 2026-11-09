@@ -46,7 +46,8 @@ Pushing a `v*` tag runs the release workflow:
 4. It pushes each channel below that the options turned on.
 5. GitHub attests the build's provenance.
 6. installgen checks the release against the install scripts. `installgen.config.mts`, written beside the scripts from
-   the same layout, drives `npx --yes @lovrozagar/installgen@0.3.0 check --default-version "$GITHUB_REF_NAME"`, which
+   the same layout, drives `npx --yes --package @workerstack/clients@<version> installgen check --default-version "$GITHUB_REF_NAME"`
+   (the clients release that generated the module), which
    fails the run unless every platform's archive is published under the tag and listed in `checksums.txt`. Then,
    unless the release is a prerelease, the run checks that `releases/latest/download/version.txt` reads the tag,
    which is what the one-liners install.

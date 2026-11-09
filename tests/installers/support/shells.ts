@@ -150,13 +150,13 @@ function ensureImage(): void {
  * The test's temp dirs are mounted at the same path, and the host network is shared, so paths and the
  * 127.0.0.1 server look the same inside and out.
  */
-function dockerRunner(
-	name: string,
-	image: string,
-	shell: string,
-	fetch: Runner["fetch"],
-	kind: Runner["kind"],
-): Runner {
+function dockerRunner({
+	name,
+	image,
+	shell,
+	fetch,
+	kind,
+}: Pick<Runner, "name" | "shell" | "fetch" | "kind"> & { image: string }): Runner {
 	return {
 		name: `docker ${name}`,
 		kind,
@@ -189,11 +189,11 @@ export function runners(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.P
 		.map(hostRunner)
 	if (env.INSTALLGEN_E2E_DOCKER === "1") {
 		out.push(
-			dockerRunner("dash", IMAGE, "dash", "curl", "sh"),
-			dockerRunner("bash", IMAGE, "bash", "curl", "sh"),
-			dockerRunner("zsh", IMAGE, "zsh", "curl", "sh"),
-			dockerRunner("busybox", BUSYBOX_IMAGE, "sh", "wget", "sh"),
-			dockerRunner("pwsh", PWSH_IMAGE, "pwsh", "irm", "ps1"),
+			dockerRunner({ name: "dash", image: IMAGE, shell: "dash", fetch: "curl", kind: "sh" }),
+			dockerRunner({ name: "bash", image: IMAGE, shell: "bash", fetch: "curl", kind: "sh" }),
+			dockerRunner({ name: "zsh", image: IMAGE, shell: "zsh", fetch: "curl", kind: "sh" }),
+			dockerRunner({ name: "busybox", image: BUSYBOX_IMAGE, shell: "sh", fetch: "wget", kind: "sh" }),
+			dockerRunner({ name: "pwsh", image: PWSH_IMAGE, shell: "pwsh", fetch: "irm", kind: "ps1" }),
 		)
 	}
 	return out

@@ -1,0 +1,148 @@
+name: installers
+
+# installgen's own gates (formerly lovrozagar/installgen's ci.yml): its suites with a real cosign, the checked-in
+# renders under shellcheck and PSScriptAnalyzer, the scripts under every Docker shell, and on native ARM Linux, macOS
+# and Windows hardware. gen's default run (ci.yml) covers the rest of the package.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/installers/**"
+      - "tests/installers/**"
+      - "assets/installers/**"
+      - "bin/installgen.js"
+      - ".github/workflows/installers.yml"
+  pull_request:
+    paths:
+      - "src/installers/**"
+      - "tests/installers/**"
+      - "assets/installers/**"
+      - "bin/installgen.js"
+      - ".github/workflows/installers.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.4.4"
+  # the last PSScriptAnalyzer that loads on the powershell image's pwsh 7.4.2
+  PSSA_VERSION: "1.23.0"
+
+jobs:
+  # installgen's suites on the host sh, with the real cosign its cosign test runs only when on PATH
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: current
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
+      - run: bun install --frozen-lockfile
+      - run: bunx vitest run --project unit --test-timeout 120000 tests/installers src/installers
+
+  # shellcheck and PSScriptAnalyzer on the checked-in renders of the three examples
+  lint-scripts:
+    name: lint-scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: shellcheck
+        working-directory: tests/installers/golden
+        run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -s sh raw/install.sh goreleaser/install.sh github/install.sh
+      - name: PSScriptAnalyzer, PowerShell 5.1 and 7.0 syntax
+        working-directory: tests/installers
+        run: >-
+          docker run --rm -v "$PWD:/w" -w /w mcr.microsoft.com/powershell pwsh -c
+          "Install-Module PSScriptAnalyzer -RequiredVersion $PSSA_VERSION -Force -Scope CurrentUser;
+          Invoke-ScriptAnalyzer -Path golden -Recurse
+          -Settings @{ExcludeRules=@('PSAvoidUsingWriteHost','PSReviewUnusedParameter');Rules=@{PSUseCompatibleSyntax=@{Enable=\$true;TargetVersions=@('5.1','7.0')}}}
+          -EnableExit"
+
+  # dash, bash, zsh, busybox ash and pwsh, each in Docker, plus shellcheck and PSScriptAnalyzer on a hostile render
+  e2e-docker:
+    name: e2e-docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      INSTALLGEN_E2E_DOCKER: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: current
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bunx vitest run --project unit --test-timeout 120000 tests/installers src/installers
+
+  # the scripts on real hardware: native ARM Linux, Apple Silicon (with Rosetta for the x86_64 shell), Intel macOS
+  e2e-native:
+    name: e2e-native (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm
+            shells: sh,bash
+          - os: macos-latest
+            shells: sh,bash,zsh,arch -x86_64 /bin/sh
+          - os: macos-15-intel
+            shells: sh,bash,zsh
+    env:
+      INSTALLGEN_E2E_SHELLS: ${{ matrix.shells }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: current
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      # arm64 macOS runners may lack Rosetta, which `arch -x86_64 /bin/sh` needs
+      - if: matrix.os == 'macos-latest'
+        run: softwareupdate --install-rosetta --agree-to-license
+      # zsh is not on the image's documented software list; fail loudly rather than skip it
+      - if: startsWith(matrix.os, 'macos')
+        run: command -v zsh && zsh --version
+      - run: bun install --frozen-lockfile
+      - run: bunx vitest run --project unit --test-timeout 120000 tests/installers src/installers
+
+  # install.ps1 under Windows PowerShell 5.1 and PowerShell 7, on x64 and ARM64: registry PATH, ARM64 fallback,
+  # replacing a running exe
+  e2e-windows:
+    name: e2e-windows (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    env:
+      INSTALLGEN_E2E_SHELLS: powershell,pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: current
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bunx vitest run --project unit --test-timeout 120000 tests/installers src/installers
