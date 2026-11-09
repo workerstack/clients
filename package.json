@@ -71,7 +71,8 @@
 		"prepack": "bun scripts/build.ts",
 		"test": "vitest run --coverage",
 		"test:harness": "vitest run --mode harness",
-		"typecheck": "tsc --noEmit -p tsconfig.json"
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"prepare": "lefthook install --reset-hooks-path"
 	},
 	"dependencies": {
 		"@lovrozagar/installgen": "0.3.0",
