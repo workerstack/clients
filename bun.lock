@@ -15,6 +15,7 @@
         "@total-typescript/ts-reset": "catalog:",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "4.1.10",
+        "@workerstack/system": "0.3.0",
         "ajv": "8.20.0",
         "ajv-formats": "3.0.1",
         "arktype": "catalog:",
@@ -905,6 +906,8 @@
     "@workerstack/backend": ["@workerstack/backend@workspace:packages/core"],
 
     "@workerstack/clients": ["@workerstack/clients@workspace:packages/gen"],
+
+    "@workerstack/system": ["@workerstack/system@0.3.0", "", { "bin": { "system": "src/bin.ts" } }, "sha512-uE3CDD8ZVLcZsGcOrUl49GoH64BZcd/nTD+Cz0nrADTvQKE3VNEiZlMSfo4ESGAnXh69HNKrIoLuf9hInznPAQ=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
