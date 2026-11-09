@@ -1,0 +1,29 @@
+{
+	"name": "@honey/e2e-cf-workers",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"deploy": "wrangler deploy --name honey-cf-e2e",
+		"dev": "WRANGLER_BUILD_CONDITIONS=honey-source,workerd,worker,browser bunx wrangler dev --port 0 --ip 0.0.0.0 --inspector-port 0",
+		"test": "playwright test",
+		"test:live": "bun scripts/live-smoke.ts",
+		"test:prod": "TEST_MODE=prod playwright test",
+		"type:check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@honey/e2e-compose": "workspace:*",
+		"@honey/e2e-defaults": "workspace:*",
+		"@honey/e2e-gateway": "workspace:*",
+		"@honey/e2e-kitchen": "workspace:*",
+		"@honey/e2e-mcp": "workspace:*",
+		"@honey/e2e-surface": "workspace:*",
+		"@workerstack/backend": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "catalog:",
+		"@playwright/test": "catalog:",
+		"typescript": "catalog:",
+		"wrangler": "catalog:"
+	}
+}

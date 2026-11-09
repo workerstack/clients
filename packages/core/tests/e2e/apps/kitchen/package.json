@@ -1,0 +1,23 @@
+{
+	"name": "@honey/e2e-kitchen",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/app.ts"
+	},
+	"scripts": {
+		"generate": "BUN_OPTIONS=--conditions=honey-source honey generate && bun --conditions=honey-source honey-clients generate --app src/gen-app.ts --target ts --ts-name Kitchen --out src/_gen/sdk",
+		"test": "bun test --conditions=honey-source tests/smoke.test.ts",
+		"type:check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@workerstack/backend": "workspace:*",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@playwright/test": "catalog:",
+		"@workerstack/clients": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

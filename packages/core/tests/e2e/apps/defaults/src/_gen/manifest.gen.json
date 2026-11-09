@@ -1,0 +1,38 @@
+{
+  "errors": [],
+  "routes": [
+    {
+      "errors": [],
+      "meta": {},
+      "method": "GET",
+      "middleware": [],
+      "params": [],
+      "path": "/health"
+    },
+    {
+      "errors": [],
+      "meta": {},
+      "method": "GET",
+      "middleware": [],
+      "params": [
+        "id"
+      ],
+      "path": "/users/:id"
+    },
+    {
+      "errors": [],
+      "meta": {},
+      "method": "POST",
+      "middleware": [],
+      "output": {
+        "application/json": {
+          "created": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/echo"
+    }
+  ]
+}

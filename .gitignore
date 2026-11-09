@@ -1,5 +1,41 @@
-node_modules/
+# dependencies
+node_modules
+**/node_modules
+
+# build
+**/dist/
+**/*.tsbuildinfo
+**/.wrangler/
+**/.honey
+
+# testing
+**/coverage/
+**/test-results/
+**/playwright-report/
+**/.ruff_cache/
+
+# python
+**/__pycache__/
+**/*.pyc
+
+# editor / os
+.DS_Store
+*.swp
+*.log
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# local
+.local
+*.local
+.tmp
+.tmp-*
+.temp
+
+# cargo target for rust SDK / harness (do not use /tmp — it is a small tmpfs)
+.cache/
 .tmp/
-coverage/
-dist/
 .worktrees/

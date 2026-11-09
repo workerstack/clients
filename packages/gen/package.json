@@ -1,0 +1,87 @@
+{
+	"name": "@workerstack/clients",
+	"version": "1.0.0-rc.22",
+	"description": "Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a CLI and an MCP server from any OpenAPI 3.x document.",
+	"keywords": [
+		"codegen",
+		"mcp",
+		"openapi",
+		"sdk",
+		"workerstack"
+	],
+	"homepage": "https://github.com/workerstack/backend#readme",
+	"bugs": {
+		"url": "https://github.com/workerstack/backend/issues"
+	},
+	"license": "MIT",
+	"author": "lovrozagar",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/workerstack/backend.git",
+		"directory": "packages/gen"
+	},
+	"bin": {
+		"honey-clients": "bin/honey-clients.js"
+	},
+	"files": [
+		"bin",
+		"dist"
+	],
+	"type": "module",
+	"exports": {
+		".": {
+			"honey-source": "./src/index.ts",
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./cli": {
+			"honey-source": "./src/cli.ts",
+			"types": "./dist/cli.d.ts",
+			"default": "./dist/cli.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"scripts": {
+		"prepack": "bun scripts/build.ts",
+		"test": "vitest run --coverage",
+		"test:harness": "vitest run --mode harness",
+		"type:check": "tsc --noEmit -p tsconfig.json"
+	},
+	"dependencies": {
+		"@lovrozagar/installgen": "0.3.0",
+		"jiti": "2.7.0",
+		"oxc-transform": "0.155.0"
+	},
+	"devDependencies": {
+		"@tanstack/query-core": "5.104.5",
+		"@total-typescript/ts-reset": "catalog:",
+		"@types/node": "catalog:",
+		"@vitest/coverage-v8": "4.1.10",
+		"ajv": "8.20.0",
+		"ajv-formats": "3.0.1",
+		"oxfmt": "0.63.0",
+		"standardwebhooks": "1.1.1",
+		"ts-morph": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"peerDependencies": {
+		"oxfmt": ">=0.63.0",
+		"ts-morph": ">=28.0.0"
+	},
+	"peerDependenciesMeta": {
+		"oxfmt": {
+			"optional": true
+		},
+		"ts-morph": {
+			"optional": true
+		}
+	},
+	"engines": {
+		"node": ">=22.12.0"
+	}
+}

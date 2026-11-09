@@ -1,0 +1,508 @@
+/**
+ * The adversarial suite's edge-middleware cases (F1): security headers on every exit, CORS
+ * credential reflection, csrf bypasses, rate-limit key spray and spoofing, the BREACH oracle, proxy
+ * SSRF and Host spoofing, curlLogger leaks, taps that fail or hang, a client-picked trace. Each is a failing input first and the guard that answers
+ * it second; the mutation harness reruns this directory with each guard disabled.
+ */
+import { resolve as resolvePath } from "node:path"
+import { describe, expect, it, vi } from "vitest"
+import { guardNamed } from "../../structure/mutation-harness.ts"
+
+const REPO = resolvePath(import.meta.dirname, "../../../../..")
+
+const mutant = guardNamed(process.env.HONEY_MUTANT)
+if (mutant !== undefined) {
+	vi.doMock(resolvePath(REPO, mutant.module), async (importOriginal) => {
+		const original = await importOriginal<Record<string, unknown>>()
+		return { ...original, ...mutant.disable(original) }
+	})
+}
+
+/* imported after the mock, so a mutant reaches every module that uses it */
+const { honey } = (await import(
+	resolvePath(REPO, "packages/core/src/routing/app.ts")
+)) as typeof import("../../../src/routing/app.ts")
+const { cors } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/cors.ts")
+)) as typeof import("../../../src/middleware/cors.ts")
+const { csrf } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/csrf.ts")
+)) as typeof import("../../../src/middleware/csrf.ts")
+const { requestId } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/request-id.ts")
+)) as typeof import("../../../src/middleware/request-id.ts")
+
+const { timeout } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/timeout.ts")
+)) as typeof import("../../../src/middleware/timeout.ts")
+const { serverTiming } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/server-timing.ts")
+)) as typeof import("../../../src/middleware/server-timing.ts")
+const { memoryRateLimitStore, rateLimit } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/rate-limit.ts")
+)) as typeof import("../../../src/middleware/rate-limit.ts")
+const { PEER_ADDRESS } = (await import(
+	resolvePath(REPO, "packages/core/src/context/peer.ts")
+)) as typeof import("../../../src/context/peer.ts")
+const { ipAllowed, ipRestrict } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/ip-restrict.ts")
+)) as typeof import("../../../src/middleware/ip-restrict.ts")
+const { compress } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/compress.ts")
+)) as typeof import("../../../src/middleware/compress.ts")
+const { proxy } = (await import(
+	resolvePath(REPO, "packages/core/src/proxy/proxy.ts")
+)) as typeof import("../../../src/proxy/proxy.ts")
+const { staticFiles } = (await import(
+	resolvePath(REPO, "packages/core/src/response/static.ts")
+)) as typeof import("../../../src/response/static.ts")
+const { timingSafeEqual } = (await import(
+	resolvePath(REPO, "packages/core/src/security/crypto.ts")
+)) as typeof import("../../../src/security/crypto.ts")
+const { curlLogger } = (await import(
+	resolvePath(REPO, "packages/core/src/observability/curl-logger.ts")
+)) as typeof import("../../../src/observability/curl-logger.ts")
+const { createErrorTranslator } = (await import(
+	resolvePath(REPO, "packages/core/src/i18n/error-i18n.ts")
+)) as typeof import("../../../src/i18n/error-i18n.ts")
+const { HoneyError } = (await import(
+	resolvePath(REPO, "packages/core/src/errors/error.ts")
+)) as typeof import("../../../src/errors/error.ts")
+const { recorder } = (await import(
+	resolvePath(REPO, "packages/core/src/telemetry/__fixtures__/recording-tracer.ts")
+)) as typeof import("../../../src/telemetry/__fixtures__/recording-tracer.ts")
+const { secureHeaders } = (await import(
+	resolvePath(REPO, "packages/core/src/middleware/secure-headers.ts")
+)) as typeof import("../../../src/middleware/secure-headers.ts")
+
+describe("v1 adversarial: no request strips the security headers", () => {
+	it("an error, an unknown path and a refused method still carry the CSP and nosniff", async () => {
+		const app = honey<{}>()
+		const guarded = app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'" }))
+		guarded.get("/boom").handler(() => {
+			throw new Error("boom")
+		})
+		guarded.post("/only-post").handler((ctx) => ctx.res.text("ok", "x"))
+		const answers = await Promise.all(
+			["/boom", "/nowhere", "/only-post"].map((path) => app.fetch(new Request(`http://app.test${path}`), {})),
+		)
+		const security = answers.map((res) => [
+			res.status,
+			res.headers.get("content-security-policy"),
+			res.headers.get("x-content-type-options"),
+		])
+		expect(security).toEqual([
+			[500, "default-src 'self'", "nosniff"],
+			[404, "default-src 'self'", "nosniff"],
+			[405, "default-src 'self'", "nosniff"],
+		])
+	})
+})
+
+describe("v1 adversarial: credentialed CORS never trusts the caller's Origin", () => {
+	it("a foreign Origin and the opaque null earn no allow-origin and no credentials", async () => {
+		const app = honey<{}>()
+		app
+			.use(cors({ credentials: true, origin: ["https://app.example"] }))
+			.get("/me")
+			.handler((ctx) => ctx.res.json("ok", { me: "secret" }))
+		const answers = await Promise.all(
+			["https://evil.example", "null"].map((origin) =>
+				app.fetch(new Request("http://app.test/me", { headers: { cookie: "sid=1", origin } }), {}),
+			),
+		)
+		expect(
+			answers.map((res) => [
+				res.headers.get("access-control-allow-origin"),
+				res.headers.get("access-control-allow-credentials"),
+			]),
+		).toEqual([
+			[null, null],
+			[null, null],
+		])
+	})
+})
+
+describe("v1 adversarial: a cross-site write never passes csrf", () => {
+	it("a cross-site POST with no content type, as a form or a fetch could send it, is 403", async () => {
+		const app = honey<{}>()
+		app
+			.use(csrf())
+			.post("/transfer")
+			.handler((ctx) => ctx.res.text("ok", "sent"))
+		const res = await app.fetch(
+			new Request("http://app.test/transfer", {
+				headers: { origin: "https://evil.example", "sec-fetch-site": "cross-site" },
+				method: "POST",
+			}),
+			{},
+		)
+		expect(res.status).toBe(403)
+	})
+})
+
+describe("v1 adversarial: a client never picks its request id", () => {
+	it("an inbound x-request-id is not adopted unless the hop is trusted", async () => {
+		const app = honey<{}>()
+		app
+			.use(requestId())
+			.get("/t")
+			.handler((ctx) => ctx.res.text("ok", ctx.requestId))
+		const res = await app.fetch(
+			new Request("http://app.test/t", { headers: { "x-request-id": "attacker-chosen" } }),
+			{},
+		)
+		expect([await res.text(), res.headers.get("x-request-id")].includes("attacker-chosen")).toBe(false)
+	})
+})
+
+describe("v1 adversarial: a handler that never answers cannot hold the request", () => {
+	it("timeout answers 504 within its duration, not when (or if) the handler does", async () => {
+		const app = honey<{}>()
+		app
+			.use(timeout({ duration: 20 }))
+			.get("/stall")
+			.handler(() => new Promise<never>(() => {}))
+		const answered = Promise.resolve(app.fetch(new Request("http://app.test/stall"), {})).then((res) => res.status)
+		const deadline = new Promise((resolve) => setTimeout(() => resolve("still waiting"), 500))
+		expect(await Promise.race([answered, deadline])).toBe(504)
+	})
+})
+
+describe("v1 adversarial: a timing name cannot forge a metric", () => {
+	it("a name or description carrying `,` `;` `=` and quotes stays one metric, not several", async () => {
+		const app = honey<{}>()
+		app
+			.use(serverTiming())
+			.get("/t")
+			.handler((ctx) => {
+				ctx.timing.start("db, cache-hit;dur=0", 'q", auth;dur=9999')
+				return ctx.res.text("ok", "x")
+			})
+		const res = await app.fetch(new Request("http://app.test/t"), {})
+		const header = res.headers.get("server-timing") ?? ""
+		/* split outside quoted strings: the metrics a browser's devtools would show */
+		const metrics = header.match(/(?:[^,"]|"(?:[^"\\]|\\.)*")+/g)?.map((metric) => metric.trim().split(";")[0])
+		expect(metrics).toEqual(["db__cache-hit_dur_0", "total"])
+	})
+})
+
+/** A request from `peer`, as the Node adapter reports it. */
+function fromPeer(peer: string, headers?: Record<string, string>): Request {
+	const req = new Request("http://app.test/t", { headers })
+	Object.defineProperty(req, PEER_ADDRESS, { value: peer })
+	return req
+}
+
+describe("v1 adversarial: a client cannot rotate its rate-limit key", () => {
+	it("past the limit, a fresh X-Forwarded-For on every request is still 429", async () => {
+		const app = honey<{}>()
+		app
+			.use(rateLimit({ limit: 2, windowMs: 60_000 }))
+			.get("/t")
+			.handler((ctx) => ctx.res.text("ok", "x"))
+		const statuses: number[] = []
+		for (let i = 0; i < 5; i += 1) {
+			const res = await app.fetch(fromPeer("203.0.113.7", { "x-forwarded-for": `198.51.100.${i}` }), {})
+			statuses.push(res.status)
+		}
+		expect(statuses).toEqual([200, 200, 429, 429, 429])
+	})
+})
+
+describe("v1 adversarial: a key spray cannot grow the rate-limit store", () => {
+	it("20 000 distinct peers (an IPv6 /64 walk) leave the store at its cap", async () => {
+		const store = memoryRateLimitStore({ maxKeys: 1000, windowMs: 60_000 })
+		const app = honey<{}>()
+		app
+			.use(rateLimit({ limit: 1, store }))
+			.get("/t")
+			.handler((ctx) => ctx.res.text("ok", "x"))
+		for (let i = 0; i < 20_000; i += 1) await app.fetch(fromPeer(`2001:db8::${i.toString(16)}`), {})
+		expect(store.size).toBe(1000)
+	})
+})
+
+describe("v1 adversarial: ipRestrict sees only the platform peer", () => {
+	it("a forwarding header naming an allowed address, CF-Connecting-IP off Workers included, is 403", async () => {
+		const app = honey<{}>()
+		app
+			.use(ipRestrict({ allowList: ["10.0.0.0/8"] }))
+			.get("/t")
+			.handler((ctx) => ctx.res.text("ok", "admin"))
+		const statuses = []
+		for (const header of ["x-forwarded-for", "x-real-ip", "cf-connecting-ip", "true-client-ip"]) {
+			statuses.push((await app.fetch(fromPeer("203.0.113.9", { [header]: "10.0.0.1" }), {})).status)
+		}
+		expect(statuses).toEqual([403, 403, 403, 403])
+	})
+
+	it("another spelling of a denied address (IPv4-mapped, zero-expanded, upper case) is still denied", async () => {
+		const app = honey<{}>()
+		app
+			.use(ipRestrict({ denyList: ["::ffff:203.0.113.9", "2001:0DB8:0:0:0:0:0:1"] }))
+			.get("/t")
+			.handler((ctx) => ctx.res.text("ok", "admin"))
+		const statuses = []
+		for (const peer of ["203.0.113.9", "2001:db8::1", "[2001:db8::1]:443"]) {
+			statuses.push((await app.fetch(fromPeer(peer), {})).status)
+		}
+		expect(statuses).toEqual([403, 403, 403])
+	})
+})
+
+describe("v1 adversarial: a stored IP list reads addresses, not text", () => {
+	it("admits another spelling of an allowed address", () => {
+		expect(ipAllowed("2001:0db8::1", { allow: ["2001:db8:0:0:0:0:0:1"] })).toBe(true)
+	})
+
+	it("treats a mapped peer as the IPv4 address it carries", () => {
+		expect(ipAllowed("::ffff:1.2.3.4", { allow: ["1.2.3.0/24"] })).toBe(true)
+		expect(ipAllowed("::ffff:1.2.3.4", { deny: ["1.2.3.4"] })).toBe(false)
+	})
+
+	it("never reads a number out of a trailing junk rule or address", () => {
+		expect(ipAllowed("1.2.3.4", { allow: ["1.2.3.0/24x"] })).toBe(false)
+		expect(ipAllowed("1.2.3.4x", { allow: ["1.2.3.0/24"] })).toBe(false)
+	})
+})
+
+describe("v1 adversarial: compressed length is no oracle for a secret (BREACH)", () => {
+	it("two same-length guesses reflected beside a session's token answer the same number of bytes", async () => {
+		const token = "f3a9c2e17b4d8a6052c9e1f7a3b8d4c6"
+		const app = honey<{}>()
+		app
+			.use(compress())
+			.get("/search")
+			.handler((ctx) => {
+				const q = new URL(ctx.req.url).searchParams.get("q") ?? ""
+				const page = `<form><input name="csrf" value="${token}"></form>${"<p>results</p>".repeat(100)}`
+				return ctx.res.html("ok", `${page}<p>you searched: value="${q}"</p>`)
+			})
+		const lengthFor = async (guess: string) => {
+			const res = await app.fetch(
+				new Request(`http://app.test/search?q=${guess}`, {
+					headers: { "accept-encoding": "gzip, br", cookie: "sid=victim" },
+				}),
+				{},
+			)
+			return (await res.arrayBuffer()).byteLength
+		}
+		const wrong = "0123456789abcdef0123456789abcdef"
+		expect(await lengthFor(token)).toBe(await lengthFor(wrong))
+	})
+})
+
+/** A request whose url is the raw target, as a runtime that does not normalize it hands it over. */
+function rawTarget(path: string, headers?: Record<string, string>): Request {
+	const req = new Request("http://app.test/", { headers })
+	Object.defineProperty(req, "url", { value: `http://app.test${path}` })
+	return req
+}
+
+describe("v1 adversarial: a proxied path never leaves the upstream's origin (SSRF)", () => {
+	it("//host and \\host targets reach destination as paths on the upstream; an encoded slash is a 400", async () => {
+		const seen: string[] = []
+		const app = honey<{}>()
+		app.all("/api/*rest").handler(
+			proxy({
+				destination: (_ctx, url) => {
+					seen.push(new URL(url, "http://up.internal").origin)
+					return new Response("ok")
+				},
+				/* a gateway strips its own prefix: what is left must still be a path */
+				rewriteUrl: (_ctx, url) => url.slice("/api".length),
+			}),
+		)
+		const statuses = []
+		for (const path of ["/api//evil.example/x", "/api/\\evil.example/x", "/api/%2F%2Fevil.example/x"]) {
+			statuses.push((await app.fetch(rawTarget(path), {})).status)
+		}
+		expect([statuses, seen]).toEqual([
+			[200, 200, 400],
+			["http://up.internal", "http://up.internal"],
+		])
+	})
+})
+
+describe("v1 adversarial: nothing the client says about itself or the hop reaches the upstream", () => {
+	it("Host, forwarding headers, hop-by-hop and Connection-named headers, TE and Expect stay behind", async () => {
+		let sent: Record<string, string> = {}
+		const app = honey<{}>()
+		app.all("/api/*rest").handler(
+			proxy({
+				destination: (_ctx, _url, init) => {
+					sent = Object.fromEntries(new Headers(init.headers).entries())
+					return new Response("ok")
+				},
+			}),
+		)
+		await app.fetch(
+			rawTarget("/api/x", {
+				connection: "x-internal-auth",
+				expect: "100-continue",
+				forwarded: "for=10.0.0.1;host=admin.internal",
+				host: "admin.internal",
+				te: "trailers",
+				"x-forwarded-for": "10.0.0.1",
+				"x-forwarded-host": "admin.internal",
+				"x-internal-auth": "admin",
+				"x-real-ip": "10.0.0.1",
+			}),
+			{},
+		)
+		expect(sent).toEqual({ "x-forwarded-host": "app.test", "x-forwarded-proto": "http" })
+	})
+})
+
+describe("v1 adversarial: staticFiles never hands resolve a path that leaves the root", () => {
+	it("dot segments, encoded separators, NUL, drives and streams, double encoding: every path resolve gets stays inside", async () => {
+		const seen: string[] = []
+		const app = honey<{}>()
+		/* the router lets encoded separators through to the handler: staticFiles must hold the line itself */
+		app.encodedSlashes("allow")
+		app
+			.use(
+				staticFiles({
+					resolve: (_ctx, filePath) => {
+						seen.push(filePath)
+						return null
+					},
+				}),
+			)
+			.get("/health")
+			.handler((ctx) => ctx.res.text("ok", "up"))
+		const corpus = [
+			"/a%2F..%2F..%2Fetc%2Fpasswd",
+			"/%2e%2e%5C%2e%2e%5Cwin.ini",
+			"/..%2fsecret",
+			"/a%00.txt",
+			"/C:%5Cboot.ini",
+			"/a.txt::$DATA",
+			"/%252e%252e%252fsecret",
+			"/../../etc/passwd",
+			"/ok/file.css",
+		]
+		for (const path of corpus) await app.fetch(rawTarget(path), {})
+		const unsafe = /[\\\0:]/
+		const escapes = seen.filter((path) => path.split("/").some((part) => part === ".." || unsafe.test(part)))
+		expect([escapes, seen.includes("/ok/file.css")]).toEqual([[], true])
+	})
+})
+
+describe("v1 adversarial: a near-miss secret never compares equal", () => {
+	it("the first or last unit wrong, a prefix, and a token whose lone surrogate UTF-8 would turn into U+FFFD all fail", async () => {
+		const stored = "tok_9f3a\ud800"
+		const presented = ["Tok_9f3a\ud800", "tok_9f3a\ud801", "tok_9f3a", "tok_9f3a\udfff", "tok_9f3a\ufffd"]
+		const results = await Promise.all(presented.map((guess) => timingSafeEqual(stored, guess)))
+		expect([results, await timingSafeEqual(stored, stored)]).toEqual([[false, false, false, false, false], true])
+	})
+})
+
+describe("v1 adversarial: the request logger leaks no credential", () => {
+	it("Authorization, Cookie, a CSRF token, a session header, a token query and a non-text body never reach the line", async () => {
+		const lines: string[] = []
+		const app = honey<{}>()
+		app
+			.use(curlLogger({ body: true, log: (data) => lines.push(data.curl) }))
+			.post("/login")
+			.handler((ctx) => ctx.res.text("ok", "in"))
+		await app.fetch(
+			new Request("http://app.test/login?access_token=TOKEN-SECRET&next=/home", {
+				body: "password=BODY-SECRET",
+				headers: {
+					authorization: "Bearer AUTH-SECRET",
+					"content-type": "multipart/form-data; boundary=x",
+					cookie: "sid=COOKIE-SECRET",
+					"x-csrf-token": "CSRF-SECRET",
+					"x-session-id": "SESSION-SECRET",
+				},
+				method: "POST",
+			}),
+			{},
+		)
+		expect([lines.length, lines.join("\n").match(/[A-Z]+-SECRET/g)]).toEqual([1, null])
+	})
+})
+
+describe("v1 adversarial: one request's locale never leaks into another's answer", () => {
+	it("a shared error thrown in German, then in a locale with no templates and in __proto__, answers each as its own", async () => {
+		const shared = new HoneyError({ errorKey: "item_gone", status: "gone", vars: { name: "Order 7" } })
+		const app = honey<{}>()
+		app.errorI18n(
+			createErrorTranslator({
+				errors: { de: { item_gone: "{name} ist weg" } },
+				resolveLocale: ({ search }) => search.lang ?? "en",
+			}),
+		)
+		app.get("/x").handler(() => {
+			throw shared
+		})
+		const messages = []
+		for (const lang of ["de", "fr", "__proto__"]) {
+			const res = await app.fetch(new Request(`http://app.test/x?lang=${lang}`), {})
+			messages.push(((await res.json()) as { message: string }).message)
+		}
+		expect([messages, shared.message, Object.prototype.hasOwnProperty.call({}, "item_gone")]).toEqual([
+			["Order 7 ist weg", "item_gone", "item_gone"],
+			"item_gone",
+			false,
+		])
+	})
+})
+
+/** Settles to "late" after 200ms: what an answer a tap held back loses its race to. */
+const late = () => new Promise<string>((resolve) => setTimeout(() => resolve("late"), 200))
+
+describe("v1 adversarial: a tap never delays, changes or fails the answer", () => {
+	it("a throwing tap and a never-settling one answer 200 at once, past onError; a failed handler fires none", async () => {
+		const onError = vi.fn()
+		const fired: string[] = []
+		const app = honey<{}>()
+		app.onError(onError)
+		app.tap("throws", () => {
+			fired.push("throws")
+			throw new Error("tap broke")
+		})
+		app.tap("hangs", () => {
+			fired.push("hangs")
+			return new Promise(() => {})
+		})
+		for (const key of ["throws", "hangs"]) {
+			app.get(`/${key}`).handler((ctx) => {
+				ctx.tap(key, {})
+				return ctx.res.text("ok", "ok")
+			})
+		}
+		app.get("/fails").handler((ctx) => {
+			ctx.tap("throws", {})
+			throw new Error("handler broke")
+		})
+		const answers = []
+		for (const path of ["/throws", "/hangs", "/fails"]) {
+			const pending = Promise.resolve(app.fetch(new Request(`http://app.test${path}`), {})).then((res) => res.status)
+			answers.push(await Promise.race([pending, late()]))
+		}
+		await new Promise((resolve) => setTimeout(resolve, 10))
+		/* onError sees the failed handler alone, never a tap */
+		expect([answers, fired, onError.mock.calls.length]).toEqual([[200, 200, 500], ["throws", "hangs"], 1])
+	})
+})
+
+describe("v1 adversarial: a client never picks the trace its request joins", () => {
+	it("an untrusted caller's traceparent and tracestate are only linked: the root starts its own trace", async () => {
+		const { spans, telemetry } = recorder()
+		const app = honey<{}>().telemetry(telemetry)
+		app.get("/a").handler((ctx) => ctx.res.text("ok", "a"))
+		const headers = {
+			traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+			tracestate: "evil=injected",
+		}
+		await (await app.fetch(new Request("http://app.test/a", { headers }), {})).text()
+		const root = spans[0]
+		expect([root?.parent, root?.links.map((l) => [l.traceId, l.state])]).toEqual([
+			null,
+			[["0af7651916cd43dd8448eb211c80319c", undefined]],
+		])
+	})
+})

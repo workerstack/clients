@@ -1,0 +1,288 @@
+/**
+ * The gen guard registry the mutation harness and the emit adversarial suite share: each guard, the module
+ * that holds it, its mutant and the toolchain its cases need. It imports no toolchain env, so a suite that
+ * looks a guard up reaches no language it does not run (toolchain-projects.test.ts); mutation-harness.ts
+ * runs the suites.
+ */
+import type { CSharpRuntimeFeatures } from "../../src/emit/csharp/transport.ts"
+import type { GoRuntimeFeatures } from "../../src/emit/go/http.ts"
+import type { PythonRuntimeFeatures } from "../../src/emit/python/transport.ts"
+import type { RustRuntimeFeatures } from "../../src/emit/rust/http.ts"
+import type { TsRuntimeFeatures } from "../../src/emit/ts/http.ts"
+import {
+	bypassedEscapes,
+	CSHARP_KEEP_CROSS_ORIGIN_HEADERS,
+	CSHARP_LEAKY_LOG,
+	CSHARP_RAW_PATH_PARAMS,
+	GO_KEEP_CROSS_ORIGIN_HEADERS,
+	GO_LEAKY_LOG,
+	GO_RAW_PATH_PARAMS,
+	KEEP_CROSS_ORIGIN_HEADERS,
+	LEAKY_LOG,
+	localeOrder,
+	MCP_KEY_UNREDACTED,
+	MCP_PATHS_UNGUARDED,
+	MCP_PROTOTYPE_KEYS_ALLOWED,
+	patchedRuntime,
+	patchedRuntimeFiles,
+	plainProtoKey,
+	PYTHON_KEEP_CROSS_ORIGIN_HEADERS,
+	PYTHON_LEAKY_LOG,
+	PYTHON_RAW_PATH_PARAMS,
+	RAW_PATH_PARAMS,
+	rawKey,
+	RUST_KEEP_CROSS_ORIGIN_HEADERS,
+	RUST_LEAKY_LOG,
+	RUST_RAW_PATH_PARAMS,
+	SIGNATURE_VALUE_COMPARE,
+} from "../security/mutants.ts"
+
+/** A language toolchain a guard's cases compile with. */
+export type Toolchain = "csharp" | "go" | "rust" | "python"
+
+/** Which toolchains this machine runs. */
+export type Present = { readonly [T in Toolchain]: boolean }
+
+/**
+ * The security file a toolchain guard's mutant reruns alone (Ff12): the one that imports that language's emitter,
+ * so the only file the mock reaches. A guard without a toolchain reruns the whole directory.
+ */
+export const SUITES: Readonly<Record<Toolchain, string>> = {
+	csharp: "tests/security/emit-adversarial.csharp.test.ts",
+	go: "tests/security/emit-adversarial.test.ts",
+	python: "tests/security/emit-adversarial.python.test.ts",
+	rust: "tests/security/emit-adversarial.rust.test.ts",
+}
+
+/** The security file each MCP guard's mutant reruns alone: the only one that imports the MCP emitter. */
+export const MCP_SUITE = "tests/security/emit-adversarial.mcp.test.ts"
+
+export type Guard = {
+	/** what the suite must catch once this guard is gone */
+	catches: string
+	/** the module's exports with the guard switched off */
+	disable(original: Record<string, unknown>): Record<string, unknown>
+	id: string
+	/** repo-relative path of the module that holds the guard */
+	module: string
+	/** a toolchain the suite needs to run this guard's cases; without it the guard is skipped, never killed */
+	toolchain?: Toolchain
+	/** the one security file the mutant reruns, the only one that imports its module; by default its toolchain's */
+	suite?: string
+}
+
+export const GUARDS: readonly Guard[] = [
+	{
+		catches: "a string literal written without its target's escape policy (U+2028, the BOM, NUL raw or misspelled)",
+		disable: () => bypassedEscapes,
+		id: "escape-bypass",
+		module: "packages/gen/src/emit/shared/escape.ts",
+	},
+	{
+		catches: "emitted names ordered by the machine's locale instead of by code unit",
+		disable: () => ({ compareCodeUnits: localeOrder }),
+		id: "nondeterministic-naming",
+		module: "packages/gen/src/emit/shared/lang.ts",
+	},
+	{
+		catches: "a spec's property name written into source as it came",
+		disable: () => ({ quoteKey: rawKey }),
+		id: "spec-text-to-source",
+		module: "packages/gen/src/emit/shared/literals.ts",
+	},
+	{
+		catches: "a cross-origin redirect hop that keeps the auth header, cookies and configured headers (H18.10)",
+		disable: (original) => ({ runtimeSource: patchedRuntime(runtime(original), KEEP_CROSS_ORIGIN_HEADERS) }),
+		id: "ts-cross-origin-auth",
+		module: "packages/gen/src/emit/ts/http.ts",
+	},
+	{
+		catches: "a webhook verify that compares the signature by value, a timing oracle on it (H18.9)",
+		disable: (original) => ({
+			webhookSource: patchedRuntime(original.webhookSource as () => string, SIGNATURE_VALUE_COMPARE),
+		}),
+		id: "ts-webhook-ct-verify",
+		module: "packages/gen/src/emit/ts/http.ts",
+	},
+	{
+		catches: "an onLog entry carrying the request URL's query or the auth header value",
+		disable: (original) => ({ runtimeSource: patchedRuntime(runtime(original), LEAKY_LOG) }),
+		id: "ts-auth-redaction",
+		module: "packages/gen/src/emit/ts/http.ts",
+	},
+	{
+		catches: "a path param written raw: `..` or `/` in a value changing which resource the request addresses",
+		disable: (original) => ({ runtimeSource: patchedRuntime(runtime(original), RAW_PATH_PARAMS) }),
+		id: "ts-path-param-escape",
+		module: "packages/gen/src/emit/ts/http.ts",
+	},
+	{
+		catches:
+			"a cross-origin redirect hop, through the SDK's client or a caller's HTTPClient, that keeps the auth header, cookies and configured headers (H18.10, R3)",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(goRuntime(original), GO_KEEP_CROSS_ORIGIN_HEADERS) }),
+		id: "go-cross-origin-auth",
+		module: "packages/gen/src/emit/go/http.ts",
+		toolchain: "go",
+	},
+	{
+		catches: "an OnLog entry carrying a path value, the query or the auth header value",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(goRuntime(original), GO_LEAKY_LOG) }),
+		id: "go-auth-redaction",
+		module: "packages/gen/src/emit/go/http.ts",
+		toolchain: "go",
+	},
+	{
+		catches: "a path param written raw: `..` or `/` in a value changing which resource the request addresses",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(goRuntime(original), GO_RAW_PATH_PARAMS) }),
+		id: "go-path-param-escape",
+		module: "packages/gen/src/emit/go/http.ts",
+		toolchain: "go",
+	},
+	{
+		catches:
+			"a cross-origin redirect hop, through the SDK's client or a caller's http_builder, that keeps the auth header, cookies and configured headers (H18.10, R3)",
+		disable: (original) => ({
+			runtimeFiles: patchedRuntimeFiles(rustRuntime(original), RUST_KEEP_CROSS_ORIGIN_HEADERS),
+		}),
+		id: "rust-cross-origin-auth",
+		module: "packages/gen/src/emit/rust/http.ts",
+		toolchain: "rust",
+	},
+	{
+		catches: "an on_log entry carrying a path value, the query or the token",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(rustRuntime(original), RUST_LEAKY_LOG) }),
+		id: "rust-auth-redaction",
+		module: "packages/gen/src/emit/rust/http.ts",
+		toolchain: "rust",
+	},
+	{
+		catches: "a path param written raw: `..` or `/` in a value changing which resource the request addresses",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(rustRuntime(original), RUST_RAW_PATH_PARAMS) }),
+		id: "rust-path-param-escape",
+		module: "packages/gen/src/emit/rust/http.ts",
+		toolchain: "rust",
+	},
+	{
+		catches:
+			"a cross-origin redirect hop, through the SDK's client or a caller's httpx2 client, on a call or a realtime event-stream dial, that keeps the auth header, cookies and configured headers (H18.10, R2)",
+		disable: (original) => ({
+			runtimeFiles: patchedRuntimeFiles(pythonRuntime(original), PYTHON_KEEP_CROSS_ORIGIN_HEADERS),
+		}),
+		id: "python-cross-origin-auth",
+		module: "packages/gen/src/emit/python/transport.ts",
+		toolchain: "python",
+	},
+	{
+		catches: "an on_log entry or error text carrying a path value, the query or the token",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(pythonRuntime(original), PYTHON_LEAKY_LOG) }),
+		id: "python-auth-redaction",
+		module: "packages/gen/src/emit/python/transport.ts",
+		toolchain: "python",
+	},
+	{
+		catches: "a path param written raw: `..` or `/` in a value changing which resource the request addresses",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(pythonRuntime(original), PYTHON_RAW_PATH_PARAMS) }),
+		id: "python-path-param-escape",
+		module: "packages/gen/src/emit/python/transport.ts",
+		toolchain: "python",
+	},
+	{
+		catches:
+			"a cross-origin redirect hop, through the SDK's client or a caller's HttpMessageHandler chain, that keeps the auth header, cookies and configured headers (H18.10, R3)",
+		disable: (original) => ({
+			runtimeFiles: patchedRuntimeFiles(csharpRuntime(original), CSHARP_KEEP_CROSS_ORIGIN_HEADERS),
+		}),
+		id: "csharp-cross-origin-auth",
+		module: "packages/gen/src/emit/csharp/transport.ts",
+		toolchain: "csharp",
+	},
+	{
+		catches: "a path param written raw: `..` or `/` in a value changing which resource the request addresses",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(csharpRuntime(original), CSHARP_RAW_PATH_PARAMS) }),
+		id: "csharp-path-param-escape",
+		module: "packages/gen/src/emit/csharp/transport.ts",
+		toolchain: "csharp",
+	},
+	{
+		catches: "an operation log entry carrying the filled path's query or the auth token value",
+		disable: (original) => ({ runtimeFiles: patchedRuntimeFiles(csharpRuntime(original), CSHARP_LEAKY_LOG) }),
+		id: "csharp-auth-redaction",
+		module: "packages/gen/src/emit/csharp/transport.ts",
+		toolchain: "csharp",
+	},
+	{
+		catches:
+			"an MCP tool's path argument holding `/`, `\\`, `.` or `..`, or an encoding of one, sent off its segment (H18.11)",
+		disable: (original) => ({ mcpRuntimeSource: patchedRuntime(mcpRuntime(original), MCP_PATHS_UNGUARDED) }),
+		id: "mcp-path-segment",
+		module: "packages/gen/src/emit/mcp/runtime.ts",
+		suite: MCP_SUITE,
+	},
+	{
+		catches: "an MCP tool's argument holding `__proto__`, `constructor` or `prototype` as a key sent to the API",
+		disable: (original) => ({ mcpRuntimeSource: patchedRuntime(mcpRuntime(original), MCP_PROTOTYPE_KEYS_ALLOWED) }),
+		id: "mcp-prototype-arguments",
+		module: "packages/gen/src/emit/mcp/runtime.ts",
+		suite: MCP_SUITE,
+	},
+	{
+		catches: "a schema property named `__proto__` written as a plain key in tools.gen.ts, so tools/list drops it",
+		disable: (original) => ({ literal: plainProtoKey(original.literal as (value: unknown) => string) }),
+		id: "mcp-prototype-schema",
+		module: "packages/gen/src/emit/mcp/literal.ts",
+		suite: MCP_SUITE,
+	},
+	{
+		catches: "the API key, as given or URL-encoded, in an MCP result or an echoed error body",
+		disable: (original) => ({ mcpRuntimeSource: patchedRuntime(mcpRuntime(original), MCP_KEY_UNREDACTED) }),
+		id: "mcp-key-redaction",
+		module: "packages/gen/src/emit/mcp/runtime.ts",
+		suite: MCP_SUITE,
+	},
+]
+
+/** The emitted runtime's reader, as the guarded module exports it. */
+const runtime = (original: Record<string, unknown>) => original.runtimeSource as (features: TsRuntimeFeatures) => string
+
+/** The MCP server's vendored runtime reader, as runtime.ts exports it. */
+const mcpRuntime = (original: Record<string, unknown>) => original.mcpRuntimeSource as () => string
+
+/** The emitted C# runtime's reader, as the guarded module exports it: its features and root namespace. */
+const csharpRuntime = (original: Record<string, unknown>) =>
+	original.runtimeFiles as (features: CSharpRuntimeFeatures, rootNamespace: string) => Record<string, string>
+
+/** The emitted Go runtime's reader, as the guarded module exports it. */
+const goRuntime = (original: Record<string, unknown>) =>
+	original.runtimeFiles as (features: GoRuntimeFeatures) => Record<string, string>
+
+/** The emitted Python runtime's reader, as the guarded module exports it. */
+const pythonRuntime = (original: Record<string, unknown>) =>
+	original.runtimeFiles as (features: PythonRuntimeFeatures) => Record<string, string>
+
+/** The emitted Rust runtime's reader, as the guarded module exports it. */
+const rustRuntime = (original: Record<string, unknown>) =>
+	original.runtimeFiles as (features: RustRuntimeFeatures) => Record<string, string>
+
+export function guardNamed(id: string | undefined): Guard | undefined {
+	if (id === undefined || id === "") return undefined
+	const guard = GUARDS.find((g) => g.id === id)
+	if (guard === undefined) throw new Error(`unknown guard "${id}"; known: ${GUARDS.map((g) => g.id).join(", ")}`)
+	return guard
+}
+
+/** The guards to report skipped: each guard whose toolchain is not `present`. */
+export function skippedFor(guards: readonly Guard[], present: Present): string[] {
+	return guards.filter((g) => g.toolchain !== undefined && !present[g.toolchain]).map((g) => g.id)
+}
+
+export type Verdicts = { killed: string[]; skipped: string[]; survived: string[] }
+
+/** Each guard's verdict from `run` (its suite's exit status); a skipped guard never runs and is neither killed nor survived. */
+export function verdicts(guards: readonly Guard[], skipped: readonly string[], run: (id: string) => number): Verdicts {
+	const ran = guards.filter((g) => !skipped.includes(g.id)).map((g) => ({ id: g.id, status: run(g.id) }))
+	return {
+		killed: ran.filter((r) => r.status !== 0).map((r) => r.id),
+		skipped: [...skipped],
+		survived: ran.filter((r) => r.status === 0).map((r) => r.id),
+	}
+}

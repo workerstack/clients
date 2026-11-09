@@ -1,0 +1,108 @@
+/**
+ * The emitted TS client, executed: the files an emitter writes land under
+ * `$HOME/.cache/honey-tmp/gen-ts/<content hash>/` (never /tmp, 00-rules) and are imported from
+ * there, so a behavior test drives exactly the text an SDK ships, `runtimeSource` included: a
+ * mutant of the runtime reaches every behavior test. Driven by an injected recording `fetch`.
+ */
+import { createHash } from "node:crypto"
+import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { generateAppClient } from "../app-client.ts"
+import type { RouteTree } from "../route-tree.ts"
+import { generateSdk, type SdkOptions } from "../sdk.ts"
+
+/** Where emitted files land: under the toolchain cache, never /tmp. */
+const root = () => join(process.env.HOME ?? homedir(), ".cache/honey-tmp/gen-ts")
+
+/** Write `files` once per content; the path of `entry` among them. */
+function writtenEntry(files: Readonly<Record<string, string>>, entry: string): string {
+	const ordered = Object.entries(files).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+	const hash = createHash("sha256").update(JSON.stringify(ordered)).digest("hex").slice(0, 20)
+	const dir = join(root(), hash)
+	if (!existsSync(join(dir, entry))) {
+		mkdirSync(dir, { recursive: true })
+		/* write each file beside its final name, then rename: a parallel worker never reads half a file */
+		for (const [name, text] of ordered) {
+			const partial = join(dir, `${name}.${process.pid}.partial`)
+			writeFileSync(partial, text)
+			renameSync(partial, join(dir, name))
+		}
+	}
+	return join(dir, entry)
+}
+
+/** Write `files` once per content and import `entry` from them. */
+async function load(files: Readonly<Record<string, string>>, entry: string): Promise<Record<string, unknown>> {
+	return (await import(writtenEntry(files, entry))) as Record<string, unknown>
+}
+
+/** The path of the index file of the SDK `generateSdk` emits for `document`, for another runtime to import. */
+export function emittedSdkEntry(document: Record<string, unknown>, options: SdkOptions = { name: "TestSDK" }): string {
+	const { files, stem } = generateSdk(document, options)
+	return writtenEntry(files, `${stem}.index.gen.ts`)
+}
+
+/** The SDK `generateSdk` emits for `document`, imported from its index file. */
+export async function emittedSdk(
+	document: Record<string, unknown>,
+	options: SdkOptions = { name: "TestSDK" },
+): Promise<Record<string, unknown> & { files: Readonly<Record<string, string>> }> {
+	const { files, stem } = generateSdk(document, options)
+	return { ...(await load(files, `${stem}.index.gen.ts`)), files }
+}
+
+/** The webhooks file the SDK emits for `document`, imported alone: the one import a receiver makes. */
+export async function emittedWebhooks(
+	document: Record<string, unknown>,
+	options: SdkOptions = { name: "TestSDK" },
+): Promise<Record<string, unknown> & { files: Readonly<Record<string, string>> }> {
+	const { files, stem } = generateSdk(document, options)
+	return { ...(await load(files, `${stem}.webhook.gen.ts`)), files }
+}
+
+/**
+ * The TanStack Query adapter the SDK emits under `tanstackQuery`, imported from its own file: the index
+ * never re-exports it, so this is the only way in, and it is the text a consumer compiles.
+ */
+export async function emittedTanstackQuery(
+	document: Record<string, unknown>,
+	options: SdkOptions = { name: "TestSDK", tanstackQuery: true },
+): Promise<Record<string, unknown> & { files: Readonly<Record<string, string>> }> {
+	const { files, stem } = generateSdk(document, { ...options, tanstackQuery: true })
+	return { ...(await load(files, `${stem}.tanstack-query.gen.ts`)), files }
+}
+
+/** The app-typed client (`createClient`) as an app's `_gen/client.gen.ts` vendors it. */
+export async function emittedApp(): Promise<Record<string, unknown> & { files: Readonly<Record<string, string>> }> {
+	const { files } = generateAppClient()
+	return { ...(await load(files, "client.gen.ts")), files }
+}
+
+/** A `fetch` that records each request and answers with `answer`. */
+export function recordingFetch(answer: (request: Request) => Response | Promise<Response> = () => Response.json({})): {
+	readonly calls: Request[]
+	readonly fetch: typeof fetch
+} {
+	const calls: Request[] = []
+	const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+		const request = new Request(input, init)
+		/* a Request follows the caller's signal only weakly: hold it from that signal while the call is in
+		   flight, as a real fetch does, or a fake that waits on `request.signal` can be collected unaborted */
+		init?.signal?.addEventListener("abort", () => request.signal.aborted, { once: true })
+		/* the record's signal is the one fetch received: a clone's follows it only weakly, and a gc leaves it unaborted */
+		const recorded = request.clone()
+		Object.defineProperty(recorded, "signal", { value: request.signal })
+		calls.push(recorded)
+		return answer(request)
+	}) as typeof globalThis.fetch
+	return { calls, fetch }
+}
+
+/** The `routes.gen.ts` module `generateRouteTree` writes for `tree`, imported, with its text. */
+export async function emittedRouteTree(tree: RouteTree): Promise<Record<string, unknown> & { text: string }> {
+	/* loaded on use, so the suites importing this file for the SDK never load the tree emitter */
+	const { generateRouteTree } = await import("../route-tree.ts")
+	const text = generateRouteTree(tree)
+	return { ...(await load({ "routes.gen.ts": text }, "routes.gen.ts")), text }
+}

@@ -1,0 +1,127 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"extends": ["./oxlint.base.json"],
+	"plugins": ["typescript", "unicorn", "oxc"],
+	"jsPlugins": [{ "name": "honey", "specifier": "./packages/core/lint/index.js" }],
+	"env": {
+		"node": true
+	},
+	"ignorePatterns": [
+		"dist/**",
+		"coverage/**",
+		"**/.wrangler/**",
+		"**/.honey/**",
+		"**/.cache/**",
+		"**/_gen/**",
+		"**/test-results/**",
+		"**/playwright-report/**",
+		".agents/**",
+		".claude/**",
+		".codex/**",
+		".gemini/**",
+		".grok/**",
+		".rulesync/**",
+		"packages/gen/src/_tokenizer/**"
+	],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn"
+	},
+	"rules": {
+		"no-unused-vars": "warn",
+		"unicorn/no-array-sort": "off",
+		"unicorn/prefer-string-starts-ends-with": "warn"
+	},
+	"overrides": [
+		{
+			"files": [
+				"**/*.{test,typetest}.ts",
+				"packages/core/tests/**/*.ts",
+				"packages/core/tests/e2e/**/*.ts",
+				"bench/**/*.ts"
+			],
+			"rules": {
+				"typescript/no-explicit-any": "off"
+			}
+		},
+		{
+			"files": [
+				"packages/core/src/**",
+				"packages/core/lint/**",
+				"packages/core/tests/structure/**",
+				"packages/core/tests/integration/**",
+				"packages/core/tests/types/**",
+				"packages/core/tests/regression/**",
+				"packages/gen/src/**",
+				"packages/gen/tests/**",
+				"bench/src/significance.ts",
+				"bench/src/significance.test.ts",
+				"bench/src/gate.ts",
+				"bench/src/gate.test.ts",
+				"bench/src/finalize.ts",
+				"bench/src/adapter.ts",
+				"bench/src/streaming.ts",
+				"bench/src/websockets.ts",
+				"bench/src/side.ts",
+				"bench/src/side.test.ts",
+				"bench/src/perf-base.ts",
+				"bench/src/perf-base.test.ts",
+				"bench/src/bombardier.test.ts"
+			],
+			"plugins": ["typescript", "unicorn", "oxc", "vitest"],
+			"rules": {
+				"complexity": ["error", 15],
+				"max-depth": ["error", 4],
+				"max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+				"max-lines-per-function": ["error", 60],
+				"max-params": ["error", 4],
+				"vitest/expect-expect": "error",
+				"vitest/no-conditional-expect": "error",
+				"vitest/no-disabled-tests": "error",
+				"vitest/no-focused-tests": "error",
+				"honey/boundaries": "error",
+				"honey/content-type-exact-essence": "error",
+				"honey/no-header-mode": "error",
+				"honey/no-module-side-effects": "error",
+				"honey/no-module-state": "error",
+				"honey/no-v8-ignore": "error",
+				"honey/public-jsdoc": "error",
+				"honey/unversioned-public": "error"
+			}
+		},
+		{
+			"files": [
+				"packages/core/src/**",
+				"packages/core/tests/**",
+				"packages/core/lint/**",
+				"packages/gen/src/**",
+				"packages/gen/tests/**"
+			],
+			"rules": {
+				"honey/no-console": "error"
+			}
+		},
+		{
+			"files": ["packages/core/**/*.test.ts", "packages/gen/**/*.test.ts"],
+			"rules": {
+				"honey/spawn-timeout": "error"
+			}
+		},
+		{
+			"files": [
+				"packages/core/src/**/*.test.ts",
+				"packages/core/lint/**/*.test.ts",
+				"packages/core/tests/structure/**",
+				"packages/core/tests/integration/**",
+				"packages/core/tests/types/**",
+				"packages/core/tests/regression/**",
+				"packages/gen/src/**/*.test.ts",
+				"packages/gen/tests/**",
+				"bench/src/significance.test.ts"
+			],
+			"rules": {
+				"max-lines": ["error", { "max": 500, "skipBlankLines": true, "skipComments": true }]
+			}
+		}
+	]
+}

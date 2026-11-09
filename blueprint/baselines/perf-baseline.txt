@@ -1,0 +1,84 @@
+v1 perf baseline — honey's own benchmarks must not regress.
+Machine-readable baseline: blueprint/baselines/bench.json (bit 20 e3): every bench's CI median and
+ceiling (the worst of 6 green CI runs x 1.10). hotpath.json below is v0's frozen record; nothing reads it.
+
+== Hot-path gate (bench/src/hotpath.ts) ==
+In-process app.fetch cost / a minimal raw fetch handler, as a ratio, so machine and runtime
+speed cancel. 15 interleaved samples x 50k iterations per scenario, after a warm-up pass.
+Verdict (bench/src/gate.ts, since bit 20 e3): a scenario regresses when its median ratio in one
+CI run is past its ceiling in bench.json; no retry. The history below is v0's era.
+
+Captured 2026-10-14, bun 1.4.3, this machine: AMD Ryzen 7 9800X3D, amd-pstate-epp, performance
+governor, boost ON (root-owned; not toggled), `taskset -c 2,3`. There is no pinned CI runner
+yet; when one exists, re-record there and commit the move with its reason. The baseline is the
+median of three full runs (`--update`). Only `bun 1.4` is recorded; the old off-machine `bun 1.3`
+entry was dropped (5 scenarios, stale).
+
+  scenario         baseline  what it runs
+  chain            2.06      two passthrough middleware before the handler
+  not-found        10.57     miss path: full ctx + miss plan (bit 02 targets a precomputed 404)
+  param            1.81      one path param
+  scoped           1.92      50 unrelated scopes + one covering scope, chain compiled at finalize
+  static           1.44      static route, JSON response
+  body             1.89      POST: JSON body read once, input AND output standard-schema validation
+  trust            1.93      trustProxy(1) resolving ctx.ip from X-Forwarded-For
+  mw-stack         1.93      real requestId + secureHeaders + cors (compress + rateLimit join in v1)
+  mw-sync          1.81      a synchronously written middleware
+  many-routes      1.61      300+ routes, deep backtracking match
+  large-response   1.01      multi-KB JSON with an output schema (no-clone output validation)
+
+Check run right after the capture, same pinning, threshold 0.10: all 11 `ok`, bands ±0.07..±0.99.
+
+Correction (2026-10-14): the round-2 notes claimed `body` and `large-response` exercised output
+validation (+6% over raw). They did not: both declared `.output({ ok: { "application/json": s } })`,
+which v0 ignores (its map is media type outer, status inner). Fixed in dc4f5af; the numbers above
+are the first that include output validation.
+
+Run: taskset -c 2,3 bun bench/src/hotpath.ts      (exit 0 = no significant regression)
+
+== Finalize cost (bench/src/finalize.ts) ==
+_finalize() on fresh apps (median of 9, after a throwaway run): every route's _resolve scans
+every scoped middleware, so cost grows with routes x scopes. The warm per-request loop never
+sees it. Same machine and pinning, 2026-10-14:
+
+  routes  scopes  finalize_us  ns per route x scope
+  100     10        277.9      277.9
+  100     100       608.3       60.8
+  500     50       2551.6      102.1
+  1000    10       1876.6      187.7
+  1000    100      7109.6       71.1
+
+Bit 02 (dispatch + finalize split) holds or improves these; it is a measurement, not yet a gate.
+(The finalize/dispatch split is bit 02, re-cut from bit 01 by dependency; bit 01 is the pure route model with no app.fetch path.)
+
+== Competitive throughput (bench/src/run.sh) ==
+honey vs hono / elysia / express / nest, naked + zod, bun + node, json/params/validate/middleware,
+bombardier 10s x 100 connections: `bun run bench`, `bun run bench:node`. The steady-state
+absolute gate (00-rules "Perf gate" step 3); run in CI.
+
+== Rule ==
+A v1 change may not regress a scenario significantly (hotpath.ts exits 1). An intended move is a
+committed `--update` with a one-line reason in this file, so even a change inside the noise band
+is visible in review.
+
+== Gating v1 before cutover (ruled; _v0 would otherwise be gated, proving nothing) ==
+Until the cutover (end bit 18), `@lovrozagar/honey` resolves to _v0, so the bench must reach v1 by
+building from `packages/core/src` directly:
+- hotpath.ts builds each scenario it CAN express from `packages/core/src` and judges it against the
+  committed v0 ratio with the existing significance test (+10% AND outside the band). A scenario
+  v1 cannot express yet prints `pending bit NN` — never a silent pass. `--update` keeps recording
+  the v0 reference (HOTPATH_TARGET=v0) until cutover, when hotpath re-points at the package.
+  Expressible now (bit 02): chain, not-found, param, scoped, static, mw-sync, many-routes; body +
+  large-response need bit 08, trust bit 03, mw-stack bit 07.
+- finalize.ts is a machine-INDEPENDENT gate: it builds a v0 and a v1 app side by side in one process
+  per (routes×scopes) grid point and fails when v1 > v0 × 1.10 (significance-gated). No committed
+  baseline file — the comparison is in-process, so it runs anywhere.
+First v1 capture (bun 1.4, taskset 2,3): v1 beats or matches v0 on all 7 expressible scenarios
+(e.g. not-found 6.84 vs 10.57, mw-sync 1.40 vs 1.81); finalize is 2-4× faster than v0 (1000×100:
+~1715 µs vs 3868) after fixing a v1 regression that re-parsed patterns + allocated per route×scope.
+
+== Deferred perf note (NOT bit-02 scope; v1 already beats v0 here) ==
+not-found is ~3.2 µs at 6.8× with 51 scopes because the miss plan runs every scope guard, so the
+precomputed-404 fast path can't apply. Indexing scopes by their first literal segment would cut it.
+Deferred: v1 already beats v0 on not-found and the miss path is not the hot path, so this is a focused
+later optimization with its own `not-found × many-scopes` scenario, not a bit-02 add-on.

@@ -1,0 +1,315 @@
+{
+  "errors": [
+    {
+      "errorKey": "api_error",
+      "status": 500,
+      "statusKey": "internal_server_error"
+    },
+    {
+      "errorKey": "invalid_input",
+      "status": 400,
+      "statusKey": "bad_request"
+    },
+    {
+      "errorKey": "org_limit_reached",
+      "status": 403,
+      "statusKey": "forbidden"
+    },
+    {
+      "errorKey": "org_slug_taken",
+      "status": 409,
+      "statusKey": "conflict"
+    },
+    {
+      "errorKey": "unauthorized",
+      "status": 401,
+      "statusKey": "unauthorized"
+    }
+  ],
+  "routes": [
+    {
+      "errors": [
+        "api_error",
+        "invalid_input",
+        "unauthorized"
+      ],
+      "input": {
+        "search": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      "meta": {
+        "description": "Test route",
+        "summary": "Root test route",
+        "tags": [
+          "test"
+        ]
+      },
+      "method": "GET",
+      "middleware": [
+        "requestId"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/api"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [],
+      "path": "/api/health"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "output": {
+        "text/event-stream": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/api/events"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "output": {
+        "text/event-stream": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/api/events-live"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "ALL",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [],
+      "path": "/api/echo"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors",
+        "withDb",
+        "withAuth"
+      ],
+      "params": [],
+      "path": "/api/v1/organizations"
+    },
+    {
+      "errors": [
+        "api_error",
+        "invalid_input",
+        "org_limit_reached",
+        "org_slug_taken",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "requestId",
+        "cors",
+        "withDb",
+        "withAuth"
+      ],
+      "params": [],
+      "path": "/api/v1/organizations"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors",
+        "withDb",
+        "withAuth"
+      ],
+      "params": [
+        "orgId"
+      ],
+      "path": "/api/v1/organizations/:orgId"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "DELETE",
+      "middleware": [
+        "requestId",
+        "cors",
+        "withDb",
+        "withAuth"
+      ],
+      "output": {
+        "application/json": {
+          "no_content": {}
+        }
+      },
+      "params": [
+        "orgId"
+      ],
+      "path": "/api/v1/organizations/:orgId"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [
+        "topic"
+      ],
+      "path": "/api/realtime/broadcast/:topic"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {
+        "internal": true
+      },
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [],
+      "path": "/api/served-from"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "input": {
+        "search": {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      },
+      "meta": {
+        "internal": true
+      },
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [],
+      "path": "/api/webhook-sample"
+    },
+    {
+      "errors": [
+        "api_error",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [],
+      "path": "/api/boundary/default"
+    },
+    {
+      "errors": [
+        "api_error",
+        "org_limit_reached",
+        "unauthorized"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "requestId",
+        "cors"
+      ],
+      "params": [],
+      "path": "/api/boundary/custom"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+# The build plugin
+
+`honeyPlugin()` from `@workerstack/backend/plugin` is a Vite plugin. On each build it writes the app's own
+artifacts: the typed route tree, the route manifest, each OpenAPI document as JSON, YAML or both, and the types the
+generated clients read. The SDKs, the CLI and the MCP server come from `honey-clients generate`, which reads that
+document; see the code generation page. The config loads through jiti, so it may be TypeScript. A key no option
+names, at any depth, fails the build, and one a release moved names where it went: a JS config is not type-checked,
+and a key read by no one would leave its document unfiltered without a word.
+
+## Example
+
+```ts
+import { honeyPlugin } from "@workerstack/backend/plugin"
+import { defineConfig } from "vite"
+
+export default defineConfig({
+	plugins: [honeyPlugin({ app: "src/app.ts" })],
+})
+```
+
+## OpenAPI documents
+
+`codegen.securitySchemes` declares every scheme the routes name, once. `codegen.openApi` is one document or several
+from the same routes, each with its own `filterRoutes`. A document shows the schemes its `security` lists: a
+requirement naming another scheme is left out, and so is that scheme's definition. Without `security` it shows every
+scheme its own routes name and no other. `servers`, `externalDocs` and `tags` are the document's own, the tags listed
+in the order given, then any tag no entry names. `formats` picks the files: the path in its own format (JSON unless it
+ends `.yaml` or `.yml`), each other one beside it under the same stem. Naming a document also writes
+`src/_gen/openapi-sources.gen.ts`, its files as `serveStaticOpenApi` sources under the assets directory
+(`codegen.assetsDir`, else wrangler's `assets.directory`); see the OpenAPI page.
+
+```ts
+import { honeyPlugin } from "@workerstack/backend/plugin"
+
+export default {
+	plugins: [
+		honeyPlugin({
+			app: "src/app.ts",
+			codegen: {
+				openApi: [
+					{ name: "internal", path: "src/_gen/openapi.internal.json", title: "Shop (internal)", version: "1.0.0" },
+					{
+						filterRoutes: (route) => route.meta.security !== undefined,
+						formats: ["json", "yaml"],
+						name: "public",
+						path: "assets/openapi.public.json",
+						sanitize: { stripXExtensions: true },
+						security: ["apiKey"],
+						servers: [{ url: "https://api.example.com" }],
+						tags: [
+							{ description: "Your products", name: "Products" },
+							{ description: "Orders and their state", name: "Orders" },
+						],
+						title: "Shop",
+						version: "1.0.0",
+					},
+				],
+				securitySchemes: {
+					apiKey: { in: "header", name: "Authorization", type: "apiKey" },
+					staffKey: { in: "header", name: "x-staff-key", type: "apiKey" },
+				},
+			},
+		}),
+	],
+}
+```
+
+## Output validation
+
+Every `.output()` route checks what it answers: under `vite dev`, in tests, in a development build, and wherever honey
+runs without the plugin. A production `vite build` (NODE_ENV `production`, the default) drops the check from each
+bundle it makes, a Worker's included: the build resolves core's `#output-check` import to a no-op under the
+`honey-no-output-check` condition, so the check's code is not in the bundle at all.
+`honeyPlugin({ outputValidation: true })` keeps it. The check that a `forward()`ed answer's status and media type are
+declared stays in every build. A build whose `.env` file sets `NODE_ENV=development` throws: Vite reads that file only
+after the plugin dropped the check, so the bundle would be a development build without it. Set `NODE_ENV=development`
+where the build runs, or pass `outputValidation: true`.
+
+A node or bun bundle keeps honey external, so its check is decided where it starts. Drop it in production with the same
+condition:
+
+```sh
+node --conditions=honey-no-output-check dist/index.js
+bun --conditions=honey-no-output-check dist/index.js
+```
+
+A build outside Vite (wrangler's own bundler, esbuild, `bun build`) keeps the check unless it resolves the
+`honey-no-output-check` condition itself: esbuild's `conditions` option, or `--conditions` on node and bun.
+
+## Reference
+
+| Value                                       | Default       | What it does                                                                                                                                                                                                                                                                                                                                                                        | Watch for                                                                                                                                                                                                                                    |
+| ------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `honeyPlugin(pluginOptions)` (vite/bundler) | —             | wires type extraction + codegen into the build                                                                                                                                                                                                                                                                                                                                      | runs in Node at build time; `ts-morph` is an optional peer loaded only here                                                                                                                                                                  |
+| `outputValidation`                          | `false`       | `true` keeps the answer check in a production build; otherwise a production `vite build` drops it from every bundle it makes                                                                                                                                                                                                                                                        | a node or bun bundle keeps honey external: start it with `--conditions=honey-no-output-check` to drop the check                                                                                                                              |
+| `generate` targets                          | all declared  | which of the app's own artifacts to write: the route tree, the manifest, each OpenAPI document as JSON, YAML or both, the types; SDKs, the CLI and MCP come from `honey-clients generate`                                                                                                                                                                                           | the bundle targets are node, bun and cf                                                                                                                                                                                                      |
+| type generation                             | on            | extract middleware ctx/chain types (calls `honey-clients` `extract/`)                                                                                                                                                                                                                                                                                                               | needs a TS honey app + `ts-morph`                                                                                                                                                                                                            |
+| route-tree emission                         | on            | emits the typed route tree (`honey-clients` `emit/ts/route-tree.ts`)                                                                                                                                                                                                                                                                                                                | consumed by the generated TS client                                                                                                                                                                                                          |
+| config loading                              | jiti          | loads `honey.config` via jiti                                                                                                                                                                                                                                                                                                                                                       | —                                                                                                                                                                                                                                            |
+| a Worker's named exports (cf target)        | all passed on | the Worker module `createBuildPlugin` emits for Workers exports every named export of the app's entry but the app itself (a Durable Object class, a `WorkerEntrypoint`, a `Workflow`), so wrangler bindings can name them; `default` is honey's fetch handler, and a `scheduled` or `queue` function from the entry moves onto it, where workerd calls it; node and bun export none | workerd loads a Worker only when each named export is a function or an object, so any other value (`export const VERSION = "1"`) is exported as an inert empty object; an entry exporting a `default` beside a named app is refused at build |

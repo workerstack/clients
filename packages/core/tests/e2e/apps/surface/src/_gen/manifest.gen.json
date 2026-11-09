@@ -1,0 +1,1160 @@
+{
+  "errors": [
+    {
+      "errorKey": "conflict",
+      "status": 409,
+      "statusKey": "conflict"
+    },
+    {
+      "errorKey": "not_found",
+      "status": 404,
+      "statusKey": "not_found"
+    },
+    {
+      "errorKey": "unauthorized",
+      "status": 401,
+      "statusKey": "unauthorized"
+    },
+    {
+      "errorKey": "validation_error",
+      "status": 400,
+      "statusKey": "bad_request"
+    }
+  ],
+  "routes": [
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "name"
+          ]
+        }
+      },
+      "meta": {
+        "operationId": "input.createJson",
+        "tags": [
+          "input"
+        ]
+      },
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "created": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/json"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "form": {
+          "type": "object",
+          "properties": {
+            "password": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "password",
+            "username"
+          ]
+        }
+      },
+      "meta": {
+        "operationId": "input.createForm",
+        "tags": [
+          "input"
+        ]
+      },
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "token"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/form"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "search": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "page": {
+              "type": "number"
+            },
+            "q": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "limit",
+            "page"
+          ]
+        }
+      },
+      "meta": {
+        "auth": "required",
+        "operationId": "input.search",
+        "tags": [
+          "input"
+        ]
+      },
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "results"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/search"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "headers": {
+          "type": "object",
+          "properties": {
+            "x-api-key": {
+              "type": "string"
+            },
+            "x-request-id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "x-api-key",
+            "x-request-id"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "accepted"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/headers"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "cookies": {
+          "type": "object",
+          "properties": {
+            "locale": {
+              "type": "string"
+            },
+            "sid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "locale",
+            "sid"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "locale": {
+                "type": "string"
+              },
+              "valid": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "locale",
+              "valid"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/cookies"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "params": {
+          "type": "object",
+          "properties": {
+            "memberId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "orgId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "memberId",
+            "orgId"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string"
+              },
+              "orgId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "memberId",
+              "orgId"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [
+        "orgId",
+        "memberId"
+      ],
+      "path": "/in/params/:orgId/members/:memberId"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {
+        "operationId": "input.none",
+        "tags": [
+          "input"
+        ]
+      },
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "ping": {
+                "type": "string",
+                "const": "pong"
+              }
+            },
+            "required": [
+              "ping"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/none"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "form": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "upload": {
+              "type": "string",
+              "format": "binary",
+              "contentEncoding": "binary"
+            }
+          },
+          "required": [
+            "title",
+            "upload"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "title"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/in/file"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "headers": {
+          "type": "object",
+          "properties": {
+            "if-match": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "if-match"
+          ]
+        },
+        "json": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "data"
+          ]
+        },
+        "search": {
+          "type": "object",
+          "properties": {
+            "force": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "version"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "PUT",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "version": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "etag",
+              "version"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [
+        "resourceId"
+      ],
+      "path": "/in/all/:resourceId"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "text/plain": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/out/text"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "text/html": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/out/html"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "text/csv": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/out/csv"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/xml": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/out/xml"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/octet-stream": {
+          "ok": {}
+        }
+      },
+      "params": [],
+      "path": "/out/binary"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "text/event-stream": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/out/sse"
+    },
+    {
+      "errors": [
+        "conflict",
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "slug"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "created": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "slug"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/out/multi-status"
+    },
+    {
+      "errors": [
+        "not_found",
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "DELETE",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "no_content": {}
+        }
+      },
+      "params": [
+        "id"
+      ],
+      "path": "/out/no-content/:id"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {
+        "operationId": "resources.list",
+        "tags": [
+          "methods"
+        ]
+      },
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/methods/resource"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "meta": {
+        "operationId": "resources.create",
+        "tags": [
+          "methods"
+        ]
+      },
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "created": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/methods/resource"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      "meta": {
+        "operationId": "resources.update",
+        "tags": [
+          "methods"
+        ]
+      },
+      "method": "PUT",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [
+        "id"
+      ],
+      "path": "/methods/resource/:id"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      "meta": {
+        "operationId": "resources.patch",
+        "tags": [
+          "methods"
+        ]
+      },
+      "method": "PATCH",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [
+        "id"
+      ],
+      "path": "/methods/resource/:id"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {
+        "operationId": "resources.delete",
+        "tags": [
+          "methods"
+        ]
+      },
+      "method": "DELETE",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "no_content": {}
+        }
+      },
+      "params": [
+        "id"
+      ],
+      "path": "/methods/resource/:id"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "ok": {
+            "type": "object",
+            "properties": {
+              "v": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "v"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/status/ok"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "x"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "created": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/status/created"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "task"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "accepted": {
+            "type": "object",
+            "properties": {
+              "jobId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "jobId"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/status/accepted"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "meta": {},
+      "method": "DELETE",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "no_content": {}
+        }
+      },
+      "params": [],
+      "path": "/status/no-content"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "search": {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string"
+            },
+            "since": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "GET",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "text/event-stream": {
+          "ok": {
+            "type": "string"
+          }
+        }
+      },
+      "params": [],
+      "path": "/stream/filtered"
+    },
+    {
+      "errors": [
+        "unauthorized",
+        "validation_error"
+      ],
+      "input": {
+        "json": {
+          "type": "object",
+          "properties": {
+            "chunks": {
+              "type": "number"
+            },
+            "fileName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chunks",
+            "fileName"
+          ]
+        }
+      },
+      "meta": {},
+      "method": "POST",
+      "middleware": [
+        "anonymous",
+        "anonymous"
+      ],
+      "output": {
+        "application/json": {
+          "accepted": {
+            "type": "object",
+            "properties": {
+              "uploadId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "uploadId"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "params": [],
+      "path": "/rs/upload"
+    }
+  ]
+}

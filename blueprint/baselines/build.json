@@ -1,0 +1,379 @@
+{
+	"builds": {
+		"bun 1.4": {
+			"compose×bun": {
+				"baseline": 0.93,
+				"byClass": {
+					"fast": 0.98,
+					"middle": 0.94,
+					"slow": 0.87
+				},
+				"catches": "+51%",
+				"ceiling": 1.404
+			},
+			"compose×node": {
+				"baseline": 0.92,
+				"byClass": {
+					"fast": 0.91,
+					"middle": 0.92
+				},
+				"catches": "+39%",
+				"ceiling": 1.282
+			},
+			"compose×workers": {
+				"baseline": 0.94,
+				"byClass": {
+					"fast": 0.91,
+					"middle": 0.94
+				},
+				"catches": "+44%",
+				"ceiling": 1.35
+			},
+			"defaults×bun": {
+				"baseline": 0.9,
+				"byClass": {
+					"fast": 0.94,
+					"middle": 0.9,
+					"slow": 0.84
+				},
+				"catches": "+49%",
+				"ceiling": 1.337
+			},
+			"defaults×node": {
+				"baseline": 0.9,
+				"byClass": {
+					"fast": 0.88,
+					"middle": 0.9
+				},
+				"catches": "+38%",
+				"ceiling": 1.242
+			},
+			"defaults×workers": {
+				"baseline": 0.91,
+				"byClass": {
+					"fast": 0.88,
+					"middle": 0.91
+				},
+				"catches": "+41%",
+				"ceiling": 1.282
+			},
+			"gateway×bun": {
+				"baseline": 0.91,
+				"byClass": {
+					"fast": 0.95,
+					"middle": 0.92,
+					"slow": 0.87
+				},
+				"catches": "+47%",
+				"ceiling": 1.337
+			},
+			"gateway×node": {
+				"baseline": 0.92,
+				"byClass": {
+					"fast": 0.91,
+					"middle": 0.92
+				},
+				"catches": "+41%",
+				"ceiling": 1.296
+			},
+			"gateway×workers": {
+				"baseline": 0.93,
+				"byClass": {
+					"fast": 0.89,
+					"middle": 0.94
+				},
+				"catches": "+42%",
+				"ceiling": 1.323
+			},
+			"kitchen×bun": {
+				"baseline": 0.94,
+				"byClass": {
+					"fast": 0.99,
+					"middle": 0.95,
+					"slow": 0.87
+				},
+				"catches": "+49%",
+				"ceiling": 1.404
+			},
+			"kitchen×node": {
+				"baseline": 0.95,
+				"byClass": {
+					"fast": 0.93,
+					"middle": 0.96
+				},
+				"catches": "+38%",
+				"ceiling": 1.31
+			},
+			"kitchen×workers": {
+				"baseline": 0.95,
+				"byClass": {
+					"fast": 0.92,
+					"middle": 0.95
+				},
+				"catches": "+39%",
+				"ceiling": 1.323
+			},
+			"mcp×bun": {
+				"baseline": 0.17,
+				"byClass": {
+					"fast": 0.18,
+					"middle": 0.17,
+					"slow": 0.16
+				},
+				"catches": "+51%",
+				"ceiling": 0.257
+			},
+			"mcp×node": {
+				"baseline": 0.17,
+				"byClass": {
+					"fast": 0.17,
+					"middle": 0.16
+				},
+				"catches": "+43%",
+				"ceiling": 0.243
+			},
+			"mcp×workers": {
+				"baseline": 0.18,
+				"byClass": {
+					"fast": 0.17,
+					"middle": 0.18
+				},
+				"catches": "+43%",
+				"ceiling": 0.257
+			},
+			"surface×bun": {
+				"baseline": 1.03,
+				"byClass": {
+					"fast": 1.08,
+					"middle": 1.03,
+					"slow": 0.99
+				},
+				"catches": "+47%",
+				"ceiling": 1.512
+			},
+			"surface×node": {
+				"baseline": 1.02,
+				"byClass": {
+					"fast": 1.01,
+					"middle": 1.03
+				},
+				"catches": "+42%",
+				"ceiling": 1.445
+			},
+			"surface×workers": {
+				"baseline": 1.05,
+				"byClass": {
+					"fast": 1.01,
+					"middle": 1.05
+				},
+				"catches": "+40%",
+				"ceiling": 1.472
+			}
+		},
+		"node 22": {
+			"compose×bun": {
+				"baseline": 1.85,
+				"byClass": {
+					"unclassified": 1.85
+				},
+				"catches": "+50%",
+				"ceiling": 2.781
+			},
+			"compose×node": {
+				"baseline": 1.86,
+				"byClass": {
+					"unclassified": 1.86
+				},
+				"catches": "+55%",
+				"ceiling": 2.876
+			},
+			"compose×workers": {
+				"baseline": 1.83,
+				"byClass": {
+					"unclassified": 1.83
+				},
+				"catches": "+56%",
+				"ceiling": 2.862
+			},
+			"defaults×bun": {
+				"baseline": 1.81,
+				"byClass": {
+					"unclassified": 1.81
+				},
+				"catches": "+69%",
+				"ceiling": 3.058
+			},
+			"defaults×node": {
+				"baseline": 1.85,
+				"byClass": {
+					"unclassified": 1.85
+				},
+				"catches": "+48%",
+				"ceiling": 2.74
+			},
+			"defaults×workers": {
+				"baseline": 1.83,
+				"byClass": {
+					"unclassified": 1.83
+				},
+				"catches": "+46%",
+				"ceiling": 2.673
+			},
+			"gateway×bun": {
+				"baseline": 1.83,
+				"byClass": {
+					"unclassified": 1.83
+				},
+				"catches": "+53%",
+				"ceiling": 2.808
+			},
+			"gateway×node": {
+				"baseline": 1.86,
+				"byClass": {
+					"unclassified": 1.86
+				},
+				"catches": "+54%",
+				"ceiling": 2.862
+			},
+			"gateway×workers": {
+				"baseline": 1.85,
+				"byClass": {
+					"unclassified": 1.85
+				},
+				"catches": "+55%",
+				"ceiling": 2.862
+			},
+			"kitchen×bun": {
+				"baseline": 1.94,
+				"byClass": {
+					"unclassified": 1.94
+				},
+				"catches": "+52%",
+				"ceiling": 2.943
+			},
+			"kitchen×node": {
+				"baseline": 1.96,
+				"byClass": {
+					"unclassified": 1.96
+				},
+				"catches": "+51%",
+				"ceiling": 2.957
+			},
+			"kitchen×workers": {
+				"baseline": 1.96,
+				"byClass": {
+					"unclassified": 1.96
+				},
+				"catches": "+49%",
+				"ceiling": 2.916
+			},
+			"mcp×bun": {
+				"baseline": 1.05,
+				"byClass": {
+					"unclassified": 1.05
+				},
+				"catches": "+47%",
+				"ceiling": 1.539
+			},
+			"mcp×node": {
+				"baseline": 1.05,
+				"byClass": {
+					"unclassified": 1.05
+				},
+				"catches": "+48%",
+				"ceiling": 1.552
+			},
+			"mcp×workers": {
+				"baseline": 1.04,
+				"byClass": {
+					"unclassified": 1.04
+				},
+				"catches": "+49%",
+				"ceiling": 1.552
+			},
+			"surface×bun": {
+				"baseline": 1.99,
+				"byClass": {
+					"unclassified": 1.99
+				},
+				"catches": "+56%",
+				"ceiling": 3.105
+			},
+			"surface×node": {
+				"baseline": 2.02,
+				"byClass": {
+					"unclassified": 2.02
+				},
+				"catches": "+52%",
+				"ceiling": 3.078
+			},
+			"surface×workers": {
+				"baseline": 1.97,
+				"byClass": {
+					"unclassified": 1.97
+				},
+				"catches": "+59%",
+				"ceiling": 3.132
+			}
+		},
+		"node 26": {
+			"compose×node": {
+				"baseline": 1.9,
+				"byClass": {
+					"unclassified": 1.9
+				},
+				"catches": "+39%",
+				"ceiling": 2.633
+			},
+			"defaults×node": {
+				"baseline": 1.85,
+				"byClass": {
+					"unclassified": 1.85
+				},
+				"catches": "+42%",
+				"ceiling": 2.619
+			},
+			"gateway×node": {
+				"baseline": 1.9,
+				"byClass": {
+					"unclassified": 1.9
+				},
+				"catches": "+40%",
+				"ceiling": 2.659
+			},
+			"kitchen×node": {
+				"baseline": 1.98,
+				"byClass": {
+					"unclassified": 1.98
+				},
+				"catches": "+40%",
+				"ceiling": 2.781
+			},
+			"mcp×node": {
+				"baseline": 1.08,
+				"byClass": {
+					"unclassified": 1.08
+				},
+				"catches": "+44%",
+				"ceiling": 1.552
+			},
+			"surface×node": {
+				"baseline": 2.01,
+				"byClass": {
+					"unclassified": 2.01
+				},
+				"catches": "+40%",
+				"ceiling": 2.808
+			}
+		}
+	},
+	"note": "Per runtime key (Bun by minor, Node by major) and e2e build cell: the cell's build time over a honey-free reference build's (packages/core/tests/e2e/build-gate.ts), from the RATIO build lines of the build and prod e2e jobs of CI runs 41577201773, 41578975301, 41580101032, 41581771216, 41583588126, 41585115149 (ci.yml dispatched with build_mode=record). Each job is classed fast, middle or slow by its own surface builds on bun, Node-only jobs unclassified; byClass is each class's median. baseline: the median of every job's ratio. ceiling (ceiling-rule.ts ceilingRule): per cell, fit log(ratio) (mean m, sample sd s), sigma_upper = s * sqrt((n-1)/chi2_0.10,n-1) (one-sided 90% upper bound on sigma), z = Phi^-1(1 - 0.02/G) with G = 42 cells, ceiling = max(worst x 1.35, exp(m + z*sigma_upper)), so the cells share a 2% per-run false-red budget. A ratio above its ceiling is REGRESSED. catches: ceiling / baseline. No retry: a red with honey unchanged is answered by a re-record (6+ runs spanning both runner classes, derived by derive-build-ceilings.ts), never a rerun.",
+	"runs": [
+		"41577201773",
+		"41578975301",
+		"41580101032",
+		"41581771216",
+		"41583588126",
+		"41585115149"
+	]
+}

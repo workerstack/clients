@@ -1,0 +1,378 @@
+#!/usr/bin/env bun
+/**
+ * Packaging tier. Packs @workerstack/backend exactly as npm would, installs the tarball into a
+ * throwaway consumer whose tsconfig turns on every strictness flag we could plausibly meet,
+ * and fails on any diagnostic originating inside the package.
+ *
+ * This exists because a package that ships raw TypeScript inherits the *consumer's* compiler
+ * flags. `skipLibCheck` does not help — it covers `.d.ts` only — and there is no per-directory
+ * suppression for `.ts` under node_modules, so a consumer cannot opt out of our lint posture.
+ * Nothing else in the test matrix can see that: every other tier compiles honey with honey's
+ * own tsconfig.
+ *
+ *   bun run packages/core/tests/e2e/run-strict-consumer.ts
+ *   bun run packages/core/tests/e2e/run-strict-consumer.ts --keep     # leave the sandbox for inspection
+ */
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { type AddressInfo, createServer } from "node:net"
+import { tmpdir } from "node:os"
+import { basename, dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+import { treeShake } from "./tree-shake.ts"
+
+const here = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(here, "../../../..")
+const fixture = join(here, "strict-consumer")
+/* outside the repo, so nothing the install lacks resolves from the repo's node_modules */
+const sandbox = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "honey-strict-consumer-"))
+const keep = process.argv.includes("--keep")
+
+const PKG = "@workerstack/backend"
+
+/* a real header, then what ./user-agent must answer for it through the packed subpath */
+const PINNED_USER_AGENTS = [
+	[
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+		"Chrome",
+		141,
+		"desktop",
+		"Windows",
+		"10",
+	],
+	[
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15",
+		"Safari",
+		18,
+		"desktop",
+		"macOS",
+		"10.15.7",
+	],
+	["Mozilla/5.0 (X11; Linux x86_64; rv:144.0) Gecko/20100101 Firefox/144.0", "Firefox", 144, "desktop", "Linux", null],
+	[
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
+		"Edge",
+		141,
+		"desktop",
+		"Windows",
+		"10",
+	],
+	[
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+		"Safari",
+		18,
+		"mobile",
+		"iOS",
+		"18.6",
+	],
+	[
+		"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
+		"Chrome",
+		141,
+		"mobile",
+		"Android",
+		"14",
+	],
+]
+
+/**
+ * `count` distinct ports the OS holds free now, all bound at once so none repeats: a fixed port in the
+ * ephemeral range is any outbound socket's on a shared machine.
+ */
+async function freePorts(count: number): Promise<number[]> {
+	const servers = Array.from({ length: count }, () => createServer())
+	await Promise.all(servers.map((server) => new Promise<void>((done) => server.listen(0, "0.0.0.0", done))))
+	const ports = servers.map((server) => (server.address() as AddressInfo).port)
+	await Promise.all(servers.map((server) => new Promise((done) => server.close(done))))
+	return ports
+}
+
+async function run(cmd: string[], cwd: string): Promise<{ code: number; out: string }> {
+	const proc = Bun.spawn(cmd, { cwd, stderr: "pipe", stdin: "ignore", stdout: "pipe" })
+	const [code, stdout, stderr] = await Promise.all([
+		proc.exited,
+		new Response(proc.stdout).text(),
+		new Response(proc.stderr).text(),
+	])
+	return { code, out: stdout + stderr }
+}
+
+/* 1. pack both packages exactly as release.yml does: scripts/pack.ts, a staged copy, so the checkout stays source-only */
+console.log("packing …")
+const packed = await run(
+	["bun", join(repoRoot, "scripts/pack.ts"), sandbox, join(repoRoot, "packages/core"), join(repoRoot, "packages/gen")],
+	repoRoot,
+)
+const [coreTarball, genTarball] = packed.out.trim().split("\n")
+if (packed.code !== 0 || !coreTarball?.endsWith(".tgz") || !genTarball?.endsWith(".tgz")) {
+	console.error(packed.out)
+	process.exit(1)
+}
+
+/* 2. a consumer that depends on the tarball, not the workspace */
+const consumer = join(sandbox, "consumer")
+mkdirSync(join(consumer, "src"), { recursive: true })
+/* every file the fixture ships, so a new leg needs no change here */
+for (const name of readdirSync(join(fixture, "src")))
+	await Bun.write(join(consumer, "src", name), await Bun.file(join(fixture, "src", name)).text())
+await Bun.write(join(consumer, "tsconfig.json"), await Bun.file(join(fixture, "tsconfig.json")).text())
+await Bun.write(
+	join(consumer, "package.json"),
+	`${JSON.stringify(
+		{
+			dependencies: { [PKG]: `file:${coreTarball}`, "@workerstack/clients": `file:${genTarball}`, zod: "4.3.6" },
+			/* esbuild at the version wrangler pins, for the tree-shake gate beside vite's rolldown */
+			devDependencies: { esbuild: "0.28.1", typescript: "7.0.2", vite: "8.1.4" },
+			name: "strict-consumer-sandbox",
+			private: true,
+			type: "module",
+			version: "0.0.0",
+		},
+		null,
+		2,
+	)}\n`,
+)
+
+console.log("installing the tarball …")
+const installed = await run(["npm", "install", "--no-audit", "--no-fund", "--silent"], consumer)
+if (installed.code !== 0) {
+	console.error(installed.out)
+	process.exit(1)
+}
+
+/* 2b. a generated client is the consumer's own source, so it inherits the consumer's flags exactly as the
+   package does — and nothing else in the matrix compiles one: the generators' tests read the emitted text,
+   they never type-check it. Each document in the fixture becomes `src/<stem>/ts/`, which the tsconfig's
+   `src` glob already covers. The second document serves no realtime route: the runtime ships whole either
+   way, so only there does a type import the file never uses show up. */
+console.log("generating a client from each document …")
+for (const name of readdirSync(join(fixture, "documents"))) {
+	const stem = basename(name, ".json")
+	const emitted = await run(
+		[
+			"node",
+			join("node_modules", ".bin", "honey-clients"),
+			"generate",
+			"--spec",
+			join(fixture, "documents", name),
+			"--target",
+			"ts",
+			/* no --ts-name: the CLI's default name, SDK, is the one an SDK's own SDKConfig once collided with */
+			"--ts-stem",
+			stem,
+			"--out",
+			join("src", stem),
+		],
+		consumer,
+	)
+	if (emitted.code !== 0) {
+		console.error(`FAIL  honey-clients generate from ${name}`)
+		console.error(emitted.out)
+		if (!keep) rmSync(sandbox, { force: true, recursive: true })
+		process.exit(1)
+	}
+}
+
+/* 3. type-check under maximal strictness */
+console.log("type-checking under maximal strictness …\n")
+const checked = await run(["npx", "tsc", "--noEmit", "-p", "tsconfig.json"], consumer)
+
+const lines = checked.out.split("\n").filter((l) => l.includes("error TS"))
+const inPackage = lines.filter((l) => l.includes(`node_modules/${PKG}/`))
+const rest = lines.filter((l) => !l.includes(`node_modules/${PKG}/`))
+const generatedDirs = readdirSync(join(fixture, "documents")).map((name) => `src/${basename(name, ".json")}/`)
+const inGenerated = rest.filter((l) => generatedDirs.some((dir) => l.includes(dir)))
+const inConsumer = rest.filter((l) => !generatedDirs.some((dir) => l.includes(dir)))
+
+if (inPackage.length > 0) {
+	const byCode = new Map<string, number>()
+	for (const line of inPackage) {
+		const code = /error (TS\d+)/.exec(line)?.[1] ?? "TS?"
+		byCode.set(code, (byCode.get(code) ?? 0) + 1)
+	}
+	console.log(`FAIL  ${inPackage.length} diagnostics originate inside ${PKG}\n`)
+	for (const [code, n] of [...byCode].sort((a, b) => b[1] - a[1])) {
+		console.log(`  ${String(n).padStart(5)}  ${code}`)
+	}
+	console.log("\nfirst few:")
+	for (const line of inPackage.slice(0, 5)) console.log(`  ${line.trim()}`)
+	console.log(
+		`\nA consumer cannot suppress these: skipLibCheck covers .d.ts only, and there is no\n` +
+			`per-directory opt-out for .ts under node_modules.`,
+	)
+}
+
+if (inGenerated.length > 0) {
+	const byFile = new Map<string, number>()
+	for (const line of inGenerated) {
+		const file = /^(\S+?)\(/.exec(line.trim())?.[1] ?? "?"
+		byFile.set(file, (byFile.get(file) ?? 0) + 1)
+	}
+	console.log(`FAIL  ${inGenerated.length} diagnostics in the clients honey-clients generated\n`)
+	for (const [file, n] of [...byFile].sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(5)}  ${file}`)
+	console.log("\nfirst few:")
+	for (const line of inGenerated.slice(0, 5)) console.log(`  ${line.trim()}`)
+	console.log(
+		"\nGenerated code is the consumer's own source: it is compiled with the consumer's flags, and\n" +
+			"no suppression reaches it either.",
+	)
+}
+
+if (inConsumer.length > 0) {
+	console.log(`\n${inConsumer.length} diagnostics in the fixture itself (these are ours to fix):`)
+	for (const line of inConsumer.slice(0, 10)) console.log(`  ${line.trim()}`)
+}
+
+/* 4. and it must actually run — types passing while the exports map is wrong is a real
+   failure mode, since `types` and `default` resolve independently */
+if (inPackage.length === 0 && inGenerated.length === 0 && inConsumer.length === 0) {
+	await Bun.write(
+		join(consumer, "smoke.ts"),
+		[
+			'import { honey } from "@workerstack/backend"',
+			'import { serveOpenApi } from "@workerstack/backend/openapi"',
+			'import { parseUserAgent } from "@workerstack/backend/user-agent"',
+			'import * as z from "zod"',
+			"const app = honey<{}>()",
+			'app.get("/hi").output({ "application/json": { ok: z.object({ ok: z.boolean() }) } })',
+			'\t.handler((c) => c.res.json("ok", { ok: true }))',
+			'serveOpenApi(app, { title: "T", version: "1" })',
+			'const res = await app.fetch(new Request("http://x/hi"), {})',
+			"if (res.status !== 200) throw new Error(`route returned ${res.status}`)",
+			'const spec = await app.fetch(new Request("http://x/openapi.json"), {})',
+			"if (spec.status !== 200) throw new Error(`openapi returned ${spec.status}`)",
+			'if (!("/hi" in ((await spec.json()) as { paths: Record<string, unknown> }).paths)) {',
+			'\tthrow new Error("route missing from the generated document")',
+			"}",
+			`for (const [header, browser, browserMajor, deviceType, os, osVersion] of ${JSON.stringify(PINNED_USER_AGENTS)} as const) {`,
+			"\tconst read = parseUserAgent(header)",
+			"\tconst want = [browser, browserMajor, deviceType, os, osVersion]",
+			"\tconst got = [read.browser, read.browserMajor, read.deviceType, read.os, read.osVersion]",
+			"\tif (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`${header} read as ${got}`)",
+			"}",
+			'console.log("runtime ok")',
+		].join("\n"),
+	)
+	const smoked = await run(["bun", "run", "smoke.ts"], consumer)
+	if (smoked.code !== 0) {
+		console.log("FAIL  the installed package does not run")
+		console.log(smoked.out)
+		if (!keep) rmSync(sandbox, { force: true, recursive: true })
+		process.exit(1)
+	}
+	console.log("runtime smoke ok (bun)")
+
+	if (!(await nodeConsumer(consumer))) {
+		if (!keep) rmSync(sandbox, { force: true, recursive: true })
+		process.exit(1)
+	}
+
+	/* 5. what a consumer's bundler keeps of a subpath it imports and never uses: nothing, a top-level effect included */
+	const unshaken = await treeShake(consumer)
+	if (unshaken.length > 0) {
+		console.log(`FAIL  ${unshaken.length} tree-shake failures\n${unshaken.join("\n")}`)
+		if (!keep) rmSync(sandbox, { force: true, recursive: true })
+		process.exit(1)
+	}
+	console.log("tree-shake ok (esbuild, rolldown)")
+}
+
+if (!keep) rmSync(sandbox, { force: true, recursive: true })
+else console.log(`\nsandbox kept at ${sandbox}`)
+
+function fail(what: string, out: string): false {
+	console.log(`FAIL  ${what}`)
+	console.log(out)
+	return false
+}
+
+/**
+ * Plain Node, no tsx and no type stripping of node_modules: the package entry, the CLI and the
+ * Vite plugin must all run from the compiled dist/. Bun runs source, so it cannot see this.
+ */
+async function nodeConsumer(dir: string): Promise<boolean> {
+	await Bun.write(
+		join(dir, "node-smoke.mjs"),
+		[
+			'import { honey } from "@workerstack/backend"',
+			"const app = honey()",
+			'app.get("/hi").handler((c) => c.res.text("ok", "hi"))',
+			'const res = await app.fetch(new Request("http://x/hi"), {})',
+			'if (res.status !== 200 || (await res.text()) !== "hi") throw new Error(`route returned ${res.status}`)',
+			'console.log("node import ok")',
+		].join("\n"),
+	)
+	const imported = await run(["node", "--unhandled-rejections=strict", "node-smoke.mjs"], dir)
+	if (imported.code !== 0) return fail("the core entry does not import on plain Node", imported.out)
+	console.log("runtime smoke ok (node)")
+
+	/* an app in the README "Start" shape: it serves at top level, which generation must survive */
+	const [port, served] = await freePorts(2)
+	await Bun.write(
+		join(dir, "src", "server-app.ts"),
+		[
+			'import { honey } from "@workerstack/backend"',
+			'import { serve } from "@workerstack/backend/node"',
+			'export const app = honey().get("/health").handler((ctx) => ctx.res.text("ok", "ok"))',
+			"export default app",
+			`await serve(app, { port: ${port} })`,
+		].join("\n"),
+	)
+	await Bun.write(
+		join(dir, "vite.config.ts"),
+		[
+			'import { honeyPlugin } from "@workerstack/backend/plugin"',
+			'export default { plugins: [honeyPlugin({ app: "src/server-app.ts", codegen: { openApi: { title: "T", version: "1" } } })] }',
+		].join("\n"),
+	)
+	const generated = await run(["node", join("node_modules", ".bin", "honey"), "generate"], dir)
+	if (generated.code !== 0 || !(await Bun.file(join(dir, "src", "_gen", "routes.gen.ts")).exists())) {
+		return fail("honey generate on Node", generated.out)
+	}
+	console.log("cli ok (node)")
+
+	await Bun.write(
+		join(dir, "vite.build.config.ts"),
+		[
+			'import { createBuildPlugin } from "@workerstack/backend/build"',
+			'import base from "./vite.config.ts"',
+			"export default {",
+			"  ...base,",
+			'  logLevel: "error",',
+			'  plugins: [...base.plugins, createBuildPlugin({ outDir: "out", target: "node" }, { entry: "src/server-app.ts", export: "app" })],',
+			"}",
+		].join("\n"),
+	)
+	const built = await run(
+		["node", join("node_modules", "vite", "bin", "vite.js"), "build", "--config", "vite.build.config.ts"],
+		dir,
+	)
+	if (built.code !== 0) return fail("vite build with the honey plugins on Node", built.out)
+
+	const server = Bun.spawn(["node", "--unhandled-rejections=strict", join("out", "index.js")], {
+		cwd: dir,
+		env: { ...process.env, PORT: String(served) },
+		stderr: "pipe",
+		stdout: "pipe",
+	})
+	try {
+		const deadline = Date.now() + 10_000
+		while (Date.now() < deadline) {
+			/* bounded: a listener that takes the connection and never answers must not hang the tier */
+			const res = await fetch(`http://127.0.0.1:${served}/health`, { signal: AbortSignal.timeout(1000) }).catch(
+				() => undefined,
+			)
+			if (res?.status === 200) {
+				console.log("vite build ok (node)")
+				return true
+			}
+			await Bun.sleep(100)
+		}
+		server.kill()
+		return fail("the built server never answered /health", await new Response(server.stderr).text())
+	} finally {
+		server.kill()
+	}
+}
+
+if (inPackage.length > 0 || inGenerated.length > 0 || inConsumer.length > 0) process.exit(1)
+console.log(`pass  0 diagnostics from ${PKG} or its generated clients under maximal strictness`)

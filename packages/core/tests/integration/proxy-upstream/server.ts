@@ -1,0 +1,64 @@
+/**
+ * Fixture for proxy-upstream.test.ts: a honey app that proxies `/up/*` to a real HTTP upstream
+ * (upstream.mjs, its own Node process) with the runtime's own `fetch()`, served by that runtime's
+ * `serve()`: the launcher names it as the first argument (`node`, `bun`). Prints `PORT <app> <upstream>`
+ * once both listen.
+ * `GET /state` on the app reports what the upstream observed.
+ */
+import { spawn } from "node:child_process"
+import { fileURLToPath } from "node:url"
+import { proxy } from "../../../src/proxy/proxy.ts"
+import { honey } from "../../../src/routing/app.ts"
+
+/* the upstream runs under Node whatever runs this file: a real upstream sees the proxy close its connection */
+const child = spawn("node", [fileURLToPath(new URL("./upstream.mjs", import.meta.url))], {
+	stdio: ["pipe", "pipe", "inherit"],
+})
+const upstreamPort = await new Promise<number>((resolve, reject) => {
+	let out = ""
+	child.stdout.on("data", (data: Buffer) => {
+		out += data.toString()
+		const match = /PORT (\d+)/.exec(out)
+		if (match) resolve(Number(match[1]))
+	})
+	child.once("exit", (code) => reject(new Error(`upstream exited with ${code}`)))
+})
+const base = `http://127.0.0.1:${upstreamPort}`
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+	process.once(signal, () => {
+		child.kill()
+		process.exit(0)
+	})
+}
+
+const HEADER_TIMEOUTS: Record<string, number> = { "/up/hang": 300, "/up/sse": 500 }
+
+const app = honey<{}>()
+app.get("/state").handler(async (ctx) => ctx.res.json("ok", await (await fetch(`${base}/__state`)).json()))
+app
+	.get("/expected/:name")
+	.handler(async (ctx) =>
+		ctx.res.json(
+			"ok",
+			await (await fetch(`${base}/__expected/${ctx.params.name === "large" ? "large" : "small"}`)).json(),
+		),
+	)
+app.all("/up/*rest").handler(
+	proxy({
+		destination: (_ctx, url, init) => fetch(base + url, init),
+		idleTimeout: (ctx: { path: string }) => (ctx.path === "/up/stall" ? 300 : 0),
+		rewriteUrl: (_ctx, url) => url.slice("/up".length),
+		/*
+		 * a header deadline only where a test is about one: 504 on hang, SSE streaming past 500 ms. Any other path has
+		 * none (0), since a 3 MB upload under load once took past 500 ms to its headers (plan 39); the test's own 30 s
+		 * timeout is its hang guard
+		 */
+		timeout: (ctx: { path: string }) => HEADER_TIMEOUTS[ctx.path] ?? 0,
+	}),
+)
+
+const { serve } = (await import(
+	process.argv[2] === "bun" ? "../../../src/adapters/bun/serve.ts" : "../../../src/adapters/node/serve.ts"
+)) as typeof import("../../../src/adapters/node/serve.ts")
+const handle = await serve(app, { hostname: "127.0.0.1", port: 0 })
+console.log(`PORT ${handle.port} ${base}`)

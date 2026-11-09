@@ -1,0 +1,112 @@
+/**
+ * The C# method shapes beyond the writers' legs (contract 45 §4.4): a nullable JSON answer is `Task<T?>` through the
+ * transport method that lets null through, and its `client.Safe` twin a `Result<T?>` of the very type; a JSON answer
+ * without a schema is any JSON value; a text answer's twin is `Result<string>`; an
+ * optional body sits after the required params and before the optional ones; header params follow the code-unit
+ * order of their names; and a client of an API without a title is the API's client.
+ */
+import { describe, expect, it } from "vitest"
+import { csharpCallPlans, generateCSharpSdk } from "./sdk.ts"
+
+type Json = Record<string, unknown>
+
+const STRING = { type: "string" }
+const answer = (schema?: Json) => ({
+	200: { content: { "application/json": schema === undefined ? {} : { schema } }, description: "ok" },
+})
+
+/** One op of each shape, under an API with no title. */
+const SHAPES: Json = {
+	components: { schemas: { Note: { properties: { text: STRING }, type: "object" } } },
+	info: { version: "1" },
+	openapi: "3.1.0",
+	paths: {
+		"/any": { get: { operationId: "any.get", responses: answer() } },
+		"/count": { get: { operationId: "count.get", responses: answer({ type: ["integer", "null"] }) } },
+		"/maybe": { get: { operationId: "maybe.get", responses: answer({ type: ["string", "null"] }) } },
+		"/notes": {
+			put: {
+				operationId: "notes.put",
+				parameters: [
+					{ in: "header", name: "X-B", schema: STRING },
+					{ in: "query", name: "b", schema: STRING },
+					{ in: "header", name: "X-A", schema: STRING },
+					{ in: "query", name: "a", required: true, schema: STRING },
+				],
+				requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Note" } } } },
+				responses: { 204: { description: "done" } },
+			},
+		},
+		"/ping": {
+			get: {
+				operationId: "ping",
+				responses: { 200: { content: { "text/plain": { schema: STRING } }, description: "ok" } },
+			},
+		},
+	},
+	servers: [{ url: "https://api.shapes.test" }],
+}
+
+/** SHAPES' Client.cs lines. */
+const lines = () => (generateCSharpSdk(SHAPES).files["Client.cs"] ?? "").split("\n")
+
+const OPTIONS = "RequestOptions? options = null, CancellationToken cancellationToken = default"
+const NONE = "new([], [], [], null, null, options)"
+const CONTEXT = "HoneySdkJsonContext.Default"
+
+/** A no-argument twin's body: the normal method `method` through Transport.Safe. */
+const twin = (method: string) => `        Transport.Safe(options, _o => _n.${method}(_o, cancellationToken));`
+
+describe("generateCSharpSdk: answers", () => {
+	it("answers a nullable JSON schema as Task<T?> through NullableAsync, and any schema-less JSON as JsonElement", () => {
+		expect(lines()).toEqual(
+			expect.arrayContaining([
+				`    public Task<string?> GetAsync(${OPTIONS}) =>`,
+				`        _t.NullableAsync(_get, ${NONE}, ${CONTEXT}.String, cancellationToken);`,
+				`    public Task<long?> GetAsync(${OPTIONS}) =>`,
+				`        _t.NullableAsync(_get, ${NONE}, ${CONTEXT}.NullableInt64, cancellationToken);`,
+				`    public Task<JsonElement> GetAsync(${OPTIONS}) =>`,
+				`        _t.CallAsync(_get, ${NONE}, ${CONTEXT}.JsonElement, cancellationToken);`,
+			]),
+		)
+	})
+
+	/* bit 21 i5: the twin wraps the normal answer's very type, so a nullable one stays nullable in its Result */
+	it("answers each client.Safe twin a Result of the normal answer's type: Result<string?>, Result<long?>, Result<string>", () => {
+		expect(lines()).toEqual(
+			expect.arrayContaining([
+				`    public Task<Result<string?>> GetAsync(${OPTIONS}) =>`,
+				twin("GetAsync"),
+				`    public Task<Result<long?>> GetAsync(${OPTIONS}) =>`,
+				`    public Task<Result<string>> PingAsync(${OPTIONS}) =>`,
+				twin("PingAsync"),
+			]),
+		)
+	})
+})
+
+describe("generateCSharpSdk: signatures", () => {
+	it("puts an optional body after the required params and before the optional ones, header params in name order", () => {
+		const arg = (name: string, ident: string) => `Arg.Of("${name}", ${ident}, ${CONTEXT}.String)`
+		expect(lines()).toEqual(
+			expect.arrayContaining([
+				`    public Task PutAsync(string a, Note? body = null, string? b = null, string? xA = null, string? xB = null, ${OPTIONS}) =>`,
+				`        _t.CallAsync(_put, new([], [${arg("a", "a")}, ${arg("b", "b")}], [${arg("X-A", "xA")}, ${arg("X-B", "xB")}], Body.Json(body, ${CONTEXT}.Note), null, options), cancellationToken);`,
+			]),
+		)
+		expect(csharpCallPlans(SHAPES)["notes.put"]).toMatchObject({
+			body: { kind: "json", param: "body" },
+			headers: { "X-A": "xA", "X-B": "xB" },
+			query: { a: "a", b: "b" },
+			required: ["a"],
+			response: "none",
+		})
+	})
+
+	it("documents the client of an API without a title as the API's client", () => {
+		const client = lines()
+		expect(client[client.indexOf("public sealed class HoneySdkClient : IDisposable") - 1]).toBe(
+			"/// <summary>The API's client, generated by honey.</summary>",
+		)
+	})
+})

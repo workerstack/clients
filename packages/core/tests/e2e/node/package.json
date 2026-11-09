@@ -1,0 +1,29 @@
+{
+	"name": "@honey/e2e-node",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun run dev:kill && NODE_OPTIONS=\"--conditions=honey-source --unhandled-rejections=strict\" bunx tsx src/server.ts",
+		"dev:kill": "lsof -ti:4101 2>/dev/null | xargs -r kill -9 2>/dev/null || true",
+		"test": "bun run dev:kill && playwright test",
+		"test:prod": "bun run dev:kill && TEST_MODE=prod playwright test",
+		"type:check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@honey/e2e-compose": "workspace:*",
+		"@honey/e2e-defaults": "workspace:*",
+		"@honey/e2e-gateway": "workspace:*",
+		"@honey/e2e-kitchen": "workspace:*",
+		"@honey/e2e-mcp": "workspace:*",
+		"@honey/e2e-surface": "workspace:*",
+		"@workerstack/backend": "workspace:*",
+		"ws": "catalog:"
+	},
+	"devDependencies": {
+		"@playwright/test": "catalog:",
+		"@types/node": "catalog:",
+		"tsx": "catalog:",
+		"typescript": "catalog:"
+	}
+}
