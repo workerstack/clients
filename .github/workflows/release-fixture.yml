@@ -1,0 +1,63 @@
+name: release-fixture
+
+# Runs the reusable release workflows at this commit against .github/release-fixture, a product with one hand-kept
+# package: each job installs the fixture's toolchains from system.config.ts and its codegen checks their exact
+# versions. No org secrets: sync runs as a token-less dry run, and bump finds no change since the fixture's recorded
+# release, so it opens no PR.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release-*.yml
+      - .github/release-fixture/**
+      - packages/gen/src/release/**
+      - system.config.ts
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-*.yml
+      - .github/release-fixture/**
+      - packages/gen/src/release/**
+      - system.config.ts
+  workflow_dispatch:
+
+concurrency:
+  group: release-fixture-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: actionlint
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
+  validate:
+    uses: ./.github/workflows/release-validate.yml
+    with:
+      config: .github/release-fixture/release.config.ts
+  sync-dry-run:
+    uses: ./.github/workflows/release-sync.yml
+    with:
+      config: .github/release-fixture/release.config.ts
+      app-owner: workerstack
+      dry-run: true
+  # a fork's token is read-only, and a reusable workflow's job gets no more than its caller grants
+  bump:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/release-bump.yml
+    with:
+      config: .github/release-fixture/release.config.ts
+      major: false
