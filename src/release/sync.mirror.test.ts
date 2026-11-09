@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { gitOutput, gitRun } from "./git.ts"
 import { readRelease } from "./load.ts"
 import { syncAll, type SyncOptions } from "./sync.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 /*
  * Real git against a local bare repository standing in for github.com/acme/openapi. A
@@ -151,7 +152,7 @@ async function run(root: string, extra: Partial<SyncOptions> = {}) {
 	return result
 }
 
-describe("syncAll against a public repo's tip", () => {
+describe("syncAll against a public repo's tip", { timeout: SPAWN_TIMEOUT }, () => {
 	it("skips when the source equals the bot's tip", async () => {
 		const root = await sourceRepo(SPEC)
 		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
@@ -211,7 +212,7 @@ describe("syncAll against a public repo's tip", () => {
 })
 
 describe("syncAll tags the version a self-publishing package records", () => {
-	it("tags the commit it pushed, and a rerun pushes nothing more", async () => {
+	it("tags the commit it pushed, and a rerun pushes nothing more", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await sourceRepo('{"openapi":"3.1.1"}\n', releasing("1.2.3"))
 		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
 
@@ -227,18 +228,22 @@ describe("syncAll tags the version a self-publishing package records", () => {
 		expect(await tip(bare)).toBe(pushed)
 	})
 
-	it("tags a bot tip that already equals the source, as after a run that stopped before its tag", async () => {
-		const root = await sourceRepo(SPEC, releasing("1.2.3"))
-		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL, releasing("1.2.3"))
-		const before = await tip(bare)
+	it(
+		"tags a bot tip that already equals the source, as after a run that stopped before its tag",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await sourceRepo(SPEC, releasing("1.2.3"))
+			const bare = await publicRepo(remotes, SPEC, BOT_EMAIL, releasing("1.2.3"))
+			const before = await tip(bare)
 
-		const result = await run(root)
-		expect(result?.status).toBe("skipped")
-		expect(result?.tag).toBe("v1.2.3")
-		expect(await tagged(bare, "v1.2.3")).toBe(before)
-	})
+			const result = await run(root)
+			expect(result?.status).toBe("skipped")
+			expect(result?.tag).toBe("v1.2.3")
+			expect(await tagged(bare, "v1.2.3")).toBe(before)
+		},
+	)
 
-	it("leaves a tag that already names another commit where it is", async () => {
+	it("leaves a tag that already names another commit where it is", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await sourceRepo(SPEC, releasing("1.2.3"))
 		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL, releasing("1.2.3"))
 		const old = await tip(bare)
@@ -255,18 +260,22 @@ describe("syncAll tags the version a self-publishing package records", () => {
 })
 
 describe("syncAll tags nothing it should not", () => {
-	it("tags nothing for a package without a release workflow or without a recorded version", async () => {
-		const noWorkflow = await sourceRepo('{"openapi":"3.1.1"}\n', { [STATE]: '{"version":"1.2.3"}\n' })
-		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
-		expect((await run(noWorkflow))?.status).toBe("synced")
-		expect(await tagged(bare, "v1.2.3")).toBeUndefined()
+	it(
+		"tags nothing for a package without a release workflow or without a recorded version",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const noWorkflow = await sourceRepo('{"openapi":"3.1.1"}\n', { [STATE]: '{"version":"1.2.3"}\n' })
+			const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
+			expect((await run(noWorkflow))?.status).toBe("synced")
+			expect(await tagged(bare, "v1.2.3")).toBeUndefined()
 
-		const noState = await sourceRepo('{"openapi":"3.1.2"}\n', { [RELEASE_YML]: "on: push\n" })
-		expect((await run(noState))?.status).toBe("synced")
-		expect(await gitOutput(["tag", "--list"], bare)).toBe("")
-	})
+			const noState = await sourceRepo('{"openapi":"3.1.2"}\n', { [RELEASE_YML]: "on: push\n" })
+			expect((await run(noState))?.status).toBe("synced")
+			expect(await gitOutput(["tag", "--list"], bare)).toBe("")
+		},
+	)
 
-	it("names the tag on a dry run and pushes nothing", async () => {
+	it("names the tag on a dry run and pushes nothing", { timeout: SPAWN_TIMEOUT }, async () => {
 		const root = await sourceRepo('{"openapi":"3.1.1"}\n', releasing("1.2.3"))
 		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
 		const before = await tip(bare)
@@ -282,27 +291,35 @@ describe("syncAll tags nothing it should not", () => {
 describe("syncAll writes the release workflow a package's registries call for", () => {
 	const GITHUB = [{ assets: ["openapi.json"], kind: "github" }]
 
-	it("puts the rendered workflow in the public tree and tags the version beside it", async () => {
-		const root = await sourceRepo('{"openapi":"3.1.1"}\n', { [STATE]: '{"version":"2.0.0"}\n' }, GITHUB)
-		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
+	it(
+		"puts the rendered workflow in the public tree and tags the version beside it",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await sourceRepo('{"openapi":"3.1.1"}\n', { [STATE]: '{"version":"2.0.0"}\n' }, GITHUB)
+			const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
 
-		const result = await run(root)
-		expect(result?.status).toBe("synced")
-		expect(result?.tag).toBe("v2.0.0")
-		expect(await tipFile(bare, RELEASE_YML)).toMatch(/gh release create "\$TAG" "openapi\.json"/)
-		expect(await tagged(bare, "v2.0.0")).toBe(await tip(bare))
+			const result = await run(root)
+			expect(result?.status).toBe("synced")
+			expect(result?.tag).toBe("v2.0.0")
+			expect(await tipFile(bare, RELEASE_YML)).toMatch(/gh release create "\$TAG" "openapi\.json"/)
+			expect(await tagged(bare, "v2.0.0")).toBe(await tip(bare))
 
-		expect((await run(root))?.status).toBe("skipped")
-	})
+			expect((await run(root))?.status).toBe("skipped")
+		},
+	)
 
-	it("refuses a source that carries its own release workflow and lists registries", async () => {
-		const root = await sourceRepo('{"openapi":"3.1.1"}\n', releasing("2.0.0"), GITHUB)
-		const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
-		const before = await tip(bare)
+	it(
+		"refuses a source that carries its own release workflow and lists registries",
+		{ timeout: SPAWN_TIMEOUT },
+		async () => {
+			const root = await sourceRepo('{"openapi":"3.1.1"}\n', releasing("2.0.0"), GITHUB)
+			const bare = await publicRepo(remotes, SPEC, BOT_EMAIL)
+			const before = await tip(bare)
 
-		const result = await run(root)
-		expect(result?.status).toBe("failed")
-		expect(result?.reason).toMatch(/release\.yml.*registries|registries.*release\.yml/)
-		expect(await tip(bare)).toBe(before)
-	})
+			const result = await run(root)
+			expect(result?.status).toBe("failed")
+			expect(result?.reason).toMatch(/release\.yml.*registries|registries.*release\.yml/)
+			expect(await tip(bare)).toBe(before)
+		},
+	)
 })

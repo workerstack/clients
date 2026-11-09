@@ -5,6 +5,7 @@ import { gitRepo, removeRepos, writeAll, writeConfig } from "./__fixtures__/rele
 import { release } from "./cli.ts"
 import { type CliOptions, formatResults, HELP, parseArgs } from "./sync-command.ts"
 import type { PackageResult } from "./sync.ts"
+import { SPAWN_TIMEOUT } from "../gen/__fixtures__/spawn-timeout.ts"
 
 afterEach(removeRepos)
 
@@ -190,13 +191,13 @@ describe("cli", () => {
 		expect(result.stdout).toContain(HELP.trim())
 	})
 
-	it("validates a config, counting its packages", async () => {
+	it("validates a config, counting its packages", { timeout: SPAWN_TIMEOUT }, async () => {
 		const result = await run(["--validate-only", "--config", await acmeConfig([OPENAPI])])
 
 		expect(result).toMatchObject({ status: 0, stdout: "Manifests valid: 1 package(s)\n" })
 	})
 
-	it("fails validation on a manifest that lists one package twice", async () => {
+	it("fails validation on a manifest that lists one package twice", { timeout: SPAWN_TIMEOUT }, async () => {
 		const result = await run([
 			"--validate-only",
 			"--config",
