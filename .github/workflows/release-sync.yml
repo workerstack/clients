@@ -60,7 +60,8 @@ jobs:
       - run: bun install --frozen-lockfile
       # each name in the config's toolchains, installed at its system.config.ts pin; then the PATH a new shell gets
       # (system install's managed ~/.bashrc blocks) goes first for every later step. GITHUB_PATH prepends each line,
-      # so the entries are written last to first.
+      # so the entries are written last to first. The installs run from the runner's temp dir, so a repo-local
+      # toolchain file (rust-toolchain.toml, go.mod's toolchain line) cannot answer their installed-version check.
       - name: Install the release config's toolchains
         run: |
           set -euo pipefail
@@ -70,8 +71,11 @@ jobs:
             exit 0
           fi
           mapfile -t toolchains <<< "$names"
+          system="$PWD/node_modules/.bin/system"
+          config="$PWD/system.config.ts"
+          cd "$RUNNER_TEMP"
           for name in "${toolchains[@]}"; do
-            bun x --no-install system install "$name" --upgrade
+            "$system" install "$name" --upgrade --config "$config"
           done
           bash -ic 'printf "\n__RELEASE_PATH__%s\n" "$PATH"' 2>/dev/null \
             | sed -n 's/^__RELEASE_PATH__//p' | tr ':' '\n' | tac >> "$GITHUB_PATH"
