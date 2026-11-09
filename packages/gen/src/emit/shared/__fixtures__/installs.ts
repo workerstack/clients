@@ -90,9 +90,10 @@ export function dotnetInstall(version: string): string {
 	].join(" && ")
 }
 
-/* `query` is a jq filter over the pins whose `.url` and `.sha256` name one download; `$k` is the loop's JDK */
+/* `query` is a jq filter over the pins whose `.url` and `.sha256` name one download; `$k` is the loop's JDK; `out`
+ * is the unquoted path, quoted here, so the sha256sum line holds it inside one string (shellcheck SC2086) */
 const fetchLine = (query: string, out: string) =>
-	`curl -fsSL -o ${out} "$(jq -r --arg k "$k" '${query}.url' "$P")" && echo "$(jq -r --arg k "$k" '${query}.sha256' "$P")  ${out}" | sha256sum -c -`
+	`curl -fsSL -o "${out}" "$(jq -r --arg k "$k" '${query}.url' "$P")" && echo "$(jq -r --arg k "$k" '${query}.sha256' "$P")  ${out}" | sha256sum -c -`
 
 /**
  * The command that installs every Java pin into the honey cache, from anywhere in the repo: each JDK tarball, the
@@ -102,14 +103,14 @@ const fetchLine = (query: string, out: string) =>
 export function javaInstall(): string {
 	const jdk = [
 		`for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")"`,
-		fetchLine(".jdk[$k]", `"$D/dl/$R.tar.gz"`),
+		fetchLine(".jdk[$k]", "$D/dl/$R.tar.gz"),
 		`rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial"`,
 		`tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1`,
 		`mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done`,
 	].join(" && ")
-	const gjf = fetchLine(".googleJavaFormat", `"$D/toolchain/google-java-format-$G.jar"`)
+	const gjf = fetchLine(".googleJavaFormat", "$D/toolchain/google-java-format-$G.jar")
 	const gradle = [
-		fetchLine(".gradle", `"$D/dl/gradle.zip"`),
+		fetchLine(".gradle", "$D/dl/gradle.zip"),
 		`rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip"`,
 	].join(" && ")
 	const jackson = [
@@ -139,7 +140,7 @@ export function toolsInstall(): string {
 		`P="$(git rev-parse --show-toplevel)/packages/gen/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/honey-tmp/tools" && mkdir -p "$D/dl"`,
 		`for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")"`,
 		`curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c -`,
-		`rm -rf "$D/$R" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial"`,
+		`rm -rf "\${D:?}/\${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial"`,
 		`chmod +x "$D/$R.partial/$(jq -r --arg k "$k" '.[$k].bin' "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$k" || exit 1; done`,
 	].join(" && ")
 }
@@ -152,7 +153,7 @@ export function jsrCliInstall(): string {
 	return [
 		`P="$(git rev-parse --show-toplevel)/packages/gen/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/honey-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl"`,
 		`curl -fsSL -o "$D/dl/$R.zip" "$(jq -r .url "$P")" && echo "$(jq -r .sha256 "$P")  $D/dl/$R.zip" | sha256sum -c -`,
-		`rm -rf "$D/$R" "$D/$R.partial" && mkdir -p "$D/$R.partial" && unzip -q "$D/dl/$R.zip" -d "$D/$R.partial"`,
+		`rm -rf "\${D:?}/\${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && unzip -q "$D/dl/$R.zip" -d "$D/$R.partial"`,
 		`chmod +x "$D/$R.partial/$(jq -r .bin "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$R.zip"`,
 	].join(" && ")
 }
