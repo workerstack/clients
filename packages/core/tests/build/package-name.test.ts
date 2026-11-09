@@ -79,12 +79,16 @@ describe("the generator package is named the same everywhere (bit 22)", () => {
 		])
 	})
 
-	it("installs a bin of that name, from a file it ships", () => {
+	it("installs a bin of that name, and installgen beside it, each from a file it ships", () => {
 		const bins = Object.entries(gen.bin ?? {})
-		expect(bins).toEqual([["honey-clients", "bin/honey-clients.js"]])
-		const [[, path]] = bins as [[string, string]]
-		expect(existsSync(join(ROOT, "packages/gen", path))).toBe(true)
-		expect(gen.files).toContain(path.split("/")[0])
+		expect(bins).toEqual([
+			["honey-clients", "bin/honey-clients.js"],
+			["installgen", "bin/installgen.js"],
+		])
+		for (const [, path] of bins) {
+			expect(existsSync(join(ROOT, "packages/gen", path))).toBe(true)
+			expect(gen.files).toContain(path.split("/")[0])
+		}
 	})
 
 	it("keeps the devDependency on the same package, so the workspace link is the shipped name", () => {

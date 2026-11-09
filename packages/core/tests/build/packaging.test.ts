@@ -90,10 +90,14 @@ function strictCheck(dir: string, resolution: string, module: string): [number, 
 
 beforeAll(() => {
 	tarballs = pack(files.out)
+	/* the app imports zod, which the clients tarball also depends on at runtime: declared at that version, never linked */
+	const { zod } = (
+		JSON.parse(readFileSync(join(REPO, "packages/gen/package.json"), "utf8")) as { dependencies: { zod: string } }
+	).dependencies
 	app = consumer(
 		join(files.out, "app"),
-		{ "@workerstack/backend": `file:${tarballs.core}`, "@workerstack/clients": `file:${tarballs.gen}` },
-		["zod", "@types/node", "vite"],
+		{ "@workerstack/backend": `file:${tarballs.core}`, "@workerstack/clients": `file:${tarballs.gen}`, zod },
+		["@types/node", "vite"],
 	)
 	write(app, { "src/app.ts": APP, "src/selectors.ts": SELECTORS })
 }, 180_000)
@@ -131,7 +135,7 @@ describe.sequential("the tarballs, installed (bit 19 i)", () => {
 		},
 	)
 
-	it("carry bin/, dist/, the README and the license but no source, and every export's files", () => {
+	it("carry bin/, dist/, the README and the license but no source (the clients also its assets/), and every export's files", () => {
 		const missing: string[] = []
 		for (const pkg of ["@workerstack/backend", "@workerstack/clients"]) {
 			const root = join(app, "node_modules", pkg)
@@ -149,6 +153,7 @@ describe.sequential("the tarballs, installed (bit 19 i)", () => {
 		expect(readdirSync(join(app, "node_modules/@workerstack/clients")).sort()).toEqual([
 			"LICENSE",
 			"README.md",
+			"assets",
 			"bin",
 			"dist",
 			"package.json",
