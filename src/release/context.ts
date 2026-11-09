@@ -25,3 +25,24 @@ export function requireConfig(config: string | undefined): string {
 	if (config === undefined) throw new ReleaseUsageError("--config <path> is required")
 	return config
 }
+
+/** What a command that takes only `--config <path>` and `--help` was asked for. */
+export type ConfigOnlyArgs = { readonly help: true } | { readonly config: string; readonly help: false }
+
+/**
+ * The flags of a command that takes only `--config <path>` (required) and `--help` (`-h`). Any other argument, or
+ * `--config` with no value, is a usage error naming it.
+ */
+export function parseConfigOnly(argv: readonly string[]): ConfigOnlyArgs {
+	let config: string | undefined
+	for (let i = 0; i < argv.length; i++) {
+		const arg = argv[i] as string
+		if (arg === "--help" || arg === "-h") return { help: true }
+		if (arg !== "--config") throw new ReleaseUsageError(`unknown flag: ${arg}`)
+		const value = argv[i + 1]
+		if (value === undefined || value.startsWith("--")) throw new ReleaseUsageError("--config requires a value")
+		config = value
+		i++
+	}
+	return { config: requireConfig(config), help: false }
+}
