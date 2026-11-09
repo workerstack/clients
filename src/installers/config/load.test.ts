@@ -297,7 +297,7 @@ describe("bun runtime", () => {
 		})
 		expect(order).toEqual([
 			"file:///self/index.js",
-			"plugin:installgen-self",
+			"plugin:self:@workerstack/clients/installers",
 			pathToFileURL(join(cwd, "installgen.config.ts")).href,
 		])
 		expect(modules.get("@workerstack/clients/installers")?.()).toEqual({ exports: self, loader: "object" })

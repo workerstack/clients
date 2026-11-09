@@ -24,6 +24,7 @@ This page is the whole generator — every target, every flag, and what each cli
 - [Errors and the safe mirror](#errors-and-the-safe-mirror)
 - [The command-line client](#the-command-line-client)
 - [Install scripts](#install-scripts)
+- [Release tooling](#release-tooling)
 - [The MCP server](#the-mcp-server)
 - [Configuring generation](#configuring-generation)
 - [What a run writes](#what-a-run-writes)
@@ -513,6 +514,36 @@ export default defineConfig({
 ```
 
 Full reference: [installgen](https://github.com/workerstack/clients/blob/main/src/installers/README.md).
+
+## Release tooling
+
+`honey-clients release` cuts versions for a product's public packages and mirrors each one to its own GitHub repo.
+A product describes its packages once, in a `release.config.ts` typed by the `@workerstack/clients/release`
+library; each package's dir sits beside the config, and the repo root is the config's git toplevel:
+
+```ts
+import { defineRelease } from "@workerstack/clients/release"
+
+export default defineRelease({
+	project: "acme",
+	codegen: ["bun", "run", "codegen"],
+	homepage: "https://example.com",
+	spec: { committedPath: "openapi.json", deployedUrl: "https://api.example.com/openapi.json" },
+	packages: [
+		{ name: "sdk", repo: "acme/sdk", description: "Acme SDK", commitMessage: "chore: sync", topics: ["acme"] },
+	],
+})
+```
+
+```sh
+honey-clients release bump --config acme-release/release.config.ts [--major]
+honey-clients release sync --config acme-release/release.config.ts [--only sdk] [--dry-run] [--validate-only]
+honey-clients release bootstrap --config acme-release/release.config.ts (--all | --only sdk) [--force-bootstrap]
+```
+
+`bump` writes each changed package's version files, `CHANGELOG.md` and `.release-state.json` (an API change is a
+minor, measured by oasdiff through Go on PATH); `sync` and `bootstrap` push with `GH_TOKEN`, committing as
+`committer` (default `public-sync[bot]`).
 
 ## The MCP server
 

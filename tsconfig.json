@@ -11,7 +11,10 @@
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"strict": true,
-		"paths": { "@workerstack/clients/installers": ["./src/installers/index.ts"] },
+		"paths": {
+			"@workerstack/clients/installers": ["./src/installers/index.ts"],
+			"@workerstack/clients/release": ["./src/release/index.ts"]
+		},
 		"target": "ESNext",
 		"types": ["@total-typescript/ts-reset", "node"]
 	},

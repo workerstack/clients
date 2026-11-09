@@ -6,6 +6,9 @@ import type { InstallgenConfig } from "./define-config.ts"
 import { registerBunHook, type BunLike } from "./hooks/bun.ts"
 import { registerNodeHook, type RegisterHooks } from "./hooks/node.ts"
 
+/** The specifier an installgen config imports `defineConfig` from, resolved to the running package. */
+export const INSTALLERS_SPECIFIER = "@workerstack/clients/installers"
+
 export const CONFIG_FILES = [
 	"installgen.config.ts",
 	"installgen.config.mts",
@@ -64,7 +67,8 @@ function find(cwd: string, configPath: string | undefined): string {
 	)
 }
 
-function stripsTypes(version: string): boolean {
+/** Whether Node `version` imports a `.ts` module natively: from 22.18, and on 23 from 23.6. */
+export function stripsTypes(version: string): boolean {
 	const [major = 0, minor = 0] = version.split(".").map(Number)
 	if (major === 22) return minor >= 18
 	if (major === 23) return minor >= 6
@@ -108,8 +112,8 @@ export async function loadConfig(options: LoadOptions): Promise<LoadedConfig> {
 
 	/* Bun's plugin stays for the process; Node's hook goes once the config is imported */
 	let hook: ReturnType<RegisterHooks> | undefined
-	if (runtime.bun) await registerBunHook(runtime.bun, selfUrl, importModule)
-	else hook = registerNodeHook(selfUrl, options.registerHooks)
+	if (runtime.bun) await registerBunHook(runtime.bun, INSTALLERS_SPECIFIER, selfUrl, importModule)
+	else hook = registerNodeHook(INSTALLERS_SPECIFIER, selfUrl, options.registerHooks)
 
 	let mod: Record<string, unknown>
 	try {
