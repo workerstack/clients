@@ -12,6 +12,13 @@ on:
         description: The release config, relative to the repo root (release.config.ts)
         type: string
         required: true
+      cli:
+        description: >-
+          The command that runs honey-clients, split on spaces. The consumer's installed bin by default; a repo whose
+          root package is @workerstack/clients itself passes its own bin
+        type: string
+        required: false
+        default: bun x --no-install honey-clients
       major:
         description: Release every changed package as a major (otherwise any API change is a minor)
         type: boolean
@@ -27,6 +34,7 @@ jobs:
       pull-requests: write
     env:
       CONFIG: ${{ inputs.config }}
+      CLI: ${{ inputs.cli }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -48,7 +56,8 @@ jobs:
       - name: Install the release config's toolchains and go
         run: |
           set -euo pipefail
-          names=$(bun x --no-install honey-clients release toolchains --config "$CONFIG")
+          read -ra cli <<< "$CLI"
+          names=$("${cli[@]}" release toolchains --config "$CONFIG")
           toolchains=()
           if [ -n "$names" ]; then mapfile -t toolchains <<< "$names"; fi
           if ! printf '%s\n' "${toolchains[@]}" | grep -qx go; then toolchains+=(go); fi
@@ -66,11 +75,12 @@ jobs:
           MAJOR: ${{ inputs.major }}
         run: |
           set -euo pipefail
+          read -ra cli <<< "$CLI"
           # bump runs codegen itself (the config's `codegen`), before deciding and again at the versions it releases;
           # one "bumped: <name> <version> <kind>" line per package whose output or hand files changed
           args=(--config "$CONFIG")
           if [ "$MAJOR" = "true" ]; then args+=(--major); fi
-          OUT=$(bun x --no-install honey-clients release bump "${args[@]}")
+          OUT=$("${cli[@]}" release bump "${args[@]}")
           echo "$OUT"
           SUMMARY_FILE=$(mktemp)
           echo "$OUT" | awk '/^bumped: / {print $2 "," $3 "," $4}' > "$SUMMARY_FILE"

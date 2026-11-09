@@ -10,6 +10,13 @@ on:
         description: The release config, relative to the repo root (release.config.ts)
         type: string
         required: true
+      cli:
+        description: >-
+          The command that runs honey-clients, split on spaces. The consumer's installed bin by default; a repo whose
+          root package is @workerstack/clients itself passes its own bin
+        type: string
+        required: false
+        default: bun x --no-install honey-clients
 
 jobs:
   validate:
@@ -19,6 +26,7 @@ jobs:
       contents: read
     env:
       CONFIG: ${{ inputs.config }}
+      CLI: ${{ inputs.cli }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -39,7 +47,8 @@ jobs:
       - name: Install the release config's toolchains
         run: |
           set -euo pipefail
-          names=$(bun x --no-install honey-clients release toolchains --config "$CONFIG")
+          read -ra cli <<< "$CLI"
+          names=$("${cli[@]}" release toolchains --config "$CONFIG")
           if [ -z "$names" ]; then
             echo "the release config lists no toolchains"
             exit 0
@@ -54,6 +63,10 @@ jobs:
           bash -ic 'printf "\n__RELEASE_PATH__%s\n" "$PATH"' 2>/dev/null \
             | sed -n 's/^__RELEASE_PATH__//p' | tr ':' '\n' | tac >> "$GITHUB_PATH"
       - name: Run the release config's codegen
-        run: bun x --no-install honey-clients release codegen --config "$CONFIG"
+        run: |
+          read -ra cli <<< "$CLI"
+          "${cli[@]}" release codegen --config "$CONFIG"
       - name: Validate the release config
-        run: bun x --no-install honey-clients release sync --config "$CONFIG" --validate-only
+        run: |
+          read -ra cli <<< "$CLI"
+          "${cli[@]}" release sync --config "$CONFIG" --validate-only

@@ -134,6 +134,11 @@ the same set-up: checkout, Node 24 (the release config loads as TypeScript), Bun
 `bun install --frozen-lockfile`, each `toolchains` name through `system install <name> --upgrade` at its
 `system.config.ts` pin with those tools first on PATH, then `release codegen`.
 
+Each workflow also takes `cli`, the command that runs honey-clients, split on spaces. It defaults to
+`bun x --no-install honey-clients`, the bin a consumer's `@workerstack/clients` install links. A consumer leaves it
+unset. This repo's own release fixture passes `node bin/honey-clients.js`, because bun never links a root package's
+own bin.
+
 ```yaml
 # .github/workflows/release-sync.yml
 on:

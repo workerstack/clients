@@ -12,6 +12,13 @@ on:
         description: The release config, relative to the repo root (release.config.ts)
         type: string
         required: true
+      cli:
+        description: >-
+          The command that runs honey-clients, split on spaces. The consumer's installed bin by default; a repo whose
+          root package is @workerstack/clients itself passes its own bin
+        type: string
+        required: false
+        default: bun x --no-install honey-clients
       app-owner:
         description: The owner of the App installation that can push the public repos; blank means the caller's owner
         type: string
@@ -43,6 +50,7 @@ jobs:
       contents: read
     env:
       CONFIG: ${{ inputs.config }}
+      CLI: ${{ inputs.cli }}
       APP_ID: ${{ secrets.app-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -65,7 +73,8 @@ jobs:
       - name: Install the release config's toolchains
         run: |
           set -euo pipefail
-          names=$(bun x --no-install honey-clients release toolchains --config "$CONFIG")
+          read -ra cli <<< "$CLI"
+          names=$("${cli[@]}" release toolchains --config "$CONFIG")
           if [ -z "$names" ]; then
             echo "the release config lists no toolchains"
             exit 0
@@ -80,7 +89,9 @@ jobs:
           bash -ic 'printf "\n__RELEASE_PATH__%s\n" "$PATH"' 2>/dev/null \
             | sed -n 's/^__RELEASE_PATH__//p' | tr ':' '\n' | tac >> "$GITHUB_PATH"
       - name: Run the release config's codegen
-        run: bun x --no-install honey-clients release codegen --config "$CONFIG"
+        run: |
+          read -ra cli <<< "$CLI"
+          "${cli[@]}" release codegen --config "$CONFIG"
       - id: app-token
         if: env.APP_ID != ''
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -95,7 +106,8 @@ jobs:
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
           set -euo pipefail
+          read -ra cli <<< "$CLI"
           args=(--config "$CONFIG")
           if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
-          bun x --no-install honey-clients release sync "${args[@]}"
+          "${cli[@]}" release sync "${args[@]}"
