@@ -1,14 +1,24 @@
 /**
- * `honey-clients release bump|sync|bootstrap --config <path>`: cut a product's versions, mirror its packages into their
- * public repos, and make the first push to a new one, all from the product's `release.config.ts`.
+ * `honey-clients release bump|sync|bootstrap|codegen|toolchains --config <path>`: cut a product's versions, mirror its
+ * packages into their public repos, and make the first push to a new one, all from the product's `release.config.ts`.
+ * `codegen` and `toolchains` serve the release workflows: what to install before codegen, and codegen run alone.
  */
 import type { Io } from "../cli.ts"
 import { bootstrap } from "./bootstrap.ts"
 import { parseBumpArgs } from "./bump-args.ts"
 import { runBump } from "./bump-command.ts"
-import { type ReleaseContext, ReleaseUsageError } from "./context.ts"
+import { regenerate } from "./codegen.ts"
+import { parseConfigOnly, type ReleaseContext, ReleaseUsageError } from "./context.ts"
 import { type LoadReleaseOptions, readRelease } from "./load.ts"
 import { sync } from "./sync-command.ts"
+
+/* the usage entries of the commands that take only --config, each also its own --help */
+const CODEGEN_USAGE = `codegen --config <path>
+      run the config's codegen from the repo root, as bump does before it decides
+`
+const TOOLCHAINS_USAGE = `toolchains --config <path>
+      print the config's toolchains, one per line: the system.config.ts names its codegen needs
+`
 
 /** What `honey-clients release` prints when it is given no command, or one it does not know. */
 export const USAGE = `usage: honey-clients release <command> --config <path> [options]
@@ -20,7 +30,7 @@ export const USAGE = `usage: honey-clients release <command> --config <path> [op
       mirror each package into its public repo (release sync --help says more)
   bootstrap --config <path> (--all | --only <names>) [--force-bootstrap]
       the first push to an empty public repo, or over the stub a new one starts with
-`
+  ${CODEGEN_USAGE}  ${TOOLCHAINS_USAGE}`
 
 /* `release bump <argv>`: the release its config describes, bumped */
 async function bump(argv: readonly string[], ctx: ReleaseContext): Promise<number> {
@@ -29,7 +39,29 @@ async function bump(argv: readonly string[], ctx: ReleaseContext): Promise<numbe
 	return runBump(await ctx.load(parsed.value.config), parsed.value.major, ctx)
 }
 
-const COMMANDS = { bootstrap, bump, sync } as const
+/* `release codegen <argv>`: the config's codegen, run as bump runs it */
+async function codegen(argv: readonly string[], ctx: ReleaseContext): Promise<number> {
+	const parsed = parseConfigOnly(argv)
+	if (parsed.help) {
+		ctx.out(`usage: honey-clients release ${CODEGEN_USAGE}`)
+		return 0
+	}
+	regenerate(await ctx.load(parsed.config), ctx.env)
+	return 0
+}
+
+/* `release toolchains <argv>`: the config's toolchains, one per line, for a workflow to install before codegen */
+async function toolchains(argv: readonly string[], ctx: ReleaseContext): Promise<number> {
+	const parsed = parseConfigOnly(argv)
+	if (parsed.help) {
+		ctx.out(`usage: honey-clients release ${TOOLCHAINS_USAGE}`)
+		return 0
+	}
+	for (const name of (await ctx.load(parsed.config)).toolchains) ctx.out(`${name}\n`)
+	return 0
+}
+
+const COMMANDS = { bootstrap, bump, codegen, sync, toolchains } as const
 
 const isCommand = (name: string | undefined): name is keyof typeof COMMANDS =>
 	name !== undefined && Object.hasOwn(COMMANDS, name)
