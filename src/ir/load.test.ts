@@ -24,7 +24,7 @@ function project(files: Record<string, string>): string {
 	return dir
 }
 
-const HONEY = 'import { honey } from "@lovrozagar/honey"\n'
+const HONEY = 'import { honey } from "@workerstack/backend"\n'
 const route = (path: string) => `honey().get(${JSON.stringify(path)}).handler((c) => c.res.text("ok", "ok"))`
 const pathsOf = (document: Record<string, unknown>) => Object.keys(document.paths as object)
 
@@ -82,14 +82,14 @@ describe("an --app module's document (bit 19 h2)", () => {
 })
 
 describe("an --app module's core (bit 19 h2)", () => {
-	it("refuses a module with no app nor default, and one with no @lovrozagar/honey installed where it resolves", async () => {
+	it("refuses a module with no app nor default, and one with no @workerstack/backend installed where it resolves", async () => {
 		const dir = project({ "src/none.ts": "export const x = 1\n" })
 		const lone = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "codegen-lone-"))
 		projects.push(() => rmSync(lone, { force: true, recursive: true }))
 		writeFileSync(join(lone, "app.ts"), "export const app = { fetch() {} }\n")
 		expect([...(await loaded(["src/none.ts"], dir)), ...(await loaded(["app.ts"], lone))]).toEqual([
 			"--app src/none.ts: no `app` or `default` export that is a honey app (name one as <module>#<export>)",
-			"--app app.ts: no @lovrozagar/honey is installed where app.ts resolves it",
+			"--app app.ts: no @workerstack/backend is installed where app.ts resolves it",
 		])
 	})
 
@@ -114,11 +114,11 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 	const bunResolving = (condition: "default" | "honey-source"): BunResolver => ({
 		resolveSync(specifier, from) {
 			if (isAbsolute(specifier)) return specifier
-			const root = join(from, "../node_modules/@lovrozagar/honey")
+			const root = join(from, "../node_modules/@workerstack/backend")
 			const { exports } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
 				exports: Record<string, Record<string, string>>
 			}
-			const target = exports[`.${specifier.slice("@lovrozagar/honey".length)}`] ?? {}
+			const target = exports[`.${specifier.slice("@workerstack/backend".length)}`] ?? {}
 			const file = join(root, target[condition] ?? target.default ?? "")
 			if (!existsSync(file)) throw new Error(`Cannot find module '${specifier}' from '${from}'`)
 			return realpathSync(file)
@@ -126,7 +126,7 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 	})
 
 	/* vitest resolves the app's own imports by Node's conditions, never honey-source, so the app reaches core by path */
-	const BY_PATH = 'import { honey } from "../node_modules/@lovrozagar/honey/src/routing/app.ts"\n'
+	const BY_PATH = 'import { honey } from "../node_modules/@workerstack/backend/src/routing/app.ts"\n'
 
 	it("generates from a checkout core its source under the honey-source condition, and from an installed one", async () => {
 		const checkout = project({ "src/app.ts": `${BY_PATH}export const app = ${route("/checkout")}\n` })
@@ -150,12 +150,12 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 		const unbuilt = project(app)
 		const stale = project({
 			...app,
-			"node_modules/@lovrozagar/honey/dist/openapi/register.js": "export {}\n",
-			"node_modules/@lovrozagar/honey/dist/routing/app.js": "export {}\n",
+			"node_modules/@workerstack/backend/dist/openapi/register.js": "export {}\n",
+			"node_modules/@workerstack/backend/dist/routing/app.js": "export {}\n",
 		})
 		vi.stubGlobal("Bun", bunResolving("default"))
 		const refusal =
-			"--app src/app.ts: @lovrozagar/honey is a checkout, read from its source only under the honey-source condition: start Bun with --conditions=honey-source"
+			"--app src/app.ts: @workerstack/backend is a checkout, read from its source only under the honey-source condition: start Bun with --conditions=honey-source"
 		expect([...(await loaded(["src/app.ts"], unbuilt)), ...(await loaded(["src/app.ts"], stale))]).toEqual([
 			refusal,
 			refusal,

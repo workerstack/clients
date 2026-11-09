@@ -1,7 +1,7 @@
 /**
  * The emitted `types.gen.d.ts` checked as a service sees it: a `consumer.ts` beside it states each
  * type as an `expectType<…>()` assertion, typechecked in-process with ts-morph's TypeScript.
- * `@lovrozagar/honey` maps to a barrel over core's real source, written as text (a user app's
+ * `@workerstack/backend` maps to a barrel over core's real source, written as text (a user app's
  * import; gen imports nothing from core, H2), so a name core lacks is a real red (O6). ts-morph is
  * injected, as `extractTypes` takes it (only extract/ imports it). One project per suite: core's
  * files parse once, each check swaps the emitted file and the consumer.
@@ -19,7 +19,7 @@ function barrel(core: string): string {
 }
 
 /** Every consumer starts with: the honey names, the always-emitted types, and the assertion helpers. */
-const PRELUDE = `import type { HoneyContext, HoneyError } from "@lovrozagar/honey"
+const PRELUDE = `import type { HoneyContext, HoneyError } from "@workerstack/backend"
 import type { BaseCtx, RouteCtx, RouteErrors, RouteErrorShapes, RouteErrorsByStatus, RouteInput, RouteMeta, RouteOutput, Routes } from "./types.gen"
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type IsAny<T> = 0 extends 1 & T ? true : false
@@ -44,7 +44,7 @@ export function typechecker(tsMorph: TsMorph) {
 			module: ts.ModuleKind.ESNext,
 			moduleResolution: ts.ModuleResolutionKind.Bundler,
 			noEmit: true,
-			paths: { "@lovrozagar/honey": [`${root}/honey.ts`] },
+			paths: { "@workerstack/backend": [`${root}/honey.ts`] },
 			skipLibCheck: true,
 			strict: true,
 			target: ts.ScriptTarget.ES2022,

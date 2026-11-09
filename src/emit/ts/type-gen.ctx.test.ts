@@ -30,7 +30,7 @@ describe("BaseCtx", () => {
 		const { diagnostics, text } = check(gets("/health"), consumer, null)
 		expect({
 			diagnostics,
-			imports: text.includes('import type { HoneyContext, WithOutput } from "@lovrozagar/honey"'),
+			imports: text.includes('import type { HoneyContext, WithOutput } from "@workerstack/backend"'),
 		}).toEqual({
 			diagnostics: [],
 			imports: true,

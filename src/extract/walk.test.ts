@@ -51,7 +51,7 @@ describe("loadEntry: the app under its export", () => {
 			}
 			const names: Record<string, string> = { "entry/default.ts": "default" }
 			const envs = Object.entries(sources).map(([rel, body]) => {
-				const entryPath = project.write(rel, lines('import { honey } from "@lovrozagar/honey"', body))
+				const entryPath = project.write(rel, lines('import { honey } from "@workerstack/backend"', body))
 				const entry = loadEntry(tsMorph, { entryPath, exportName: names[rel] ?? "app" })
 				const env = entry.appType.getProperty("$env")
 				return env === undefined ? null : entry.checker.typeToString(entry.checker.getTypeOfSymbol(env))
@@ -93,7 +93,7 @@ describe("registrations: the routes the program's own files register", () => {
 			project.write(
 				"walk/node_modules/dep/index.ts",
 				lines(
-					'import { honey } from "@lovrozagar/honey"',
+					'import { honey } from "@workerstack/backend"',
 					'export const dep = honey<{}>().get("/dep").handler((c) => c.res.text("ok", "ok"))',
 				),
 			)
@@ -101,15 +101,15 @@ describe("registrations: the routes the program's own files register", () => {
 			project.write(
 				"walk/more.ts",
 				lines(
-					'import type { Honey } from "@lovrozagar/honey"',
+					'import type { Honey } from "@workerstack/backend"',
 					'export const more = (app: Honey<{}>) => app.on(["GET", "PUT"], "/more").handler((c) => c.res.text("ok", "ok"))',
 				),
 			)
 			const entryPath = project.write(
 				"walk/app.ts",
 				lines(
-					'import { honey } from "@lovrozagar/honey"',
-					'import { ws } from "@lovrozagar/honey/ws"',
+					'import { honey } from "@workerstack/backend"',
+					'import { ws } from "@workerstack/backend/ws"',
 					'import "dep"',
 					'import { more } from "./more.ts"',
 					"export const app = honey<{}>()",

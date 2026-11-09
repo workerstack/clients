@@ -32,7 +32,7 @@ const BIN = resolve(import.meta.dirname, "../bin/honey-clients.js")
 const REPO = resolve(import.meta.dirname, "../../..")
 const PINNED_BUN = withPinnedBun()
 const MARK = markOf()
-const HONEY = 'import { honey } from "@lovrozagar/honey"\n'
+const HONEY = 'import { honey } from "@workerstack/backend"\n'
 
 const projects: (() => void)[] = []
 afterEach(() => {
@@ -274,8 +274,8 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 		const stale = (file: string) =>
 			`import { appendFileSync } from "node:fs"\nappendFileSync("evaluations.log", "dist ")\nexport * from ${JSON.stringify(join(REPO, "packages/core/src", file))}\n`
 		const dir = project({
-			"node_modules/@lovrozagar/honey/dist/openapi/register.js": stale("openapi/register.ts"),
-			"node_modules/@lovrozagar/honey/dist/routing/app.js": stale("routing/app.ts"),
+			"node_modules/@workerstack/backend/dist/openapi/register.js": stale("openapi/register.ts"),
+			"node_modules/@workerstack/backend/dist/routing/app.js": stale("routing/app.ts"),
 			"src/app.ts": `${HONEY}export const app = honey().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
 		})
 		const run = onBun(dir)
