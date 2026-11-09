@@ -20,6 +20,8 @@ export const GO = [
 	/* channels.test.ts parses the release options and renders YAML, Node alone: it runs in unit */
 	"src/emit/cli/**/!(channels).test.ts",
 	"src/cli.test.ts",
+	"src/release/oasdiff.test.ts",
+	"src/release/bump.e2e.test.ts",
 	"scripts/sdk-budget.cli.test.ts",
 	"src/emit/shared/escape.test.ts",
 	"src/emit/shared/gofmt.test.ts",

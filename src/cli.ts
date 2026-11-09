@@ -28,6 +28,7 @@ import { checkedMetadata, type Metadata, type PackageIdentity, shippedOf } from 
 import { type Options, optionsFor, type Target, type TargetOptions } from "./gen/targets.ts"
 import { type ReadFile, shippedFiles } from "./gen/shipped.ts"
 import { writeTarget } from "./gen/write.ts"
+import { release } from "./release/cli.ts"
 
 /** One SDK target's generation: its files, its package's identity on each registry, and what it reports (a name it renamed). */
 function sdkOf(
@@ -295,6 +296,8 @@ function watchSpec(
 /** Runs `honey-clients <argv>`: the exit code it ends with (a watch ends only by `options.signal`). */
 export async function main(argv: readonly string[], io: Io = PROCESS_IO, options: RunOptions = {}): Promise<number> {
 	try {
+		/* release has subcommands of its own, each with its own --help */
+		if (argv[0] === "release") return await release(argv.slice(1), io, { env: options.env })
 		if (argv.length === 0 || argv[0] === "-h" || argv[0] === "--help" || argv.includes("--help")) {
 			io.out(`${usage()}\n`)
 			return argv.length === 0 ? 1 : 0

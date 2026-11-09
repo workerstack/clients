@@ -40,6 +40,9 @@ export function usage(): string {
   --watch           generate again on each change of the spec or the app module
   -h, --help        this text
 
+Other commands:
+  release bump|sync|bootstrap --config <path>   cut versions, mirror packages, and bootstrap mirrors from a release config
+
 The package metadata every publishing target reads, given once as --metadata-<field> <value> (a target's own
 option of the same meaning wins; authors and keywords comma separated):
   ${METADATA_FIELDS.map((field) => `--metadata-${kebab(field)}`).join(" ")}
