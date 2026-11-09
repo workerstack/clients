@@ -88,9 +88,10 @@ function specSource(): z.ZodType<SpecSource, SpecSource> {
 }
 
 /* a parsed config: every default applied */
-type ReleaseManifest = Omit<ReleaseManifestInput, "committer" | "packages"> & {
+type ReleaseManifest = Omit<ReleaseManifestInput, "committer" | "packages" | "toolchains"> & {
 	readonly committer: Committer
 	readonly packages: readonly ManifestPackage[]
+	readonly toolchains: readonly string[]
 }
 
 function releaseManifest(): z.ZodType<ReleaseManifest, ReleaseManifestInput> {
@@ -106,6 +107,9 @@ function releaseManifest(): z.ZodType<ReleaseManifest, ReleaseManifestInput> {
 			packages: z.array(manifestPackage()).min(1),
 			project: z.string().regex(SLUG),
 			spec: specSource(),
+			toolchains: z
+				.array(z.string().regex(SLUG, "a toolchain is a system.config.ts dep name (a lowercase slug)"))
+				.default([]),
 		})
 		.superRefine((manifest, ctx) => {
 			for (const key of ["name", "repo"] as const) {
@@ -192,5 +196,5 @@ export function placeRelease(raw: unknown, root: string, configPath: string): Re
 	if (unlisted.length > 0)
 		throw new Error(`${file} does not list: ${unlisted.map((dir) => relative(root, dir)).join(", ")}`)
 
-	return { codegen: data.codegen, packages, project, root, spec }
+	return { codegen: data.codegen, packages, project, root, spec, toolchains: data.toolchains }
 }

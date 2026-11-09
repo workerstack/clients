@@ -109,6 +109,11 @@ export type ReleaseManifestInput = {
 	readonly project: string
 	/** The product's spec. */
 	readonly spec: SpecSource
+	/**
+	 * The tools codegen needs, each a dep name in the repo root's `system.config.ts`; the release workflows install
+	 * them in this order before codegen runs. None by default.
+	 */
+	readonly toolchains?: readonly string[]
 }
 
 /** A listed package with its defaults applied. */
@@ -151,4 +156,6 @@ export type Release = {
 	readonly root: string
 	/** The product's spec; `committedPath` is absolute. */
 	readonly spec: SpecSource
+	/** The `system.config.ts` dep names codegen needs, in install order; possibly none. */
+	readonly toolchains: readonly string[]
 }

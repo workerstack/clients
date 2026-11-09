@@ -3,16 +3,16 @@
  * prod, then write versions, regenerate at those versions, and record what was released. All or nothing: a refusal
  * writes nothing, and a failure before the states are written leaves them as they were, so a rerun decides the same.
  */
-import { execFileSync, spawnSync } from "node:child_process"
+import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import * as fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 import { decide, type Decision, type Observed } from "./bump.ts"
 import { CHANGELOG_FILE, ENOENT, MAX_OUTPUT_BYTES, PORCELAIN_PREFIX_LENGTH, RELEASE_STATE } from "./constants.ts"
+import { regenerate } from "./codegen.ts"
 import type { ReleaseContext } from "./context.ts"
 import { handDigest, outputDigest } from "./digest.ts"
-import { RELEASE_VERSIONS_ENV } from "./manifest.ts"
 import type { PublicPackage, Release } from "./types.ts"
 import { apiChanges, type ApiChange } from "./oasdiff.ts"
 import { type ReleaseState, releaseStateSchema } from "./release-state.ts"
@@ -21,9 +21,6 @@ import { readVersions, writeVersions } from "./version-files.ts"
 
 /** The header every CHANGELOG bump writes starts with; entries go directly under it, newest first. */
 export const CHANGELOG_HEADER = "# Changelog\n\n"
-
-/* codegen's own output goes to stderr's descriptor, so stdout stays bump's report */
-const STDERR_FD = 2
 
 /** `existing` with `entry` directly under the `# Changelog` header, which it gains when it had none. */
 export function prependEntry(existing: string, entry: string): string {
@@ -54,18 +51,6 @@ async function prependChangelog(changelogFile: string, entry: string): Promise<v
 
 const git = (root: string, ...args: string[]) =>
 	execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: MAX_OUTPUT_BYTES })
-
-/* Runs the product's codegen from the repo root, in `env` with the release versions when given. */
-function regenerate(release: Release, env: NodeJS.ProcessEnv, versions?: Record<string, string>): void {
-	const [command = "", ...args] = release.codegen
-	const result = spawnSync(command, args, {
-		cwd: release.root,
-		env: versions === undefined ? env : { ...env, [RELEASE_VERSIONS_ENV]: JSON.stringify(versions) },
-		stdio: ["ignore", STDERR_FD, STDERR_FD],
-	})
-	if (result.error) throw new Error(`codegen could not start: ${result.error.message}`)
-	if (result.status !== 0) throw new Error(`codegen (${release.codegen.join(" ")}) exited ${result.status}`)
-}
 
 /* The committed spec as HEAD holds it; refuses a working copy that differs, since the state records HEAD. */
 function committedSpec({ root, spec }: Release): Observed["spec"] {

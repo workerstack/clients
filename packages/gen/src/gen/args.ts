@@ -41,7 +41,8 @@ export function usage(): string {
   -h, --help        this text
 
 Other commands:
-  release bump|sync|bootstrap --config <path>   cut versions, mirror packages, and bootstrap mirrors from a release config
+  release bump|sync|bootstrap|codegen|toolchains --config <path>
+                    cut versions, mirror packages, bootstrap mirrors, and run or list codegen's needs from a release config
 
 The package metadata every publishing target reads, given once as --metadata-<field> <value> (a target's own
 option of the same meaning wins; authors and keywords comma separated):
