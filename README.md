@@ -613,7 +613,7 @@ This package also exports the app-side generators the honey CLI and Vite plugin 
   [releasing it](https://github.com/workerstack/backend/blob/main/docs/cli-release.md), and
   [the MCP server](https://github.com/workerstack/backend/blob/main/docs/mcp.md).
 - [SDK conformance](https://github.com/workerstack/backend/blob/main/docs/conformance.md) and
-  [the framework itself](https://github.com/workerstack/backend/blob/main/packages/core/README.md).
+  [the framework itself](https://github.com/workerstack/backend#readme).
 
 ## License
 

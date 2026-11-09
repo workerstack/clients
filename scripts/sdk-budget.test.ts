@@ -87,7 +87,7 @@ describe("the v1 SDK within the budget (bit 11)", () => {
 		}
 		const over: string[] = []
 		for (const app of APPS) {
-			const file = join(REPO, `packages/core/tests/e2e/apps/${app}/src/_gen/openapi.gen.json`)
+			const file = new URL(`../tests/fixtures/apps/${app}.openapi.json`, import.meta.url)
 			const spec = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown> & { paths: Record<string, never> }
 			const { files, stem } = generateSdk(spec, { name: "SDK" })
 			for (const [name, text] of v1SdkSurfaces(files[`${stem}.types.gen.ts`] ?? ""))

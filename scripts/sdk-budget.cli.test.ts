@@ -137,9 +137,10 @@ const TOKEN_HEADROOM = 0.2
 
 /** An e2e app's emitted OpenAPI document. */
 const appSpec = (app: string) =>
-	JSON.parse(
-		readFileSync(join(REPO, `packages/core/tests/e2e/apps/${app}/src/_gen/openapi.gen.json`), "utf8"),
-	) as Record<string, unknown>
+	JSON.parse(readFileSync(new URL(`../tests/fixtures/apps/${app}.openapi.json`, import.meta.url), "utf8")) as Record<
+		string,
+		unknown
+	>
 
 /** `app`'s CLI built, and what its binary prints of each surface, beside what the emitter planned. */
 async function surfacesOf(app: string) {

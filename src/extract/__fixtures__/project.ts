@@ -1,22 +1,28 @@
 /**
  * A throwaway TypeScript project for the extract suites: a temp directory holding the app files a
- * case writes, a tsconfig, and `@workerstack/backend` mapped to a barrel over core's source. The barrel
- * is a user app's import, written as text; gen itself imports nothing from core (H2).
+ * case writes, a tsconfig, and `node_modules/@workerstack/backend` linked to the backend this package resolves,
+ * so a fixture app imports it as a user app does: its source in a checkout (the `honey-source` condition), its
+ * declarations once installed. gen itself imports nothing from backend (H2).
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join } from "node:path"
 import * as tsMorph from "ts-morph"
 import { type ExtractedProp, type ExtractOptions, extractTypes } from "../extract.ts"
 
-/** What a fixture app imports from honey, by the names the package will export them under. */
-function barrel(): string {
-	const core = resolve(import.meta.dirname, "../../../../core/src")
-	return [
-		`export { Honey, honey } from "${core}/routing/app.ts"`,
-		`export { createMiddleware } from "${core}/middleware/middleware.ts"`,
-		`export type { HoneyContext } from "${core}/context/context.ts"`,
-	].join("\n")
+/** The root of the `@workerstack/backend` this package resolves: the workspace's in a checkout, npm's once installed. */
+const backendRoot = (): string =>
+	realpathSync(dirname(createRequire(import.meta.url).resolve("@workerstack/backend/package.json")))
+
+/** The file backend's root export names for a checker: its `honey-source` in a checkout, its `types` once installed. */
+export function backendEntry(): string {
+	const root = backendRoot()
+	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+		exports: { ".": Record<string, string> }
+	}
+	const entry = manifest.exports["."]
+	return join(root, entry["honey-source"] ?? (entry.types as string))
 }
 
 export const COMPILER_OPTIONS = {
@@ -26,7 +32,6 @@ export const COMPILER_OPTIONS = {
 	module: "ESNext",
 	moduleResolution: "Bundler",
 	noEmit: true,
-	paths: { "@workerstack/backend": ["./honey.ts"] },
 	strict: true,
 	target: "ES2022",
 }
@@ -38,8 +43,11 @@ export type FixtureProject = {
 	dispose: () => void
 }
 
-/** A fresh project root with the barrel and a tsconfig (`compilerOptions` merged over the defaults). */
-export function fixtureProject(compilerOptions: Record<string, unknown> = {}): FixtureProject {
+/**
+ * A fresh project root with a tsconfig (`compilerOptions` merged over the defaults) and, unless `linked` is false,
+ * backend linked into its node_modules.
+ */
+export function fixtureProject(compilerOptions: Record<string, unknown> = {}, linked = true): FixtureProject {
 	const root = mkdtempSync(join(tmpdir(), "honey-extract-"))
 	const write = (rel: string, content: string): string => {
 		const path = join(root, rel)
@@ -47,7 +55,10 @@ export function fixtureProject(compilerOptions: Record<string, unknown> = {}): F
 		writeFileSync(path, content, "utf8")
 		return path
 	}
-	write("honey.ts", barrel())
+	if (linked) {
+		mkdirSync(join(root, "node_modules/@workerstack"), { recursive: true })
+		symlinkSync(backendRoot(), join(root, "node_modules/@workerstack/backend"), "dir")
+	}
 	write("tsconfig.json", JSON.stringify({ compilerOptions: { ...COMPILER_OPTIONS, ...compilerOptions } }))
 	return { dispose: () => rmSync(root, { force: true, recursive: true }), root, write }
 }

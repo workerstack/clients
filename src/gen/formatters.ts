@@ -113,7 +113,7 @@ export const FORMATTERS: Partial<Record<Target, FormatPass>> = {
 /**
  * The formatter for `target`, or none when its binary is not there. Each factory is named here rather than
  * held in the table's rows: `honey/spawn-timeout` proves which exports reach a spawn by walking named calls
- * (`packages/core/lint/spawners.js`), and a closure in a table is opaque to that walk — which would leave a
+ * (the repo lint plugin's `spawners.js`), and a closure in a table is opaque to that walk — which would leave a
  * test calling `generated()` free of the bound it needs, since the spawn is real either way.
  */
 export async function formatterFor(

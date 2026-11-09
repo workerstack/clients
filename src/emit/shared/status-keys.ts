@@ -1,6 +1,6 @@
 /**
- * HTTP status code → honey's status key (`201` → `created`), as core's response vocabulary names
- * them (gen never imports core, H2). A core test compares this table to core's, so the two cannot drift.
+ * HTTP status code → honey's status key (`201` → `created`), as backend's response vocabulary names
+ * them (gen never imports backend, H2). tests/integration/codegen-tables.test.ts answers each key through a real app, so the two cannot drift.
  */
 
 export const STATUS_KEYS: Readonly<Record<number, string>> = {

@@ -5,7 +5,7 @@ type Verb = "delete" | "get" | "patch" | "post" | "put"
 
 type Call = (path: string, input?: object) => Promise<unknown>
 
-/** The emitted client as these tests drive it; its types are pinned in core's app-client.typetest.ts. */
+/** The emitted client as these tests drive it; its types are pinned in tests/types/app-client.typetest.ts. */
 type Client = { readonly [V in Verb]: Call } & { readonly safe: { readonly [V in Verb]: Call }; readonly ws: unknown }
 
 type ErrorClass = abstract new (...args: never[]) => Error

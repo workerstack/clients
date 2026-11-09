@@ -1,7 +1,7 @@
 /**
  * The mounted resource server under the official Python client's OAuth (bit 21 f): `mcp` 2.3.0's `OAuthClientProvider`,
- * pinned to 2026-07-28, against core's OAuth world (an orders app whose endpoint is mounted with `oauth`, and a stub
- * authorization server), started under Bun as gen starts core's conformance app, so gen imports nothing of core.
+ * pinned to 2026-07-28, against backend's OAuth world (an orders app whose endpoint is mounted with `oauth`, and a stub
+ * authorization server), copied into this package on backend's public exports and started under Bun.
  * From a bare connect: 401, the metadata, the authorization server, PKCE and the endpoint as `resource`, the call; a
  * call needing more scope gets the 403 step-up and re-authorizes for the union. In the `python` project.
  */
@@ -11,11 +11,11 @@ import { describe, expect, it } from "vitest"
 import { withPython } from "../python/__fixtures__/python-env.ts"
 import { type OAuthTarget, pythonOAuthSession } from "./__fixtures__/python-client.ts"
 
-const WORLD = new URL("../../../../core/tests/integration/mcp-oauth/serve.ts", import.meta.url).pathname
+const WORLD = new URL("./__fixtures__/oauth-world/serve.ts", import.meta.url).pathname
 
 /** The world started, the Python session run against it, then the world's log of every request it answered. */
 async function run(): Promise<[Record<string, unknown>, OAuthTarget, readonly string[]]> {
-	/* core's source, resolved as every checkout process resolves it (honey-source) */
+	/* backend resolved as every checkout process resolves it (honey-source), or as installed */
 	const child = spawn(
 		"bun",
 		["--conditions=honey-source", "-e", `await (await import(${JSON.stringify(WORLD)})).main()`],
