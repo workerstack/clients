@@ -4,6 +4,12 @@ All notable changes to [`@workerstack/clients`](https://www.npmjs.com/package/@w
 
 ## 1.0.0
 
+### Added
+
+- **installgen ships inside the package.** The `installgen` command (`init`, `build`, `check`) and the `@workerstack/clients/installers` subpath replace `@lovrozagar/installgen`. A generated CLI's `release.yml` now runs `npx --yes --package @workerstack/clients@<version> installgen check`, from the same release that wrote its installers.
+- **Release tooling ships inside the package.** `honey-clients release bump|sync|bootstrap|codegen|toolchains --config <path>` and the `@workerstack/clients/release` subpath version, mirror and publish the packages a `release.config.ts` lists. `release codegen` runs the config's codegen as `bump` does, and `release toolchains` prints the `system.config.ts` names that codegen needs, from the config's new `toolchains` field.
+- **Reusable release workflows.** `release-validate.yml`, `release-sync.yml` and `release-bump.yml` in this repository are callable as `workerstack/clients/.github/workflows/<name>.yml@workflows-v1`; they install the consumer's toolchains and run its codegen before they validate, mirror or open the release PR. [`references/release.md`](https://github.com/workerstack/clients/blob/main/references/release.md) is the release guide. They need this release or later in the consumer.
+
 ### Changed
 
-- **The package has its own repository.** `@workerstack/clients` now ships from [github.com/workerstack/clients](https://github.com/workerstack/clients), with its full history. Nothing in the package changed: the `honey-clients` command, every export and the generated code are rc.23's. It depends on `@workerstack/backend` only for its tests, and an app keeps both as before.
+- **The package has its own repository.** `@workerstack/clients` now ships from [github.com/workerstack/clients](https://github.com/workerstack/clients), with its full history. The move itself changed nothing in the package: 1.0.0-rc.24 has rc.23's `honey-clients` command, exports and generated code. It depends on `@workerstack/backend` only for its tests, and an app keeps both as before.
