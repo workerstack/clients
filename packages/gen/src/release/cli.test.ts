@@ -104,7 +104,7 @@ describe("release --config", () => {
 
 describe("release toolchains", () => {
 	it.each([
-		[["go", "rust", "uv", "ruff"], "go\nrust\nuv\nruff\n"],
+		[["rust", "uv", "ruff", "go"], "rust\nuv\nruff\ngo\n"],
 		[undefined, ""],
 	])("prints %j one name per line", { timeout: SPAWN_TIMEOUT }, async (toolchains, stdout) => {
 		const root = await acme({ ...CONFIG, ...(toolchains === undefined ? {} : { toolchains }) })
