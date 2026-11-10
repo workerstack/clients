@@ -14,7 +14,7 @@ export const RELEASE_WORKFLOW = ".github/workflows/release.yml"
  * the step give up sooner. */
 const DEFAULT_LIVE_TRIES = 60
 const liveStep = (registry: Registry, k: Kind) => `      - name: ${registry.kind} serves the version
-        run: |
+${k.liveEnv ?? ""}        run: |
           NAME="$(${k.name})"
           for _ in $(seq "\${LIVE_CHECK_TRIES:-${k.tries ?? DEFAULT_LIVE_TRIES}}"); do
             if ${k.live}; then echo "${registry.kind} serves $NAME $VERSION"; exit 0; fi

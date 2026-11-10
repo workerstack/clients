@@ -49,6 +49,8 @@ export type Kind = {
 	publish: string
 	/** A shell condition, true once the registry serves `$NAME` at `$VERSION`. */
 	live: string
+	/** Environment the live check needs (YAML `env:` lines, indented for a step). */
+	liveEnv?: string
 	oidc: boolean
 	/** How many 10 s waits the live check allows (60 unless the registry lags longer). */
 	tries?: number
@@ -259,17 +261,21 @@ function goProxy(): Kind {
 	}
 }
 
+/* gh in Actions runs only with a token in GH_TOKEN */
+const GH_TOKEN_ENV = `        env:
+          GH_TOKEN: \${{ github.token }}
+`
+
 function githubRelease(registry: Extract<Registry, { kind: "github" }>): Kind {
 	const assets = registry.assets.map((asset) => JSON.stringify(asset)).join(" ")
 	return {
 		file: ".release-state.json",
 		live: `gh release view "$TAG" > /dev/null`,
+		liveEnv: GH_TOKEN_ENV,
 		name: 'echo "$GITHUB_REPOSITORY"',
 		oidc: false,
 		publish: `      - name: GitHub release
-        env:
-          GH_TOKEN: \${{ github.token }}
-        run: gh release create "$TAG" ${assets} --verify-tag --title "$TAG" --notes "Release $TAG."
+${GH_TOKEN_ENV}        run: gh release create "$TAG" ${assets} --verify-tag --title "$TAG" --notes "Release $TAG."
 `,
 		version: "jq -r .version .release-state.json",
 	}

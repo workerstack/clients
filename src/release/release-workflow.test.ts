@@ -48,14 +48,20 @@ function versionCheck(registries: Registry[], tag: string, files: Record<string,
 	})
 }
 
-/** Runs the step named `name` of `registries`' workflow with `env`, a `curl` on `PATH` that answers `curlBody`. */
-function runStep(registries: Registry[], name: string, env: Record<string, string>, curlBody = "") {
+/** A stand-in command that prints `body`, as a registry API answers. */
+const answering = (body: string) => `#!/bin/sh\nprintf '%s' '${body}'\n`
+
+/** Runs the step named `name` of `registries`' workflow with `env`, and each of `bins` (command name to shell script)
+ * on `PATH`; `curl` answers nothing unless `bins` names it. */
+function runStep(registries: Registry[], name: string, env: Record<string, string>, bins: Record<string, string> = {}) {
 	const dir = mkdtempSync(path.join(os.tmpdir(), "release-workflow-"))
 	dirs.push(dir)
 	const bin = path.join(dir, "bin")
 	mkdirSync(bin)
-	writeFileSync(path.join(bin, "curl"), `#!/bin/sh\nprintf '%s' '${curlBody}'\n`)
-	chmodSync(path.join(bin, "curl"), 0o755)
+	for (const [file, script] of Object.entries({ curl: answering(""), ...bins })) {
+		writeFileSync(path.join(bin, file), script)
+		chmodSync(path.join(bin, file), 0o755)
+	}
 	const step = steps(registries).find((s) => s.name === name)
 	return spawnSync("bash", ["-e", "-c", step?.run ?? "exit 99"], {
 		cwd: dir,
@@ -211,6 +217,28 @@ describe("releaseWorkflow on NuGet", () => {
 	)
 })
 
+describe("releaseWorkflow on a GitHub release", () => {
+	it(
+		"checks the GitHub release with the job's token, which gh needs in Actions",
+		() => {
+			const registries: Registry[] = [{ assets: ["openapi.json"], kind: "github" }]
+			const live = steps(registries).find((step) => step.name === "github serves the version")
+			expect(live?.env).toEqual({ GH_TOKEN: "${{ github.token }}" })
+			/* gh in a workflow refuses to run without GH_TOKEN, as this stand-in does */
+			const gh = '#!/bin/sh\n[ -n "$GH_TOKEN" ] || { echo "gh: set GH_TOKEN" >&2; exit 4; }\n'
+			const { GH_TOKEN: _gh, GITHUB_TOKEN: _github, ...bare } = process.env
+			const result = runStep(
+				registries,
+				"github serves the version",
+				{ ...bare, GITHUB_REPOSITORY: "anyrow/openapi", LIVE_CHECK_TRIES: "1", TAG: "v1.0.0", VERSION: "1.0.0" },
+				{ gh },
+			)
+			expect(`${result.status} ${result.stdout}${result.stderr}`).toBe("0 github serves anyrow/openapi 1.0.0\n")
+		},
+		SPAWN_TIMEOUT,
+	)
+})
+
 describe("releaseWorkflow on Maven Central", () => {
 	it("signs and uploads a Maven Central bundle with the Portal and GPG secrets, and waits on repo1", () => {
 		const maven: Registry[] = [{ kind: "maven" }]
@@ -233,7 +261,7 @@ describe("releaseWorkflow on Maven Central", () => {
 		() => {
 			const status = "Maven Central publishes the deployment"
 			const env = { DEPLOYMENT_ID: "abc", PORTAL_TRIES: "2", PORTAL_WAIT: "0" }
-			const said = (state: string) => JSON.stringify({ deploymentState: state, errors: {} })
+			const said = (state: string) => ({ curl: answering(JSON.stringify({ deploymentState: state, errors: {} })) })
 			expect(runStep([{ kind: "maven" }], status, env, said("PUBLISHED")).status).toBe(0)
 			expect(runStep([{ kind: "maven" }], status, env, said("FAILED")).status).not.toBe(0)
 			expect(runStep([{ kind: "maven" }], status, env, said("LOST")).status).not.toBe(0)
