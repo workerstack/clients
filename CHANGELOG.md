@@ -13,3 +13,7 @@ All notable changes to [`@workerstack/clients`](https://www.npmjs.com/package/@w
 ### Changed
 
 - **The package has its own repository.** `@workerstack/clients` now ships from [github.com/workerstack/clients](https://github.com/workerstack/clients), with its full history. The move itself changed nothing in the package: 1.0.0-rc.24 has rc.23's `honey-clients` command, exports and generated code. It depends on `@workerstack/backend` only for its tests, and an app keeps both as before.
+
+### Fixed
+
+- **A GitHub release's live check has the job's token.** The rendered `release.yml` step that confirms a `github` registry's release ran `gh release view` without `GH_TOKEN`, so it failed in Actions after the release was created. It now gets `GH_TOKEN: ${{ github.token }}` like the publish step. The release guide also lists `administration: write` for the sync App, which sync needs to set a repo's description, homepage and topics.

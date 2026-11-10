@@ -110,8 +110,8 @@ export default defineRelease({
    - Go: nothing to register; the workflow's `proxy.golang.org` fetch indexes the tag.
    - A CLI's channels are honey `cli` options, each optional: a Homebrew tap repo, a Scoop bucket repo, a
      `microsoft/winget-pkgs` fork, an AUR account with an SSH key. Each one's token goes in the CLI's repo.
-3. Create a GitHub App with `contents: write` and `workflows: write` (sync pushes each repo's `release.yml`), install
-   it on the org's public repos, and store its ID and private key as two Actions secrets in the private repo.
+3. Create a GitHub App with `contents: write`, `workflows: write` (sync pushes each repo's `release.yml`) and
+   `administration: write` (sync sets each repo's description, homepage and topics), install it on the org's public repos, and store its ID and private key as two Actions secrets in the private repo.
 4. Write `release.config.ts` with a dir per package, add the prerequisites above, and check the config:
    `honey-clients release sync --config <path> --validate-only`. A CLI also needs a hand `README.md` and `LICENSE`;
    honey writes its `.goreleaser.yaml` and `.github/workflows/release.yml`.
