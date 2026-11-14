@@ -4,6 +4,10 @@ All notable changes to [`@workerstack/clients`](https://www.npmjs.com/package/@w
 
 ## 1.0.0
 
+### Breaking
+
+- **Every honey name is gone (1.0.0-rc.27).** The bin is `clients` (was `honey-clients`), the env vars are `CLIENTS_*`, the source condition is `backend-source`, the wire names are `x-backend-*`, and the generated SDKs are named for the target: `HttpSdk`, `http_sdk`, `HttpException` and the rest. There are no aliases. Upgrade together with `@workerstack/backend` 1.0.0-rc.26, rerun `clients generate`, and use [the migration guide](docs/migrating-from-honey.md), which maps each old name to its new one.
+
 ### Added
 
 - **installgen ships inside the package.** The `installgen` command (`init`, `build`, `check`) and the `@workerstack/clients/installers` subpath replace `@lovrozagar/installgen`. A generated CLI's `release.yml` now runs `npx --yes --package @workerstack/clients@<version> installgen check`, from the same release that wrote its installers.
