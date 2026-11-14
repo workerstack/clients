@@ -53,10 +53,10 @@ const SCHEMES = {
 	},
 }
 
-/** A running server, as either runtime's `serve` answers it. */
+/** A running server, as `serve.ts` answers it. */
 type Listener = { close(timeout?: number): Promise<void>; readonly url: string }
 
-/** `serve` from `@workerstack/backend/node` or `@workerstack/backend/bun`: the runtime the world runs on. */
+/** Serves an app on a loopback port: `serve.ts` does it over `Bun.serve`. */
 export type Serve = (
 	app: { fetch(request: Request, env: {}): Promise<Response> },
 	options: { hostname: string; port: number },
