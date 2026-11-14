@@ -15,13 +15,13 @@ import { type ExtractedProp, type ExtractOptions, extractTypes } from "../extrac
 const backendRoot = (): string =>
 	realpathSync(dirname(createRequire(import.meta.url).resolve("@workerstack/backend/package.json")))
 
-/** The file backend's root export names for a checker: its `honey-source` in a checkout, its `types` once installed. */
+/** The file backend's `/http` export names for a checker: its `honey-source` in a checkout, its `types` once installed. */
 export function backendEntry(): string {
 	const root = backendRoot()
 	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-		exports: { ".": Record<string, string> }
+		exports: { "./http": Record<string, string> }
 	}
-	const entry = manifest.exports["."]
+	const entry = manifest.exports["./http"]
 	return join(root, entry["honey-source"] ?? (entry.types as string))
 }
 

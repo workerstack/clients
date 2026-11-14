@@ -34,7 +34,7 @@ describe("honey/boundaries: imports", () => {
 	it("keeps honey-clients on @workerstack/backend's public subpaths", () => {
 		const fixture = {
 			"src/ir/load.ts": [
-				'import type { OpenApiSpec } from "@workerstack/backend/openapi"',
+				'import type { OpenApiSpec } from "@workerstack/backend/http/openapi"',
 				'import { x } from "@workerstack/backend/src/routing/app.ts"',
 				'import { z } from "@workerstack/backend/dist/index.js"',
 				"",

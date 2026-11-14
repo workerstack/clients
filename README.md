@@ -33,7 +33,7 @@ This page is the whole generator — every target, every flag, and what each cli
 
 ## Install
 
-honey moved to the workerstack org in 1.0.0-rc.23, and [the migration note](https://github.com/workerstack/backend/blob/main/docs/migrating-to-workerstack.md)
+honey moved to the workerstack org in 1.0.0-rc.23, and [the migration note](https://github.com/workerstack/backend/blob/main/docs/migrating-from-honey.md)
 maps each old package name to its new one. 1.0 is out as a release candidate, published under npm's `next` tag, so
 an install without a tag gets a deprecated placeholder.
 Add `@next` until the final release:
@@ -92,7 +92,7 @@ honey-clients generate --spec openapi.json --target ts --target cli --out genera
 
 - `--spec <file>`: the OpenAPI document, as JSON.
 - `--app <module>[#export]`: a honey app module instead of `--spec` (give one, never both). Its named export, else
-  `app`, else `default`, is the app; its document is made by the app's own `@workerstack/backend/openapi`, resolved from
+  `app`, else `default`, is the app; its document is made by the app's own `@workerstack/backend/http/openapi`, resolved from
   the app as at run time, and the module's `openApi` export, if any, is that document's options (`info`,
   `securitySchemes`, `invalidate`, …, as `generateOpenApi` takes them). Started by `bun run`, the bin hands the load to
   that Bun, so a module needing Bun's loaders works; a run ends once it has written, whatever the module left open.

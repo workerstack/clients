@@ -21,7 +21,7 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-const ENTRIES = { ".": "routing/app", "./openapi": "openapi/register" }
+const ENTRIES = { "./http": "routing/app", "./http/openapi": "openapi/register" }
 
 /** The backend this package resolves: its root, and its runtime tree (`src/`, `.ts` in a checkout; `dist/`, `.js` installed). */
 export function backend(): { root: string; tree: string; ext: string } {

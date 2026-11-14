@@ -5,7 +5,7 @@
  */
 import type { McpHandler } from "@workerstack/backend/mcp"
 import { mcp } from "@workerstack/backend/mcp"
-import { workersWebSocket } from "@workerstack/backend/ws/workers"
+import { workersWebSocket } from "@workerstack/backend/ws"
 import { createConformanceApp, type Origins } from "./app.ts"
 
 /** The worker's module, with `handler` mounted at /mcp when there is one. */

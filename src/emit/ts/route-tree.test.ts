@@ -21,7 +21,7 @@ type Loaded = {
 /** The module emitted for `tree`, imported. */
 const emitted = async (tree: RouteTree) => (await emittedRouteTree(tree)) as unknown as Loaded
 
-/** Core's tree types (core routing/tree.ts) restated: what `@workerstack/backend/tree` gives the emitted module. */
+/** Core's tree types (core routing/tree.ts) restated: what `@workerstack/backend/http/tree` gives the emitted module. */
 const CORE_TREE = `export type TreeNode = {
 	d: { c: TreeNode; n: string } | null
 	m: Record<string, string> | null
@@ -56,7 +56,7 @@ const project = new Project({
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		noEmit: true,
-		paths: { "@workerstack/backend/tree": ["/honey/tree.ts"] },
+		paths: { "@workerstack/backend/http/tree": ["/honey/tree.ts"] },
 		strict: true,
 		target: ts.ScriptTarget.ES2022,
 	},

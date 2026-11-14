@@ -10,8 +10,8 @@ import type { createClient } from "../../src/runtime/ts/app.ts"
 import type { ErrorEnvelope } from "../../src/runtime/ts/app-types.ts"
 import type { DecodeError } from "../../src/runtime/ts/error.ts"
 import type { Result } from "../../src/runtime/ts/response.ts"
-import { defineErrors } from "@workerstack/backend"
-import { honey } from "@workerstack/backend"
+import { defineErrors } from "@workerstack/backend/http"
+import { honey } from "@workerstack/backend/http"
 
 const row = z.object({ id: z.string(), name: z.string() })
 

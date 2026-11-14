@@ -17,7 +17,7 @@ describe("the chain: intersections, optionality and a context without the framew
 			const entryPath = project.write(
 				"chain/narrow.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					"const loose = createMiddleware((_c, next) => next({ who: 'x' as string | null }))",
 					"const strict = createMiddleware((_c, next) => next({ who: 'x' }))",
 					"const maybe = createMiddleware((_c, next) => next({} as { hint?: number }))",
@@ -41,7 +41,7 @@ describe("the chain: intersections, optionality and a context without the framew
 			const entryPath = project.write(
 				"chain/custom.ts",
 				lines(
-					'import { honey, type Honey } from "@workerstack/backend"',
+					'import { honey, type Honey } from "@workerstack/backend/http"',
 					"export const app: Honey<{}, { res: number; custom: string }> = honey<{}>() as never",
 				),
 			)
@@ -62,7 +62,7 @@ describe("the chain: what the framework owns, and props without a declaration of
 			const entryPath = project.write(
 				"chain/edges.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					'import type { Db } from "./db.ts"',
 					'const mapped = createMiddleware((_c, next) => next({} as Record<"tenant", string>))',
 					"const param = createMiddleware((_c, next) => {",
@@ -91,7 +91,7 @@ describe("the chain: what the framework owns, and props without a declaration of
 			const entryPath = project.write(
 				"mw/owned.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					"const mw = createMiddleware((_c, next) => next({ log: 'mine', user: 1 }))",
 					"export const app = honey<{}>().use(mw)",
 				),
@@ -125,7 +125,7 @@ describe("the chain: a prop's declared type, by reference", () => {
 			const entryPath = project.write(
 				"refs/app.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					'import type { DbClient, SessionDb } from "./db-types.ts"',
 					"const withDb = createMiddleware((_c: { env: { DB: string } }, next) => {",
 					"\tconst db: DbClient = {} as DbClient",
@@ -159,7 +159,7 @@ describe("the chain: a destructured binding's declared type", () => {
 			const entryPath = project.write(
 				"refs/destructured.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					'import type { ShardDb } from "./shard.ts"',
 					"function openShardSession() {",
 					"\tconst shardDb: ShardDb = { query: () => null, shard: 1 }",

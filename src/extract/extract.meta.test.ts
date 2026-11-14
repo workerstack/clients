@@ -19,7 +19,7 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
 			const declared = project.write(
 				"meta/declared.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					'type AppMeta = { tenant?: "organization" | "project"; worker: "extract" }',
 					'export const app = honey<{}>().metaType<AppMeta>().meta({ worker: "extract" })',
 					'app.get("/tables").handler((c) => c.res.text("ok", "ok"))',
@@ -28,7 +28,7 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
 			const none = project.write(
 				"meta/none.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					"export const app = honey<{}>()",
 					'app.get("/tables").handler((c) => c.res.text("ok", "ok"))',
 				),
@@ -45,7 +45,7 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
 			const typeOnly = project.write(
 				"meta/type-only.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					'type AppMeta = { tenant?: "organization" | "project"; worker: "extract" }',
 					"export const app = honey<{}>().metaType<AppMeta>()",
 					'app.get("/tables").meta({ worker: "extract" }).handler((c) => c.res.text("ok", "ok"))',
@@ -67,7 +67,7 @@ describe("an app from an older honey", () => {
 			const older = project.write(
 				"meta/older.ts",
 				lines(
-					'import type { HoneyContext } from "@workerstack/backend"',
+					'import type { HoneyContext } from "@workerstack/backend/http"',
 					"type OlderApp = {",
 					"\treadonly $ctx: HoneyContext<{ DB: string }>",
 					"\treadonly $env: { DB: string }",

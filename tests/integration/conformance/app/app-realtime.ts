@@ -4,7 +4,7 @@
  */
 import * as z from "zod"
 import type { ConformanceApp, errors } from "./app.ts"
-import type { HoneyRes } from "@workerstack/backend"
+import type { HoneyRes } from "@workerstack/backend/http"
 
 /** How often an open `realtime.capped` stream looks for a send it has not framed yet. */
 const POLL_MS = 10

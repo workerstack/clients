@@ -1,6 +1,6 @@
 {
 	"name": "@workerstack/clients",
-	"version": "1.0.0-rc.26",
+	"version": "1.0.0-rc.27",
 	"description": "Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a CLI and an MCP server from any OpenAPI 3.x document.",
 	"keywords": [
 		"codegen",
@@ -100,7 +100,7 @@
 		"@total-typescript/ts-reset": "0.6.1",
 		"@types/node": "26.1.1",
 		"@vitest/coverage-v8": "4.1.10",
-		"@workerstack/backend": "1.0.0-rc.24",
+		"@workerstack/backend": "file:vendor/workerstack-backend-1.0.0-rc.26.tgz",
 		"@workerstack/system": "0.3.0",
 		"ajv": "8.20.0",
 		"ajv-formats": "3.0.1",

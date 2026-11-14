@@ -24,7 +24,7 @@ function project(files: Record<string, string>): string {
 	return dir
 }
 
-const HONEY = 'import { honey } from "@workerstack/backend"\n'
+const HONEY = 'import { honey } from "@workerstack/backend/http"\n'
 const route = (path: string) => `honey().get(${JSON.stringify(path)}).handler((c) => c.res.text("ok", "ok"))`
 const pathsOf = (document: Record<string, unknown>) => Object.keys(document.paths as object)
 
@@ -155,7 +155,7 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 		})
 		vi.stubGlobal("Bun", bunResolving("default"))
 		const refusal =
-			"--app src/app.ts: @workerstack/backend is a checkout, read from its source only under the honey-source condition: start Bun with --conditions=honey-source"
+			"--app src/app.ts: @workerstack/backend/http is a checkout, read from its source only under the honey-source condition: start Bun with --conditions=honey-source"
 		expect([...(await loaded(["src/app.ts"], unbuilt)), ...(await loaded(["src/app.ts"], stale))]).toEqual([
 			refusal,
 			refusal,

@@ -68,14 +68,14 @@ describe("the base: the env, whatever the app is exported as", () => {
 			const typed = project.write(
 				"env/app.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					"type Env = { DB: string; SECRET: string }",
 					"export const app = honey<Env>()",
 				),
 			)
 			const bare = project.write(
 				"env/bare.ts",
-				lines('import { honey } from "@workerstack/backend"', "export const app = honey()"),
+				lines('import { honey } from "@workerstack/backend/http"', "export const app = honey()"),
 			)
 			expect([extract(typed).types.env, extract(bare).types.env]).toEqual(["{ DB: string; SECRET: string }", "unknown"])
 		},
@@ -89,12 +89,12 @@ describe("the base: the env, whatever the app is exported as", () => {
 			// v0: 3a2b67a05a
 			const named = project.write(
 				"entries/named.ts",
-				lines('import { honey } from "@workerstack/backend"', "export const myApp = honey<{ KEY: string }>()"),
+				lines('import { honey } from "@workerstack/backend/http"', "export const myApp = honey<{ KEY: string }>()"),
 			)
 			const fallback = project.write(
 				"entries/default.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					"type Env = { KEY: string }",
 					"export default honey<Env>()",
 				),
@@ -115,7 +115,7 @@ describe("the base: the entry and the tsconfig it is read with", () => {
 			// v0: 1a53918b16
 			const entryPath = project.write(
 				"entries/missing.ts",
-				lines('import { honey } from "@workerstack/backend"', "export const app = honey()", "export const n = 1"),
+				lines('import { honey } from "@workerstack/backend/http"', "export const app = honey()", "export const n = 1"),
 			)
 			expect(() => extract(entryPath, { exportName: "nonexistent" })).toThrow(
 				`Export "nonexistent" not found in ${entryPath}`,
@@ -130,17 +130,17 @@ describe("the base: the entry and the tsconfig it is read with", () => {
 		() => {
 			// v0: 0ca2eabe14
 			/* backend unlinked here, so only a tsconfig's paths can find it */
-			const broken = fixtureProject({ paths: { "@workerstack/backend": ["./missing.ts"] } }, false)
+			const broken = fixtureProject({ paths: { "@workerstack/backend/http": ["./missing.ts"] } }, false)
 			try {
 				broken.write(
 					"alt/tsconfig.json",
 					JSON.stringify({
-						compilerOptions: { ...COMPILER_OPTIONS, paths: { "@workerstack/backend": [backendEntry()] } },
+						compilerOptions: { ...COMPILER_OPTIONS, paths: { "@workerstack/backend/http": [backendEntry()] } },
 					}),
 				)
 				const entryPath = broken.write(
 					"app.ts",
-					lines('import { honey } from "@workerstack/backend"', "export const app = honey<{ X: number }>()"),
+					lines('import { honey } from "@workerstack/backend/http"', "export const app = honey<{ X: number }>()"),
 				)
 				expect(extract(entryPath, { tsconfigPath: join(broken.root, "alt/tsconfig.json") }).types.env).toBe(
 					"{ X: number }",
@@ -162,12 +162,12 @@ describe("the base: the app's own additions and its taps", () => {
 			// v0: 7b7f0cda8a
 			const bare = project.write(
 				"mw/bare.ts",
-				lines('import { honey } from "@workerstack/backend"', "export const app = honey<{}>()"),
+				lines('import { honey } from "@workerstack/backend/http"', "export const app = honey<{}>()"),
 			)
 			const annotated = project.write(
 				"mw/annotated.ts",
 				lines(
-					'import { honey, type Honey, type HoneyContext } from "@workerstack/backend"',
+					'import { honey, type Honey, type HoneyContext } from "@workerstack/backend/http"',
 					"type MwAdds = { userId: string; role?: string }",
 					"export const app: Honey<{}, HoneyContext<{}> & MwAdds> = honey<{}>() as never",
 				),
@@ -187,12 +187,12 @@ describe("the base: the app's own additions and its taps", () => {
 			// v0: 81c8d17a0a
 			const none = project.write(
 				"taps/none.ts",
-				lines('import { honey } from "@workerstack/backend"', "export const app = honey<{}>()"),
+				lines('import { honey } from "@workerstack/backend/http"', "export const app = honey<{}>()"),
 			)
 			const declared = project.write(
 				"taps/declared.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					'type Payload = { action: "create" | "delete"; id: string }',
 					"type Taps = { audit: Payload }",
 					"export const app = honey<{}>().taps<Taps>()",
@@ -217,7 +217,7 @@ describe("routes: keyed by the caller's route id", () => {
 			const entryPath = project.write(
 				"routes/chains.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					"type AuthData = { sub: string }",
 					"const withAuth = createMiddleware(async (_c, next) => next({ auth: { sub: 'x' } as AuthData }))",
 					"const withAdmin = createMiddleware(async (_c, next) => next({ admin: { level: 1 } }))",
@@ -231,7 +231,7 @@ describe("routes: keyed by the caller's route id", () => {
 			)
 			const bare = project.write(
 				"routes/bare.ts",
-				lines('import { honey } from "@workerstack/backend"', "export const app = honey<{ DB: string }>()"),
+				lines('import { honey } from "@workerstack/backend/http"', "export const app = honey<{ DB: string }>()"),
 			)
 			const { routes } = extract(entryPath).types
 			expect(Object.keys(routes).sort()).toEqual(["GET /admin", "GET /user"])
@@ -259,7 +259,7 @@ describe("routes: every kind of middleware and method", () => {
 			const entryPath = project.write(
 				"routes/kinds.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					"const a = createMiddleware((_c, next) => next({ a: 'x' }))",
 					"const s = createMiddleware((_c, next) => next({ s: 1 }))",
 					"const b = createMiddleware((_c, next) => next({ b: true }))",
@@ -296,7 +296,7 @@ describe("routes: full paths, across modules", () => {
 			const entryPath = project.write(
 				"h71/app.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					'import { mountPublic } from "./public.ts"',
 					"type User = { id: string }",
 					"const auth = createMiddleware((_c, next) => next({ user: { id: 'u' } as User }))",
@@ -309,7 +309,7 @@ describe("routes: full paths, across modules", () => {
 			project.write(
 				"h71/public.ts",
 				lines(
-					'import { createMiddleware, type Honey } from "@workerstack/backend"',
+					'import { createMiddleware, type Honey } from "@workerstack/backend/http"',
 					"const flags = createMiddleware((_c, next) => next({ flags: ['beta'] as string[] }))",
 					"export function mountPublic(app: Honey<{}>) {",
 					'\tapp.basePath("/public").use(flags).get("/items").handler((c) => c.res.json("ok", { f: c.flags }))',
@@ -333,7 +333,7 @@ describe("routes: what is skipped, and said", () => {
 			const entryPath = project.write(
 				"routes/skipped.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					"const a = createMiddleware((_c, next) => next({ a: 1 }))",
 					"const b = createMiddleware((_c, next) => next({ b: 1 }))",
 					"export const app = honey<{}>()",
@@ -369,7 +369,7 @@ describe("routes: only a route's own additions", () => {
 			const entryPath = project.write(
 				"routes/beyond.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					"const auth = createMiddleware((_c, next) => next({ auth: 'x' }))",
 					"const admin = createMiddleware((_c, next) => next({ admin: true }))",
 					"export const app = honey<{}>().use(auth)",
@@ -397,7 +397,7 @@ describe("types: a named type by reference, everything else exactly", () => {
 			const entryPath = project.write(
 				"h72/app.ts",
 				lines(
-					'import { createMiddleware, honey } from "@workerstack/backend"',
+					'import { createMiddleware, honey } from "@workerstack/backend/http"',
 					'import { type Client, hidden } from "fakepkg/client"',
 					'import type { Lib } from "fakelib"',
 					'import type { I } from "idxpkg"',
@@ -442,7 +442,7 @@ describe("inputs: each route's ctx.input as the handler gets it (O3)", () => {
 			const entryPath = project.write(
 				"routes/inputs.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					"/** a Standard schema reading a string and producing a number */",
 					"const count = { '~standard': { types: undefined as unknown as { input: string; output: number }, validate: (v: unknown) => ({ value: Number(v) }), vendor: 'x', version: 1 as const } }",
 					"export const app = honey<{}>()",
@@ -467,7 +467,7 @@ describe("params: each route's ctx.params where a declared schema types it", () 
 			const entryPath = project.write(
 				"routes/params.ts",
 				lines(
-					'import { honey } from "@workerstack/backend"',
+					'import { honey } from "@workerstack/backend/http"',
 					"/** a Standard schema reading a string and producing one of two scans */",
 					'const scan = { \'~standard\': { types: undefined as unknown as { input: string; output: "daily" | "weekly" }, validate: (v: unknown) => ({ value: v as "daily" }), vendor: \'x\', version: 1 as const } }',
 					"export const app = honey<{}>()",

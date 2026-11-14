@@ -40,7 +40,7 @@ describe("clients imports no backend runtime subpath", () => {
 		expect(runtimeImports("app.ts", source)).toEqual([
 			"app.ts:1 imports @workerstack/backend/bun: serve on workerd or Bun's own server",
 		])
-		expect(runtimeImports("app.ts", 'import { workersWebSocket } from "@workerstack/backend/ws/workers"\n')).toEqual([])
+		expect(runtimeImports("app.ts", 'import { workersWebSocket } from "@workerstack/backend/ws"\n')).toEqual([])
 	})
 
 	it("imports no backend runtime subpath", { timeout: SPAWN_TIMEOUT }, () => {
