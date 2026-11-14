@@ -54,6 +54,7 @@ describe("routes: a mounted group, as kitchen mounts it", () => {
 				"GET /api/hello": "{ search: { q: string } }",
 				"POST /api/hello": "{ json: { name: string } }",
 			})
+			expect(types.mounted).toEqual(["GET /api/hello", "POST /api/hello"])
 			expect(reports).toEqual([])
 		},
 		SLOW,
@@ -132,6 +133,8 @@ describe("routes: nested mounts", () => {
 			expect(Object.keys(inner)).toEqual(["GET /api/g/v1/x"])
 			const outer = extract(project.write("mount/nested-export.ts", nested(true)), { exportName: "group" }).types
 			expect(Object.keys(outer.routes).sort()).toEqual(["GET /api/g/v1/x", "GET /v1/x"])
+			/* the sub registered "/x": both ids serve it through a mount */
+			expect(outer.mounted).toEqual(["GET /api/g/v1/x", "GET /v1/x"])
 		},
 		SLOW,
 	)
@@ -161,6 +164,7 @@ describe("routes: an app mounted into itself", () => {
 			expect(Object.keys(types.routes)).toEqual(["GET /account"])
 			expect(shown(types.routes["GET /account"])).toEqual(["db: { name: string }"])
 			expect(types.inputs).toEqual({ "GET /feed": "{ search: { page: number } }" })
+			expect(types.mounted).toEqual([])
 			expect(reports).toEqual([])
 		},
 		SLOW,

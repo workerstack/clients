@@ -9,7 +9,11 @@ import { isPublicName, type Serializer } from "./serialize.ts"
 import type { Registration } from "./walk.ts"
 
 /** A registration with the route ids its methods and paths give: the router's, never guessed. */
-export type Routed = Registration & { ids: string[] }
+export type Routed = Registration & {
+	ids: string[]
+	/** the ids among `ids` served through a mount, at a path other than `own` */
+	mounted: string[]
+}
 
 /** One property on `ctx` that the framework's context class does not declare: what the middleware added. */
 export type ExtractedProp = {

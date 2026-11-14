@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { dirname, join, relative, sep } from "node:path"
 import type { ts } from "ts-morph"
+import { compareCodeUnits } from "../emit/shared/lang.ts"
 import { addedProps, type ExtractedProp, frameworkClass, routeAdditions, type Routed, SKIPPED } from "./chain.ts"
 import { Serializer } from "./serialize.ts"
 import { type EntryOptions, loadEntry, type Registration, registrations, type TsMorph } from "./walk.ts"
@@ -43,6 +44,8 @@ export type ExtractedTypes = {
 	params: Record<string, string>
 	/** the meta type the app declares (`metaType<AppMeta>()`), or null when it declares none */
 	meta: string | null
+	/** the route ids served through a mount, at a path other than the one their handler's ctx types; code-unit sorted */
+	mounted: string[]
 	/** per route id, what the route's middleware added beyond `middleware`; a route that added nothing has none */
 	routes: Record<string, ExtractedProp[]>
 }
@@ -159,17 +162,18 @@ function routed(
 		const { at, methods, paths } = registration
 		if (paths === null) {
 			report(`${at}: the route's path is not a literal type; ${SKIPPED}`)
-			return { ...registration, ids: [] }
+			return { ...registration, ids: [], mounted: [] }
 		}
-		const ids = paths.flatMap((path) => {
+		const served = paths.map((path) => {
 			try {
-				return methods.map((method) => routeId(method, path))
+				return { ids: methods.map((method) => routeId(method, path)), moved: path !== registration.own }
 			} catch (error) {
 				report(`${at}: the router refuses ${JSON.stringify(path)} (${(error as Error).message}); ${SKIPPED}`)
-				return []
+				return { ids: [], moved: false }
 			}
 		})
-		return { ...registration, ids }
+		const ids = served.flatMap((s) => s.ids)
+		return { ...registration, ids, mounted: served.flatMap((s) => (s.moved ? s.ids : [])) }
 	})
 }
 
@@ -241,6 +245,7 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 		),
 		meta: meta === "{}" ? null : text(meta),
 		middleware: props(middleware),
+		mounted: [...new Set(found.flatMap((r) => r.mounted))].sort(compareCodeUnits),
 		params: routeTypes(
 			found,
 			(r) => r.params,

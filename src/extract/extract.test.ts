@@ -244,6 +244,7 @@ describe("routes: keyed by the caller's route id", () => {
 				inputs: {},
 				meta: null,
 				middleware: [],
+				mounted: [],
 				params: {},
 				routes: {},
 			})

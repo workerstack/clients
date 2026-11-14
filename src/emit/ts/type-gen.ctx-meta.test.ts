@@ -117,3 +117,23 @@ expectType<Equal<RouteMeta<"/v1/users", "get">, {}>>()`
 		expect(check(app, consumer).diagnostics).toEqual([])
 	})
 })
+
+describe("a handler's own ctx fits the generated one", () => {
+	it("types the ctx's meta as the OpenAPI keys when the app declares none, so a handler's widened meta passes", () => {
+		/* the handler's own meta: \`.meta()\` widens each value, so the tree's literals would refuse it */
+		const consumer = `declare const live: { readonly summary?: string; readonly operationId?: string }
+const intoGenerated: Routes["/orgs"]["get"]["ctx"]["meta"] = live
+expectType<Equal<RouteMeta<"/health", "get">, { summary: "Health check" }>>()
+void intoGenerated`
+		expect(check(META_APP, consumer, extracted({ env: "{}" })).diagnostics).toEqual([])
+	})
+
+	it("types a mounted route's ctx routePattern as any pattern, and one served where it was registered as its own", () => {
+		/* a sub's handler types the path it was registered at; the router serves it at the mount's */
+		const consumer = `declare const local: "/"
+const mounted: Routes["/health"]["get"]["ctx"]["routePattern"] = local
+expectType<Equal<Routes["/orgs"]["get"]["ctx"]["routePattern"], "/orgs">>()
+void mounted`
+		expect(check(META_APP, consumer, extracted({ env: "{}", mounted: ["GET /health"] })).diagnostics).toEqual([])
+	})
+})

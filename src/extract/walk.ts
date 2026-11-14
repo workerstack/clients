@@ -57,6 +57,8 @@ export type Registration = {
 	 * registered at; null when that path is not a literal. Code-unit sorted, without duplicates.
 	 */
 	paths: string[] | null
+	/** the full path its own app registered it at, the one its handler's `ctx.routePattern` types; null as `paths` */
+	own: string | null
 }
 
 /**
@@ -240,7 +242,7 @@ function servedPrefixes(mounts: readonly Mount[], exported: AppNode): (node: App
 }
 
 /** A registration before its mounts are known: the path its own app gives it, and the builder that app comes from. */
-type Found = Omit<Registration, "paths"> & { builder: ts.Expression; path: string | null }
+type Found = Omit<Registration, "own" | "paths"> & { builder: ts.Expression; path: string | null }
 
 /** The registration a call is, if it is `<route builder>.handler(…)`. */
 function registrationOf(entry: LoadedEntry, call: ts.CallExpression): Found | null {
@@ -304,6 +306,7 @@ export function registrations(entry: LoadedEntry, report: (message: string) => v
 	const prefixes = servedPrefixes(mounts, origin(compiler.isVariableDeclaration(appNode) ? appNode.name : appNode))
 	return found.map(({ builder, path, ...registration }) => ({
 		...registration,
+		own: path,
 		paths:
 			path === null
 				? null

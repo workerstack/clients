@@ -165,6 +165,8 @@ export type ExtractedSpec = {
 	readonly inputs?: Record<string, string>
 	/** the meta type the app declares, written out; null when it declares none */
 	readonly meta?: string | null
+	/** the route ids served through a mount, at a path other than the one their handler types */
+	readonly mounted?: readonly string[]
 	/** route id → its `ctx.params` type text, where a param schema declares one */
 	readonly params?: Record<string, string>
 	/** name → type text; a `?` suffix on the name marks it optional */
@@ -184,6 +186,7 @@ export function extracted(spec: ExtractedSpec = {}): ExtractedTypes {
 		params: spec.params ?? {},
 		meta: spec.meta ?? null,
 		middleware: props(spec.middleware),
+		mounted: [...(spec.mounted ?? [])],
 		routes: Object.fromEntries(Object.entries(spec.routes ?? {}).map(([id, added]) => [id, props(added)])),
 	}
 }

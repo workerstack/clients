@@ -173,15 +173,28 @@ function errorsOf(op: IROperation, ctx: Ctx): { factories: Field[]; fields: Fiel
  * Without an extracted declaration (no ts-morph, or an app that declares no meta) the literals are all there is.
  */
 function ctxMeta(extracted: ExtractedTypes | null | undefined, literal: string): string {
-	const declared = extracted?.meta ?? null
+	/* with nothing extracted, the tree's literals are all there is */
+	if (extracted === null || extracted === undefined) return literal
 	/* the OpenAPI keys the declared meta does not redefine: a consumer that types `security` its own way holds
-	   that type in the handler, and intersecting backend's would conflict with it */
-	return declared === null ? literal : `Partial<Omit<HttpMeta, keyof ${declared}>> & ${declared}`
+	   that type in the handler, and intersecting backend's would conflict with it. An app that declares none
+	   holds them all, each widened by \`.meta()\` */
+	const declared = extracted.meta
+	return declared === null ? "Partial<HttpMeta>" : `Partial<Omit<HttpMeta, keyof ${declared}>> & ${declared}`
 }
 
 /** `ctx.params`: the type a param schema gives it as extracted, else each of the pattern's params a string. */
 function ctxParams(extracted: ExtractedTypes | null | undefined, id: string, pattern: string): string {
 	return extracted?.params[id] ?? objectText(paramsOf(pattern))
+}
+
+/**
+ * The ctx's `meta` and `routePattern`. A mounted route's handler types the path it was registered at, never the one
+ * it is served at, so its ctx keeps the base's `string` and that handler's own ctx still fits.
+ */
+function routeFields(extracted: ExtractedTypes | null | undefined, id: string, literal: string): Field[] {
+	const fields: Field[] = [["readonly meta", `Readonly<${ctxMeta(extracted, literal)}>`]]
+	if (!extracted?.mounted.includes(id)) fields.push(["readonly routePattern", tsString(id.slice(id.indexOf(" ") + 1))])
+	return fields
 }
 
 /** One `Routes[pattern][method]` entry. */
@@ -195,13 +208,12 @@ function routeEntry(id: string, op: IROperation, options: GenerateTypesOptions, 
 	const mt = options.tree.routes[id]?.mt
 	/* the values the tree carries, as literals: what a consumer reads a route's configuration from */
 	const literal = mt && Object.keys(mt).length > 0 ? literalType(mt) : "{}"
-	const meta = ctxMeta(extracted, literal)
 	const output = outputOf(op, ctx)
 	const own: Field[] = []
 	if (input !== "{}") own.push(["readonly input", input])
 	if (params !== "{}") own.push(["readonly params", params])
 	if (factories.length > 0) own.push(["readonly errors", objectText(factories)])
-	own.push(["readonly meta", `Readonly<${meta}>`], ["readonly routePattern", tsString(pattern)])
+	own.push(...routeFields(extracted, id, literal))
 	const base = options.baseCtxName ?? "BaseCtx"
 	const parts = [factories.length > 0 ? `Omit<${base}, "errors">` : base]
 	const adds = extracted?.routes[id]
@@ -304,14 +316,9 @@ export function generateTypes(options: GenerateTypesOptions): string {
 	const names: TypeOptions = { refName: componentNames(ir, [...RESERVED, name]) }
 	const ctx: Ctx = { names, resolve: (schema) => irToTs(schema, names) }
 	const hasErrors = [...routes.values()].some((op) => Object.keys(op.extensions.errors ?? {}).length > 0)
-	/* HttpMeta only when a declared meta is emitted: the ctx's meta is that type and the keys a route may add */
-	const declaredMeta = options.extracted?.meta ?? null
-	const imports = [
-		"HttpContext",
-		"WithOutput",
-		...(hasErrors ? ["HttpError"] : []),
-		...(declaredMeta === null ? [] : ["HttpMeta"]),
-	]
+	/* HttpMeta once a route's ctx reads it: with anything extracted, the ctx's meta is built from its keys */
+	const readsMeta = options.extracted !== null && options.extracted !== undefined && routes.size > 0
+	const imports = ["HttpContext", "WithOutput", ...(hasErrors ? ["HttpError"] : []), ...(readsMeta ? ["HttpMeta"] : [])]
 	const out = [`import type { ${imports.join(", ")} } from "@workerstack/backend/http"`]
 	out.push(baseCtx(options.extracted, name))
 	const slot = operationSlot(ir, options, ctx)
