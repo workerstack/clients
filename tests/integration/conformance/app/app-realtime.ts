@@ -3,7 +3,6 @@
  * routes every transport dials, and `realtime.capped`, a send's answer past a small response cap.
  */
 import * as z from "zod"
-import type { SSEStream } from "@workerstack/backend"
 import type { ConformanceApp, errors } from "./app.ts"
 import type { HoneyRes } from "@workerstack/backend"
 
