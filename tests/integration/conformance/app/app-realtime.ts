@@ -42,7 +42,7 @@ export function realtimeRoutes(app: ConformanceApp, streams: { dialed: number },
 
 /**
  * `realtime.capped` (bit 21 i7): a send's answer past a small response cap. The upgrade 404s, so the SDK dials the
- * event stream, which stays open with only a retry directive (Bun sends a streamed answer's headers with its first
+ * event stream, which stays open with only a retry directive (a streamed answer's headers go out with its first
  * bytes); each send (a POST, internal so in no generated artifact) answers a 2xx past 16 bytes, then `{ n: 1 }` goes
  * to every open stream, so a client that took that answer reads a frame.
  */

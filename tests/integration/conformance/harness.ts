@@ -1,5 +1,5 @@
 /**
- * The conformance harness (bit 11): spawns core's reference app on bun and drives it over HTTP
+ * The conformance harness (bit 11): spawns the reference app (launcher.ts, the app on workerd) and drives it over HTTP
  * alone. gen never imports core (H2): the app's path is a process argument. The child prints one
  * readiness line `{"url","alt","drop"}` once its listeners are up; it stops on SIGTERM or when its
  * stdin closes, so a killed vitest worker never orphans it. Opt-in: `vitest run --mode harness`.
@@ -55,7 +55,7 @@ export type TargetRunner = {
 	readonly start?: () => Promise<ReferenceApp>
 }
 
-const APP = fileURLToPath(new URL("./app/app.ts", import.meta.url))
+const APP = fileURLToPath(new URL("./app/launcher.ts", import.meta.url))
 /** where each cell's observation is recorded for the release's conformance gate (gate.ts); unset, nowhere */
 const RECORD = process.env.HONEY_CONFORMANCE_RECORD
 /**
