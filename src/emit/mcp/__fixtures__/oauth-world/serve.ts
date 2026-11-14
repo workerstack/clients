@@ -5,8 +5,13 @@
  * one readiness line (the endpoint, the issuer, the registered client and its redirect), and once its standard input
  * closes, one line with the log of every request answered, then stops.
  */
-import { serve } from "@workerstack/backend/bun"
-import { CLIENT_ID, REDIRECT_URI, startOAuthWorld } from "./fixture.ts"
+import { CLIENT_ID, REDIRECT_URI, type Serve, startOAuthWorld } from "./fixture.ts"
+
+/** The world's `serve`, on Bun's own server: plain `{ fetch }` objects on a loopback port, no WebSocket. */
+const serve: Serve = async (app, { hostname, port }) => {
+	const server = Bun.serve({ fetch: (request) => app.fetch(request, {}), hostname, port })
+	return { close: async (timeout) => void (await server.stop(timeout === 0)), url: `http://${hostname}:${server.port}` }
+}
 
 export async function main(): Promise<void> {
 	const world = await startOAuthWorld(serve)

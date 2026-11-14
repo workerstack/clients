@@ -3,10 +3,10 @@
  * `Bearer valid-token` passes; anything else, `Bearer expired-token` included, is `unauthorized`,
  * which is what the TS harness's onAuthExpired cases retry against.
  */
-import { createHash } from "node:crypto"
 import * as z from "zod"
 import { createMiddleware } from "@workerstack/backend"
 import type { ConformanceApp, errors } from "./app.ts"
+import { sha256 } from "./digest.ts"
 
 type User = { readonly email: string; readonly id: string; readonly name: string }
 
@@ -102,9 +102,9 @@ function uploadRoutes(app: Secure): void {
 		.meta({ operationId: "uploads.blob", mcp: true })
 		.input({ binary: ["application/octet-stream"] })
 		.output({ "application/json": { ok: z.object({ sha256: z.string(), size: z.number().int() }) } })
-		.handler((ctx) => {
+		.handler(async (ctx) => {
 			const { bytes } = ctx.input.binary
-			return ctx.res.json("ok", { sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.byteLength })
+			return ctx.res.json("ok", { sha256: await sha256(bytes), size: bytes.byteLength })
 		})
 	app
 		.post("/uploads/form")

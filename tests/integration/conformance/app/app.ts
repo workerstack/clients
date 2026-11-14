@@ -1,27 +1,24 @@
 /**
  * The conformance reference app (bit 11): the live target every generated client is measured
- * against. gen's harness spawns this file on bun; it serves one app on two loopback listeners (the
- * alt one is another origin) and a third, the drop origin, that cuts each answer's connection at its end
- * (drop-front.ts), and prints `{"url","alt","drop"}` once all listen. Everything crosses HTTP:
+ * against. gen's harness spawns launcher.ts, which runs this app on workerd (worker.ts) behind two loopback
+ * listeners (the alt one is another origin) and a third, the drop origin, that cuts each answer's connection at
+ * its end (drop-front.ts), and prints `{"url","alt","drop"}` once all listen. Everything crosses HTTP:
  * the routes, the document at `/v1/openapi.json`, and the wire log at `/v1/__conformance/*`.
  *
  * Every public route names an `operationId`, the key the matrix joins targets on. A root
  * middleware records each non-internal request in arrival order; `mark` and `wire?since=` read it.
  */
-import { createHash } from "node:crypto"
 import * as z from "zod"
-import { serve } from "@workerstack/backend/bun"
 import { defineErrors } from "@workerstack/backend"
 import { createErrorTranslator } from "@workerstack/backend/i18n"
-import type { MiddlewareFn } from "@workerstack/backend"
+import type { MiddlewareFn, WSAdapter } from "@workerstack/backend"
 
 /** The `next` a middleware is handed, read off the exported middleware type. */
 type NextFn = Parameters<MiddlewareFn>[1]
 import { requestId } from "@workerstack/backend/request-id"
-import { type McpHandler, mcp } from "@workerstack/backend/mcp"
 import { serveOpenApi } from "@workerstack/backend/openapi"
 import { honey } from "@workerstack/backend"
-import { listenDropFront } from "./drop-front.ts"
+import { sha256 } from "./digest.ts"
 import { createReferenceServer } from "./reference-server.ts"
 import { realtimeRoutes } from "./app-realtime.ts"
 import { secureRoutes } from "./app-secure.ts"
@@ -91,7 +88,6 @@ const CATALOG = [
 	{ id: "c3", name: "cherry" },
 ] as const
 
-const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex")
 const item = (id: string) => ({ id, name: `item ${id}` })
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 /** A realtime echo's answer to `data`: JSON as it is, any other text as `{ got }`, so a quoted send shows. */
@@ -114,7 +110,7 @@ function essence(contentType: string | null): string | null {
 async function bodyOf(request: Request): Promise<WireHop["body"]> {
 	const bytes = new Uint8Array(await request.arrayBuffer().catch(() => new ArrayBuffer(0)))
 	const contentType = essence(request.headers.get("content-type"))
-	const body = { contentType, sha256: sha256(bytes), size: bytes.byteLength }
+	const body = { contentType, sha256: await sha256(bytes), size: bytes.byteLength }
 	if (contentType === null || !/^application\/(.+\+)?json$/.test(contentType)) return body
 	try {
 		return { ...body, json: JSON.parse(new TextDecoder().decode(bytes)) as unknown }
@@ -129,8 +125,8 @@ type Captured = { readonly meta: Readonly<Record<string, unknown>>; readonly req
 function createWire(originOf: (request: Request) => WireHop["origin"]) {
 	const hops: { hop: WireHop; seq: number }[] = []
 	let seq = 0
-	/* the copy is read before the handler answers: bun 1.3 never delivers a body still unread when the
-	   response goes out (a 401 before the handler), and the hop is logged even if the client gives up */
+	/* the copy is read before the handler answers: so a request answered before its handler (a 401) still logs its body,
+	   and the hop is logged even if the client gives up */
 	const capture = async (ctx: Captured, next: NextFn) => {
 		if (ctx.meta.internal === true) return next()
 		const at = ++seq
@@ -156,8 +152,9 @@ function createWire(originOf: (request: Request) => WireHop["origin"]) {
 }
 
 /** The app with its settings, the wire capture and request ids: what every route group hangs off. */
-function configured(wire: ReturnType<typeof createWire>) {
+function configured(wire: ReturnType<typeof createWire>, wsAdapter: WSAdapter) {
 	return honey<{}>()
+		.wsAdapter(wsAdapter)
 		.encodedSlashes("allow")
 		.errorFactory(errors)
 		.defaultBoundary("api_error")
@@ -256,9 +253,9 @@ function streamRoutes(app: ConformanceApp): void {
 		.meta({ operationId: "files.put", mcp: true })
 		.input({ binary: ["application/octet-stream"] })
 		.output({ "application/json": { ok: Digest } })
-		.handler((ctx) => {
+		.handler(async (ctx) => {
 			const { bytes, type } = ctx.input.binary
-			return ctx.res.json("ok", { contentType: type, sha256: sha256(bytes), size: bytes.byteLength })
+			return ctx.res.json("ok", { contentType: type, sha256: await sha256(bytes), size: bytes.byteLength })
 		})
 	app
 		.get("/ticks")
@@ -402,7 +399,7 @@ function socketRoutes(app: ConformanceApp): void {
 }
 
 /** The conformance app; `origins` names its two listeners once they are up (none in process). */
-export function createConformanceApp(origins: () => Origins | null = () => null) {
+export function createConformanceApp(wsAdapter: WSAdapter, origins: () => Origins | null = () => null) {
 	const originOf = (request: Request): WireHop["origin"] => {
 		const host = new URL(request.url).host
 		const known = origins()
@@ -411,7 +408,7 @@ export function createConformanceApp(origins: () => Origins | null = () => null)
 		return host === new URL(known.drop).host ? "drop" : "primary"
 	}
 	const wire = createWire(originOf)
-	const captured = configured(wire)
+	const captured = configured(wire, wsAdapter)
 	const ref = createReferenceServer()
 	for (let n = 1; n <= 5; n++) ref.append({ n })
 	/* the reference server's ctx has no request id: it mounts under the capture alone */
@@ -439,32 +436,3 @@ export function createConformanceApp(origins: () => Origins | null = () => null)
 		.handler(async (ctx) => ctx.res.json("ok", wire.since(Number(new URL(ctx.req.url).searchParams.get("since") ?? 0))))
 	return serveOpenApi(app, { title: "Conformance", version: "1.0.0" })
 }
-
-/**
- * Serve on two loopback listeners and the drop origin, print the readiness line, and stop on a signal or a closed
- * stdin. With $HONEY_CONFORMANCE_MCP naming a generated MCP handler module, it is mounted at /v1/mcp (bit 21 e).
- */
-async function main(): Promise<void> {
-	let origins: Origins | null = null
-	const app = createConformanceApp(() => origins)
-	const handler = process.env.HONEY_CONFORMANCE_MCP
-	if (handler !== undefined) mcp(app, "/mcp", ((await import(handler)) as { mcpHandler: McpHandler }).mcpHandler)
-	const listeners = await Promise.all([0, 1].map(() => serve(app, { hostname: "127.0.0.1", port: 0 })))
-	const [primary, alt] = listeners as [(typeof listeners)[number], (typeof listeners)[number]]
-	const drop = await listenDropFront(app)
-	origins = { alt: alt.url, drop: drop.url, url: primary.url }
-	process.stdout.write(`${JSON.stringify({ url: primary.url, alt: alt.url, drop: drop.url })}\n`)
-	let stopping = false
-	const stop = () => {
-		if (stopping) return
-		stopping = true
-		drop.server.close()
-		void Promise.all(listeners.map((listener) => listener.close(100))).finally(() => process.exit(0))
-	}
-	process.once("SIGTERM", stop)
-	process.once("SIGINT", stop)
-	process.stdin.once("end", stop)
-	process.stdin.resume()
-}
-
-if (import.meta.main) void main()

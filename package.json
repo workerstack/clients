@@ -106,6 +106,7 @@
 		"ajv-formats": "3.0.1",
 		"js-yaml": "5.3.0",
 		"lefthook": "2.2.2",
+		"miniflare": "4.20260730.0",
 		"oxc-parser": "0.152.0",
 		"oxfmt": "0.78.0",
 		"oxlint": "1.93.0",
@@ -115,8 +116,7 @@
 		"ts-morph": "28.0.0",
 		"typescript": "7.0.2",
 		"vite": "8.1.4",
-		"vitest": "4.1.10",
-		"ws": "8.21.0"
+		"vitest": "4.1.10"
 	},
 	"peerDependencies": {
 		"oxfmt": ">=0.63.0",

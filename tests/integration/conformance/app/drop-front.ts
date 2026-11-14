@@ -1,12 +1,12 @@
 /**
- * The reference app's drop origin (bit 21 i0): a raw TCP listener relaying each request to the app in process and
+ * The reference app's drop origin (bit 21 i0): a raw TCP listener relaying each request to the app (the worker under workerd) and
  * ending the connection where the app's answer ends, without the chunked body's terminal chunk. A client reads every
  * byte the app sent, then a connection lost mid-answer: the grid's `stream/mid-drop`. A raw socket, because Bun's own
  * server finishes a body whose stream errors cleanly on 1.3 (the terminal chunk written) and resets it on 1.4.
  */
 import { createServer, type Server, type Socket } from "node:net"
 
-type FetchApp = { fetch(request: Request, env: Record<string, never>): Response | Promise<Response> }
+type FetchApp = { fetch(request: Request): Response | Promise<Response> }
 
 /** The request head's lines: the request line, then each header field. */
 function requestOf(head: string, origin: string): Request | string {
@@ -31,7 +31,7 @@ async function relay(app: FetchApp, socket: Socket, head: string, origin: string
 		socket.end(`HTTP/1.1 501 Not Implemented\r\ncontent-length: ${Buffer.byteLength(request)}\r\n\r\n${request}`)
 		return
 	}
-	const response = await app.fetch(request, {})
+	const response = await app.fetch(request)
 	let out = `HTTP/1.1 ${response.status} ${response.statusText}\r\n`
 	response.headers.forEach((value, name) => {
 		if (name !== "connection" && name !== "content-length" && name !== "transfer-encoding")
