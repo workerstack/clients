@@ -1,7 +1,7 @@
 {
 	"openapi": "3.1.0",
 	"info": {
-		"title": "Honey E2E",
+		"title": "Backend E2E",
 		"version": "0.0.1"
 	},
 	"paths": {
@@ -10,7 +10,7 @@
 				"summary": "Root test route",
 				"description": "Test route",
 				"tags": ["test"],
-				"x-honey-route": "GET /api",
+				"x-backend-route": "GET /api",
 				"parameters": [
 					{
 						"in": "query",
@@ -41,7 +41,7 @@
 							}
 						},
 						"description": "invalid_input",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"401": {
 						"content": {
@@ -52,7 +52,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -63,10 +63,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -81,7 +81,7 @@
 		},
 		"/api/boundary/custom": {
 			"get": {
-				"x-honey-route": "GET /api/boundary/custom",
+				"x-backend-route": "GET /api/boundary/custom",
 				"responses": {
 					"401": {
 						"content": {
@@ -92,7 +92,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -103,7 +103,7 @@
 							}
 						},
 						"description": "org_limit_reached",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -114,10 +114,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -132,7 +132,7 @@
 		},
 		"/api/boundary/default": {
 			"get": {
-				"x-honey-route": "GET /api/boundary/default",
+				"x-backend-route": "GET /api/boundary/default",
 				"responses": {
 					"401": {
 						"content": {
@@ -143,7 +143,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -154,10 +154,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -169,7 +169,7 @@
 		},
 		"/api/echo": {
 			"get": {
-				"x-honey-route": "ALL /api/echo",
+				"x-backend-route": "ALL /api/echo",
 				"responses": {
 					"401": {
 						"content": {
@@ -180,7 +180,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -191,10 +191,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -204,7 +204,7 @@
 				}
 			},
 			"post": {
-				"x-honey-route": "ALL /api/echo",
+				"x-backend-route": "ALL /api/echo",
 				"responses": {
 					"401": {
 						"content": {
@@ -215,7 +215,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -226,10 +226,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -239,7 +239,7 @@
 				}
 			},
 			"put": {
-				"x-honey-route": "ALL /api/echo",
+				"x-backend-route": "ALL /api/echo",
 				"responses": {
 					"401": {
 						"content": {
@@ -250,7 +250,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -261,10 +261,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -274,7 +274,7 @@
 				}
 			},
 			"patch": {
-				"x-honey-route": "ALL /api/echo",
+				"x-backend-route": "ALL /api/echo",
 				"responses": {
 					"401": {
 						"content": {
@@ -285,7 +285,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -296,10 +296,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -309,7 +309,7 @@
 				}
 			},
 			"delete": {
-				"x-honey-route": "ALL /api/echo",
+				"x-backend-route": "ALL /api/echo",
 				"responses": {
 					"401": {
 						"content": {
@@ -320,7 +320,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -331,10 +331,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -347,7 +347,7 @@
 		"/api/echo-ws": {
 			"get": {
 				"x-websocket": true,
-				"x-honey-route": "WS /api/echo-ws",
+				"x-backend-route": "WS /api/echo-ws",
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
@@ -357,7 +357,7 @@
 		},
 		"/api/events": {
 			"get": {
-				"x-honey-route": "GET /api/events",
+				"x-backend-route": "GET /api/events",
 				"responses": {
 					"200": {
 						"description": "ok",
@@ -378,7 +378,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -389,10 +389,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -404,7 +404,7 @@
 		},
 		"/api/events-live": {
 			"get": {
-				"x-honey-route": "GET /api/events-live",
+				"x-backend-route": "GET /api/events-live",
 				"responses": {
 					"200": {
 						"description": "ok",
@@ -425,7 +425,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -436,10 +436,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -451,7 +451,7 @@
 		},
 		"/api/health": {
 			"get": {
-				"x-honey-route": "GET /api/health",
+				"x-backend-route": "GET /api/health",
 				"responses": {
 					"401": {
 						"content": {
@@ -462,7 +462,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -473,10 +473,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -488,7 +488,7 @@
 		},
 		"/api/realtime/broadcast/{topic}": {
 			"post": {
-				"x-honey-route": "POST /api/realtime/broadcast/:topic",
+				"x-backend-route": "POST /api/realtime/broadcast/:topic",
 				"parameters": [
 					{
 						"in": "path",
@@ -509,7 +509,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -520,10 +520,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -536,7 +536,7 @@
 		"/api/realtime/chat/{roomId}": {
 			"get": {
 				"x-websocket": true,
-				"x-honey-route": "WS /api/realtime/chat/:roomId",
+				"x-backend-route": "WS /api/realtime/chat/:roomId",
 				"parameters": [
 					{
 						"in": "path",
@@ -557,7 +557,7 @@
 		"/api/realtime/echo": {
 			"get": {
 				"x-websocket": true,
-				"x-honey-route": "WS /api/realtime/echo",
+				"x-backend-route": "WS /api/realtime/echo",
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
@@ -568,7 +568,7 @@
 		"/api/reconnect-ws": {
 			"get": {
 				"x-websocket": true,
-				"x-honey-route": "WS /api/reconnect-ws",
+				"x-backend-route": "WS /api/reconnect-ws",
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
@@ -578,7 +578,7 @@
 		},
 		"/api/v1/organizations": {
 			"get": {
-				"x-honey-route": "GET /api/v1/organizations",
+				"x-backend-route": "GET /api/v1/organizations",
 				"responses": {
 					"401": {
 						"content": {
@@ -589,7 +589,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -600,10 +600,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -613,7 +613,7 @@
 				}
 			},
 			"post": {
-				"x-honey-route": "POST /api/v1/organizations",
+				"x-backend-route": "POST /api/v1/organizations",
 				"responses": {
 					"400": {
 						"content": {
@@ -624,7 +624,7 @@
 							}
 						},
 						"description": "invalid_input",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"401": {
 						"content": {
@@ -635,7 +635,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -646,7 +646,7 @@
 							}
 						},
 						"description": "org_limit_reached",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"409": {
 						"content": {
@@ -657,7 +657,7 @@
 							}
 						},
 						"description": "org_slug_taken",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -668,10 +668,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -692,7 +692,7 @@
 		},
 		"/api/v1/organizations/{orgId}": {
 			"get": {
-				"x-honey-route": "GET /api/v1/organizations/:orgId",
+				"x-backend-route": "GET /api/v1/organizations/:orgId",
 				"parameters": [
 					{
 						"in": "path",
@@ -713,7 +713,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -724,10 +724,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -737,7 +737,7 @@
 				}
 			},
 			"delete": {
-				"x-honey-route": "DELETE /api/v1/organizations/:orgId",
+				"x-backend-route": "DELETE /api/v1/organizations/:orgId",
 				"parameters": [
 					{
 						"in": "path",
@@ -761,7 +761,7 @@
 							}
 						},
 						"description": "unauthorized",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"500": {
 						"content": {
@@ -772,10 +772,10 @@
 							}
 						},
 						"description": "api_error",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"api_error": {
 						"status": 500
 					},
@@ -788,7 +788,7 @@
 		"/api/v1/socket": {
 			"get": {
 				"x-websocket": true,
-				"x-honey-route": "WS /api/v1/socket",
+				"x-backend-route": "WS /api/v1/socket",
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"

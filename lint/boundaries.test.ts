@@ -5,10 +5,10 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 
 const rule = plugin.rules.boundaries
 const ESCAPE = "an import stays inside its package's src (no repo path outside it, no sibling package)"
-const TS_MORPH = "ts-morph is for honey-clients's extract/ only"
-const INTERNAL = "honey-clients reads @workerstack/backend through public subpaths only"
+const TS_MORPH = "ts-morph is for clients's extract/ only"
+const INTERNAL = "clients reads @workerstack/backend through public subpaths only"
 
-describe("honey/boundaries: imports", () => {
+describe("clients/boundaries: imports", () => {
 	it("never leaves the package's src: no repo path outside it, no sibling package by path", () => {
 		const fixture = {
 			"src/emit/ts/sdk.ts": 'import { judge } from "../../../../bench/src/significance.ts"\n',
@@ -31,7 +31,7 @@ describe("honey/boundaries: imports", () => {
 		expect(reportsOf(rule, fixture)).toEqual([{ file: "src/ir/load.ts", message: TS_MORPH }])
 	})
 
-	it("keeps honey-clients on @workerstack/backend's public subpaths", () => {
+	it("keeps clients on @workerstack/backend's public subpaths", () => {
 		const fixture = {
 			"src/ir/load.ts": [
 				'import type { OpenApiSpec } from "@workerstack/backend/http/openapi"',
@@ -55,7 +55,7 @@ describe("honey/boundaries: imports", () => {
 		expect(reportsOf(rule, fixture)).toEqual([])
 	})
 
-	it("fails oxlint through the honey plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
+	it("fails oxlint through the clients plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
 		const fixture = {
 			"src/ir/load.ts": 'import { Project } from "ts-morph"\n',
 			"src/extract/walk.ts": 'import { Project } from "ts-morph"\n',

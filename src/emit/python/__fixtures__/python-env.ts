@@ -1,8 +1,8 @@
 /**
  * The one way gen runs Python (G10, G11): every uv, python, ruff and mypy a test, the conformance runner or the
- * harness spawns goes through here. It runs the uv `uv.toml` pins, installed into `$HOME/.cache/honey-tmp/python/uv`
+ * harness spawns goes through here. It runs the uv `uv.toml` pins, installed into `$HOME/.cache/backend-tmp/python/uv`
  * by `uvInstall` (never the user's own uv, which it leaves alone), and only the uv-managed interpreters that uv
- * installed under `$HOME/.cache/honey-tmp/python/pythons` with `--no-bin`, so nothing lands in `~/.local/bin`. All
+ * installed under `$HOME/.cache/backend-tmp/python/pythons` with `--no-bin`, so nothing lands in `~/.local/bin`. All
  * caches stay under that dir (never /tmp, 00-rules). Downloads are manual: a missing uv or interpreter fails
  * where Python is required, naming its install, and is never fetched by a run. A structure test forbids a Python
  * spawn elsewhere.
@@ -33,7 +33,7 @@ export const pinnedUv = (): string => pinIn("uv.toml", /^required-version = "==(
 
 /** Where gen's Python lives: one area under the toolchain cache, made on first use. */
 export function pythonCacheDir(...parts: string[]): string {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/python", ...parts)
+	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/python", ...parts)
 	mkdirSync(dir, { recursive: true })
 	return dir
 }
@@ -225,7 +225,7 @@ export function hasPython(version = pinnedPython()): boolean {
 
 /** Whether a missing Python must fail rather than skip: CI and the pre-push battery set one of these. */
 export function pythonRequired(): boolean {
-	return process.env.HONEY_REQUIRE_TOOLCHAINS === "1" || process.env.HONEY_REQUIRE_PYTHON === "1"
+	return process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1" || process.env.CLIENTS_REQUIRE_PYTHON === "1"
 }
 
 /**
@@ -237,7 +237,7 @@ export function withPython(version = pinnedPython()): boolean {
 	const found = find(version)
 	if (found.status !== 0 && pythonRequired())
 		throw new Error(
-			`Python ${version} is required here (HONEY_REQUIRE_PYTHON or HONEY_REQUIRE_TOOLCHAINS) and is not installed under uv ${pinnedUv()}: ${uvInstall(pinnedUv())}; ${pythonInstall([version])}\n${found.error?.message ?? found.stderr}`,
+			`Python ${version} is required here (CLIENTS_REQUIRE_PYTHON or CLIENTS_REQUIRE_TOOLCHAINS) and is not installed under uv ${pinnedUv()}: ${uvInstall(pinnedUv())}; ${pythonInstall([version])}\n${found.error?.message ?? found.stderr}`,
 		)
 	return found.status === 0
 }

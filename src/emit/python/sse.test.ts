@@ -100,7 +100,7 @@ async with aclient() as c:
 const TYPES = [
 	"from typing import assert_type",
 	"",
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"",
 	"",
 	"async def run(c: sdk.AsyncSDK) -> None:",
@@ -200,7 +200,7 @@ describe.skipIf(!PY)("an SSE stream's failures and typed headers: raised once, t
 		]
 		const { run } = await drive(replies, [ticks(), ticks()], { script: {} })
 		const decoded = {
-			chain: ["DecodeError", "HoneyError"],
+			chain: ["DecodeError", "HttpError"],
 			status: undefined,
 			text: "an event's data is not a JSON object",
 			type: "DecodeError",
@@ -246,7 +246,7 @@ const FAILED_OPENED = {
 	calls: [
 		{
 			error: {
-				chain: ["NotFoundError", "APIStatusError", "HoneyError"],
+				chain: ["NotFoundError", "APIStatusError", "HttpError"],
 				status: 404,
 				text: "HTTP 404: nope",
 				type: "NotFoundError",
@@ -256,7 +256,7 @@ const FAILED_OPENED = {
 		},
 		{
 			error: {
-				chain: ["InternalServerError", "APIStatusError", "HoneyError"],
+				chain: ["InternalServerError", "APIStatusError", "HttpError"],
 				status: 500,
 				text: "HTTP 500: boom",
 				type: "InternalServerError",
@@ -420,7 +420,7 @@ describe.skipIf(!PY)(
 			const call = run.trace?.calls[0]
 			expect({ error: errorOf(call?.error), hops: hops.length, observed: run.observed }, run.stderr).toEqual({
 				error: {
-					chain: ["CanceledError", "HoneyError"],
+					chain: ["CanceledError", "HttpError"],
 					status: undefined,
 					text: "the call was canceled",
 					type: "CanceledError",

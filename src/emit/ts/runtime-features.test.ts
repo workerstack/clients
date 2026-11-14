@@ -36,7 +36,7 @@ const doc = (paths: Record<string, unknown>, webhooks?: Record<string, unknown>)
 /** A Standard Webhooks event `type` whose data is `{ [field]: string }`, as core documents it. */
 const event = (type: string, field: string) => ({
 	post: {
-		"x-honey-webhook": "standard-webhooks",
+		"x-backend-webhook": "standard-webhooks",
 		requestBody: {
 			content: {
 				"application/json": {
@@ -151,7 +151,7 @@ describe("the runtime a generated SDK ships", () => {
 		expect(typeErrors(sdkFiles(document).files)).toEqual([])
 	})
 
-	/* `SDK` is honey-clients' default name, and `SDKConfig` is also the runtime config type the types file imports */
+	/* `SDK` is clients' default name, and `SDKConfig` is also the runtime config type the types file imports */
 	it.each([
 		["a plain document", doc(HEALTH)],
 		["a document with events", doc(HEALTH, EVENTS_HOOKS)],

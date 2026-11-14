@@ -169,7 +169,7 @@ describe.skipIf(!DOTNET)("an SSE open through a plain call's pipeline: the OnRes
 			run.stderr,
 		).toEqual({
 			error: plain({
-				chain: ["HookException", "HoneyException"],
+				chain: ["HookException", "HttpException"],
 				inner: "InvalidOperationException",
 				text: "hook: bad",
 				type: "HookException",

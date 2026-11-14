@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	sdk "honey.test/driver/sdk"
+	sdk "backend.test/driver/sdk"
 )
 
 // script is the envelope's optional script, decoded strictly

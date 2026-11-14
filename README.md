@@ -5,14 +5,14 @@ server from an OpenAPI 3.x document, or straight from a
 [`@workerstack/backend`](https://www.npmjs.com/package/@workerstack/backend) app.
 
 Every target reads one intermediate representation and vendors its own small runtime, so a generated SDK has no
-dependency on honey, and a spec from another framework generates just as well. The output is formatted and
+dependency on backend, and a spec from another framework generates just as well. The output is formatted and
 deterministic: regenerating an unchanged spec changes nothing on disk.
 
 This page is the whole generator — every target, every flag, and what each client looks like to call.
 
 - [Install](#install)
 - [Start](#start)
-- [honey-clients generate](#honey-clients-generate)
+- [clients generate](#clients-generate)
 - [Every flag](#every-flag)
 - [The six SDKs](#the-six-sdks)
   - [The TypeScript SDK](#the-typescript-sdk)
@@ -33,7 +33,7 @@ This page is the whole generator — every target, every flag, and what each cli
 
 ## Install
 
-honey moved to the workerstack org in 1.0.0-rc.23, and [the migration note](https://github.com/workerstack/backend/blob/main/docs/migrating-from-honey.md)
+backend moved to the workerstack org in 1.0.0-rc.23, and [the migration note](https://github.com/workerstack/backend/blob/main/docs/migrating-from-honey.md)
 maps each old package name to its new one. 1.0 is out as a release candidate, published under npm's `next` tag, so
 an install without a tag gets a deprecated placeholder.
 Add `@next` until the final release:
@@ -51,53 +51,53 @@ Each target formats what it writes with that language's own formatter, when it c
 | `go`, `cli` | gofmt     | `$GOFMT`, `$GOROOT/bin/gofmt`, `gofmt` on `PATH`, beside the `go` on `PATH` |
 | `python`    | ruff      | `$RUFF`, then `ruff` on `PATH`                                              |
 | `rust`      | rustfmt   | `$RUSTFMT`, the active toolchain's own binary beside `rustc`, `PATH`        |
-| `ts`        | oxfmt     | the `oxfmt` optional peer, installed beside honey-clients                   |
+| `ts`        | oxfmt     | the `oxfmt` optional peer, installed beside clients                         |
 
 A formatter it cannot find is named on standard error and skipped: the files go out as the emitter wrote them,
 which is valid source either way, so generating a Python SDK never requires you to install ruff. Set
-`HONEY_REQUIRE_FORMATTERS=1` to make a missing formatter fail the run instead, for a pipeline that would
+`CLIENTS_REQUIRE_FORMATTERS=1` to make a missing formatter fail the run instead, for a pipeline that would
 rather stop than ship unformatted code. An override that points at nothing is refused by name.
 
-oxfmt is the exception and says nothing when absent: it is honey's own choice of TypeScript formatter and a
-declared optional peer, so not having it is the documented normal rather than news. `HONEY_REQUIRE_FORMATTERS`
+oxfmt is the exception and says nothing when absent: it is clients' own choice of TypeScript formatter and a
+declared optional peer, so not having it is the documented normal rather than news. `CLIENTS_REQUIRE_FORMATTERS`
 still stops for it.
 
 The `csharp` and `java` targets are not formatted today: `dotnet format` and google-java-format work over a
-project rather than a stream, which honey's post-pass does not yet do.
+project rather than a stream, which clients' post-pass does not yet do.
 
 ## Start
 
 From a document:
 
 ```sh
-npx honey-clients generate --spec openapi.json --target ts --target python --out generated
+npx clients generate --spec openapi.json --target ts --target python --out generated
 ```
 
-From a honey app module, with no document written first:
+From a backend app module, with no document written first:
 
 ```sh
-npx honey-clients generate --app src/app.ts --target ts --target go --go-module-path github.com/acme/shop/sdk \
+npx clients generate --app src/app.ts --target ts --target go --go-module-path github.com/acme/shop/sdk \
   --out generated
 ```
 
 The targets are `ts`, `go`, `rust`, `python`, `csharp`, `java`, `cli` and `mcp`. Each target's files go under
 `<out>/<target>`.
 
-## honey-clients generate
+## clients generate
 
 ```sh
-honey-clients generate --spec openapi.json --target ts --target cli --out generated \
+clients generate --spec openapi.json --target ts --target cli --out generated \
   --cli-binary-name shop --cli-module-path github.com/acme/shop --cli-repo acme/shop
 ```
 
 - `--spec <file>`: the OpenAPI document, as JSON.
-- `--app <module>[#export]`: a honey app module instead of `--spec` (give one, never both). Its named export, else
+- `--app <module>[#export]`: a backend app module instead of `--spec` (give one, never both). Its named export, else
   `app`, else `default`, is the app; its document is made by the app's own `@workerstack/backend/http/openapi`, resolved from
   the app as at run time, and the module's `openApi` export, if any, is that document's options (`info`,
   `securitySchemes`, `invalidate`, …, as `generateOpenApi` takes them). Started by `bun run`, the bin hands the load to
   that Bun, so a module needing Bun's loaders works; a run ends once it has written, whatever the module left open.
   The module exports the app and serves nothing: one that calls `serve()` as it loads is outside `--app`'s contract,
-  since honey never serves implicitly and has no switch to stop it.
+  since backend never serves implicitly and has no switch to stop it.
 - `--target <name>`: `ts`, `go`, `rust`, `python`, `csharp`, `java`, `cli` or `mcp`; repeat it for more than one.
 - `--out <dir>`: each target's files go under `<dir>/<target>`.
 - `--<target>-<option>`: a target's options are its generator's, passed through as given. Each takes a value.
@@ -115,7 +115,7 @@ One table, since a flag that is not written down is a flag nobody finds:
 | Flag                       | Target | What it sets                                                                      |
 | -------------------------- | ------ | --------------------------------------------------------------------------------- |
 | `--spec <file>`            | —      | the OpenAPI document to generate from                                             |
-| `--app <module>[#export]`  | —      | a honey app module instead of a document                                          |
+| `--app <module>[#export]`  | —      | a backend app module instead of a document                                        |
 | `--target <name>`          | —      | which target to emit; repeat for more than one                                    |
 | `--out <dir>`              | —      | the output root; each target writes under `<dir>/<target>`                        |
 | `--watch`                  | —      | regenerate on each change, in a fresh process                                     |
@@ -199,7 +199,7 @@ a place for the field, so a description or license is given once, not once per t
 same meaning wins: `--java-description` over `--metadata-description`. Each field is checked before anything
 generates: URLs must be https, the license an SPDX expression, text one line.
 
-`--metadata-readme` and `--metadata-license-file` name files on disk, read once relative to where honey runs. Every
+`--metadata-readme` and `--metadata-license-file` name files on disk, read once relative to where clients runs. Every
 target writes them into its package root as `README.md` and `LICENSE`, and each manifest points at the ones it has:
 pyproject's `readme` and `license-files`, Cargo's `readme` and `include`, the `.csproj`'s `PackageReadmeFile` and packed
 items, and jsr.json's publish list; npm packs both on its own. The README must be a `.md` file, and both must be UTF-8
@@ -218,7 +218,7 @@ language's client in a slice of a compiled example; the
 ### The TypeScript SDK
 
 ```sh
-honey-clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen
+clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen
 ```
 
 ```ts sdk
@@ -261,7 +261,7 @@ also gets a `jsr.json` that publishes the sources themselves, its `.js` imports 
 `--metadata-*` fills description, keywords, homepage, bugs, license, author and repository.
 
 ```sh
-honey-clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen \
+clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen \
   --ts-package-name @acme/kitchen --ts-version 1.4.0 --metadata-license MIT
 ```
 
@@ -270,7 +270,7 @@ honey-clients generate --spec openapi.json --target ts --out generated --ts-name
 `--ts-tanstack-query` writes one more file beside the SDK, `<stem>.tanstack-query.gen.ts`. It takes no value:
 
 ```sh
-honey-clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen --ts-tanstack-query
+clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen --ts-tanstack-query
 ```
 
 Its `createQueryHelpers(sdk, { getQueryClient })` gives five surfaces — `query`, `mutation`, `infiniteQuery`,
@@ -296,11 +296,11 @@ filter's own positions, so that reaches every search of that read, the paged ent
 params are not all known the filter stays the bare prefix, which reaches everything under it — made stale
 rather than missed.
 
-Two notes. `@tanstack/query-core` is your dependency, not honey's — install it yourself; the file imports it for
+Two notes. `@tanstack/query-core` is your dependency, not backend's — install it yourself; the file imports it for
 types only. And a read's options carry `initialData: undefined`, which is what solid-query needs to keep the
 unseeded overload; it is harmless under react-query.
 
-Drop the flag and the next run deletes the file, the way `.honey-generated.json` deletes anything the previous
+Drop the flag and the next run deletes the file, the way `.clients-generated.json` deletes anything the previous
 run wrote and this one did not. The index file never re-exports the adapter, so an SDK generated without the
 flag names no TanStack type anywhere.
 
@@ -310,7 +310,7 @@ Idiomatic Go: a `Config`, `context.Context` on every call, errors read with `err
 `range` over a function.
 
 ```sh
-honey-clients generate --spec openapi.json --target go --out generated --go-module-path github.com/acme/shop/sdk
+clients generate --spec openapi.json --target go --out generated --go-module-path github.com/acme/shop/sdk
 ```
 
 Go wants a v2-or-later module's major version at the end of its path, so pass the base path and the version:
@@ -343,7 +343,7 @@ func listing(ctx context.Context, client *sdk.Client) string {
 Async over `reqwest`, each call taking its options struct, with the safe mirror as a second client style.
 
 ```sh
-honey-clients generate --spec openapi.json --target rust --out generated --rust-crate-name shop-sdk
+clients generate --spec openapi.json --target rust --out generated --rust-crate-name shop-sdk
 ```
 
 ```rust
@@ -369,13 +369,13 @@ A sync `SDK` and an async `AsyncSDK`, both context managers, typed for `mypy --s
 dataclasses to narrow with `match`.
 
 ```sh
-honey-clients generate --spec openapi.json --target python --out generated --python-package-name shop_sdk
+clients generate --spec openapi.json --target python --out generated --python-package-name shop_sdk
 ```
 
 `pyproject.toml` builds with hatchling and carries what PyPI shows: `--metadata-*` gives the description, the SPDX
 `license` (PEP 639, so no `License ::` classifier), authors, keywords, and `[project.urls]` (Homepage, Source,
-Issues, Documentation, Changelog). The classifiers name the Python versions honey tests and `Typing :: Typed`, and
-honey's own manifest stays out of the sdist.
+Issues, Documentation, Changelog). The classifiers name the Python versions clients tests and `Typing :: Typed`, and
+clients' own manifest stays out of the sdist.
 
 ```python
 async def health(client: AsyncSDK) -> str:
@@ -394,7 +394,7 @@ A .NET project with its own `HttpClient` pipeline, `IAsyncDisposable` streams, a
 `Result<T>`.
 
 ```sh
-honey-clients generate --spec openapi.json --target csharp --out generated --csharp-package-id Acme.Shop
+clients generate --spec openapi.json --target csharp --out generated --csharp-package-id Acme.Shop
 ```
 
 nuget.org shows a package's description, authors, license and links: give them with `--csharp-description`,
@@ -402,7 +402,7 @@ nuget.org shows a package's description, authors, license and links: give them w
 into `dotnet pack`.
 
 ```csharp
-    public static async Task<string> Listing(HoneySdkClient client, string id)
+    public static async Task<string> Listing(HttpSdkClient client, string id)
     {
         var result = await client.Safe.GetApiAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
         return result.Match(
@@ -422,7 +422,7 @@ A Java 17 library on Jackson 3, with builders, `try`-with-resources streams, `cl
 `Result<T>`, and a Gradle publication.
 
 ```sh
-honey-clients generate --spec openapi.json --target java --out generated --java-group-id com.acme
+clients generate --spec openapi.json --target java --out generated --java-group-id com.acme
 ```
 
 Maven Central refuses a POM without a URL, a license, a developer and scm: give them with `--java-homepage`,
@@ -471,7 +471,7 @@ release workflow, which can publish to Homebrew, Scoop, winget, AUR and deb/rpm/
 install scripts that verify what they install.
 
 ```sh
-honey-clients generate --spec openapi.json --target cli --out ./cli --cli-repo acme/shop-cli
+clients generate --spec openapi.json --target cli --out ./cli --cli-repo acme/shop-cli
 shop orders list --status open --output json
 ```
 
@@ -517,7 +517,7 @@ Full reference: [installgen](https://github.com/workerstack/clients/blob/main/sr
 
 ## Release tooling
 
-`honey-clients release` cuts versions for a product's public packages and mirrors each one to its own GitHub repo.
+`clients release` cuts versions for a product's public packages and mirrors each one to its own GitHub repo.
 A product describes its packages once, in a `release.config.ts` typed by the `@workerstack/clients/release`
 library; each package's dir sits beside the config, and the repo root is the config's git toplevel:
 
@@ -536,9 +536,9 @@ export default defineRelease({
 ```
 
 ```sh
-honey-clients release bump --config acme-release/release.config.ts [--major]
-honey-clients release sync --config acme-release/release.config.ts [--only sdk] [--dry-run] [--validate-only]
-honey-clients release bootstrap --config acme-release/release.config.ts (--all | --only sdk) [--force-bootstrap]
+clients release bump --config acme-release/release.config.ts [--major]
+clients release sync --config acme-release/release.config.ts [--only sdk] [--dry-run] [--validate-only]
+clients release bootstrap --config acme-release/release.config.ts (--all | --only sdk) [--force-bootstrap]
 ```
 
 `bump` writes each changed package's version files, `CHANGELOG.md` and `.release-state.json` (an API change is a
@@ -554,7 +554,7 @@ status and key, never as a successful result. Read-only operations are annotated
 default, and Streamable HTTP with `--http`.
 
 ```sh
-honey-clients generate --spec openapi.json --target mcp --out ./mcp --mcp-name acme
+clients generate --spec openapi.json --target mcp --out ./mcp --mcp-name acme
 ```
 
 Its package publishes to npm as written. `--mcp-package-name @acme/shop-mcp` names it (its bin keeps the server's
@@ -596,13 +596,13 @@ Full reference: [the generated MCP server](https://github.com/workerstack/backen
 
 ## Configuring generation
 
-In a honey project the generation is configured once, in the Vite plugin, and `honey-clients generate --app` reads
+In a backend project the generation is configured once, in the Vite plugin, and `clients generate --app` reads
 the same app. `codegen.mcp` writes the handler `mcp()` mounts, and `codegen.openApi` the document the SDKs are
 generated from:
 
 ```sh
 # the whole set, from the app module, in one run
-npx honey-clients generate --app src/app.ts \
+npx clients generate --app src/app.ts \
   --target ts --target go --target python --target cli --target mcp \
   --go-module-path github.com/acme/shop/sdk --cli-repo acme/shop-cli --out generated
 ```
@@ -610,7 +610,7 @@ npx honey-clients generate --app src/app.ts \
 ```json
 {
 	"scripts": {
-		"generate": "honey generate && honey-clients generate --app src/app.ts --target ts --out generated"
+		"generate": "backend generate && clients generate --app src/app.ts --target ts --out generated"
 	}
 }
 ```
@@ -621,7 +621,7 @@ from a developer's.
 
 ## What a run writes
 
-**Stale files are deleted, edited ones kept.** Each `<out>/<target>` keeps `.honey-generated.json`: every file the
+**Stale files are deleted, edited ones kept.** Each `<out>/<target>` keeps `.clients-generated.json`: every file the
 run wrote, with its sha256. A file is rewritten only when its bytes change, through a temp file renamed over it. A
 regeneration deletes a file the last run wrote and this one does not (a `cli` target's old `<name>_cmds.go`, say),
 unless it was edited since: that one is kept and named on stderr. A file the manifest never listed is never deleted,
@@ -637,7 +637,7 @@ the package on each registry it publishes to, as `{ registry, name, version }` (
 `npm` and `mcp-registry` for an MCP server with an `mcpName`, `pypi`, `crates.io`, `nuget`, `maven-central` as
 `group:artifact`, and `go` by the module path, its `/vN` included and no version when none is given).
 `writeTarget(dir, files, packages)` writes one target's into a directory you pick under the same rules, keeping
-`MANIFEST` (`.honey-generated.json`) there with the packages recorded beside the files, so a release reads each name
+`MANIFEST` (`.clients-generated.json`) there with the packages recorded beside the files, so a release reads each name
 and version from it. A file the last call wrote that you leave out of `files` is stale: deleted if unedited, kept and
 named in the result's `kept` if you changed it, and dropped from the manifest either way, so a file you take over by
 editing is never touched again.
@@ -656,7 +656,7 @@ const result = targetOptionSchemas.go["~standard"].validate({ modulePath: "githu
 export const ok = result.issues === undefined && TARGETS.includes("go")
 ```
 
-This package also exports the app-side generators the honey CLI and Vite plugin use: `generateRouteTree`,
+This package also exports the app-side generators the backend CLI and Vite plugin use: `generateRouteTree`,
 `generateTypes` and `extractTypes` from `@workerstack/clients`, and the command's own entry at
 `@workerstack/clients/cli`.
 

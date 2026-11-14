@@ -1,6 +1,6 @@
 /**
  * The Java deadline (bit 16 phase c2, W8; Qc3, contract 47 §5.10): one deadline over the whole non-streaming exchange,
- * every hop and the auth retry, ended as ApiTimeoutException (a HoneyException, never CancellationException; ruling #1).
+ * every hop and the auth retry, ended as ApiTimeoutException (a HttpException, never CancellationException; ruling #1).
  *
  * C#'s scope, read from src/runtime/csharp/Exchange.cs: `_log.Start()` (line 57) runs before the timer, then the linked
  * token's `CancelAfter` (lines 59-63) wraps `AnswerAsync` (line 66). Inside it: the auth retry (lines 103-106), the request
@@ -90,7 +90,7 @@ async function drive(replies: readonly Reply[], calls: readonly Call[], setup: S
 /** An error as the trace records a lapsed deadline: the SDK's timeout, thrown by the method, not canceled. */
 const lapsed = (text: string): Partial<JavaError> => ({
 	canceled: false,
-	chain: ["ApiTimeoutException", "HoneyException"],
+	chain: ["ApiTimeoutException", "HttpException"],
 	display: expect.any(String),
 	inner: TIMEOUT_CHAIN,
 	text,

@@ -1,7 +1,7 @@
 /**
  * The one way gen runs Java (G10, G11, R7): every java, javac, javap, Gradle and google-java-format a test, a fixture
  * or the harness spawns goes through here. It runs only the releases `java-pins.json` pins by sha256, extracted into
- * `$HOME/.cache/honey-tmp/java/toolchain/<release>` by `javaInstall`'s command after each checksum passes: never a
+ * `$HOME/.cache/backend-tmp/java/toolchain/<release>` by `javaInstall`'s command after each checksum passes: never a
  * java or gradle on PATH, never a caller's `JAVA_HOME`. The Jackson set and its POMs live in `…/java/repo` in Maven
  * layout, and every Gradle run resolves from that repo alone, offline, with no daemon. The default run uses JDK 21
  * (google-java-format needs it); 17 and 25 are CI's matrix. Downloads are manual: a missing pin fails where Java is
@@ -34,13 +34,13 @@ const pins = (): Pins => JSON.parse(readFileSync(resolve(import.meta.dirname, "j
 
 /** Where gen's Java lives: one area under the toolchain cache, made on first use. */
 export function javaCacheDir(...parts: string[]): string {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/java", ...parts)
+	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/java", ...parts)
 	mkdirSync(dir, { recursive: true })
 	return dir
 }
 
 /** The cache root without making it: a presence check never writes. */
-const root = () => join(process.env.HOME ?? homedir(), ".cache/honey-tmp/java")
+const root = () => join(process.env.HOME ?? homedir(), ".cache/backend-tmp/java")
 
 /** The google-java-format jar the pins name. */
 export const gjfJar = (): string =>
@@ -129,7 +129,7 @@ export function execJava(
 			options.killAfterMs === undefined
 				? undefined
 				: setTimeout(() => {
-						stderr += `honey: the program was killed, still running after ${options.killAfterMs} ms\n`
+						stderr += `clients: the program was killed, still running after ${options.killAfterMs} ms\n`
 						child.kill("SIGKILL")
 					}, options.killAfterMs)
 		child.on("close", () => clearTimeout(bound))
@@ -163,7 +163,7 @@ export const runGjf = (args: readonly string[], options: RunOptions = {}) =>
 
 /** The init script every Gradle run takes: the cache's repo is its only repository. */
 function offlineInit(): string {
-	const path = join(javaCacheDir("gradle-home"), "honey-offline.gradle")
+	const path = join(javaCacheDir("gradle-home"), "clients-offline.gradle")
 	const repo = join(root(), "repo")
 	const text = `allprojects { repositories { clear(); maven { url = uri("file://${repo}") } } }\n`
 	if (!existsSync(path) || readFileSync(path, "utf8") !== text) writeFileSync(path, text)
@@ -186,7 +186,7 @@ export function hasJava(): boolean {
 
 /** Whether a missing pin must fail rather than skip: CI and the pre-push battery set one of these. */
 export const javaRequired = (): boolean =>
-	process.env.HONEY_REQUIRE_TOOLCHAINS === "1" || process.env.HONEY_REQUIRE_JAVA === "1"
+	process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1" || process.env.CLIENTS_REQUIRE_JAVA === "1"
 
 /**
  * Whether a test runs its Java half: false only where Java may be absent. A missing pin fails where it is required

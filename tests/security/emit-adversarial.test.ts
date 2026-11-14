@@ -23,7 +23,7 @@ const GO = withGo()
 
 const REPO = resolve(import.meta.dirname, "../..")
 
-const mutant = guardNamed(process.env.HONEY_MUTANT)
+const mutant = guardNamed(process.env.CLIENTS_MUTANT)
 if (mutant !== undefined) {
 	vi.doMock(resolve(REPO, mutant.module), async (importOriginal) => {
 		const original = await importOriginal<Record<string, unknown>>()
@@ -112,9 +112,9 @@ const { generateTypes } = (await import(
 const { emittedApp, emittedRouteTree, emittedWebhooks, recordingFetch } = (await import(
 	resolve(REPO, "src/emit/ts/__fixtures__/emitted.ts")
 )) as typeof import("../../src/emit/ts/__fixtures__/emitted.ts")
-const { honeyDoc } = (await import(
-	resolve(REPO, "src/emit/ts/__fixtures__/honey-doc.ts")
-)) as typeof import("../../src/emit/ts/__fixtures__/honey-doc.ts")
+const { httpDoc } = (await import(
+	resolve(REPO, "src/emit/ts/__fixtures__/http-doc.ts")
+)) as typeof import("../../src/emit/ts/__fixtures__/http-doc.ts")
 const { treeOf } = (await import(
 	resolve(REPO, "src/emit/ts/__fixtures__/tree-data.ts")
 )) as typeof import("../../src/emit/ts/__fixtures__/tree-data.ts")
@@ -133,7 +133,7 @@ function syntaxErrors(text: string): string[] {
 }
 
 /** generateTypes over `app` with nothing extracted. */
-const typesOf = (app: ReturnType<typeof honeyDoc>) => generateTypes({ ...app, extracted: null, report: () => {} })
+const typesOf = (app: ReturnType<typeof httpDoc>) => generateTypes({ ...app, extracted: null, report: () => {} })
 
 describe("gen adversarial: the TS SDK emitter", () => {
 	// v0: 0e4ec405fe
@@ -165,7 +165,7 @@ const webhookDoc = (type: string) => ({
 	webhooks: {
 		[type]: {
 			post: {
-				"x-honey-webhook": "standard-webhooks",
+				"x-backend-webhook": "standard-webhooks",
 				requestBody: {
 					content: {
 						"application/json": {
@@ -219,14 +219,14 @@ describe("gen adversarial: generateTypes and generateRouteTree keep spec text as
 
 	// v0: a9fc43d983
 	it("writes a hyphenated path param as a quoted key, and the file parses", () => {
-		const text = typesOf(honeyDoc([{ method: "GET", pattern: "/users/:user-id" }]))
+		const text = typesOf(httpDoc([{ method: "GET", pattern: "/users/:user-id" }]))
 		expect([syntaxErrors(text), text.includes('"user-id": string')]).toEqual([[], true])
 	})
 
 	// v0: ba5748a9eb
 	it("writes error keys holding - and . as quoted keys, and the file parses", () => {
 		const errors = { "rate-limited": { status: 429 }, "user.not_found": { status: 404 } }
-		const text = typesOf(honeyDoc([{ errors, method: "GET", pattern: "/u" }]))
+		const text = typesOf(httpDoc([{ errors, method: "GET", pattern: "/u" }]))
 		expect([syntaxErrors(text), text.includes('"rate-limited"'), text.includes('"user.not_found"')]).toEqual([
 			[],
 			true,
@@ -240,7 +240,7 @@ describe("gen adversarial: generateTypes and generateRouteTree keep spec text as
 		const input = {
 			search: { properties: { kind: { enum: values, type: "string" } }, required: ["kind"], type: "object" },
 		}
-		const text = typesOf(honeyDoc([{ input, method: "GET", pattern: "/kinds" }]))
+		const text = typesOf(httpDoc([{ input, method: "GET", pattern: "/kinds" }]))
 		const union = compiled(text.match(/kind: ([^;}]+)/)?.[1] ?? "never")
 		expect([syntaxErrors(text), [...union.values].sort()]).toEqual([[], [...values].sort()])
 	})
@@ -254,7 +254,7 @@ describe("gen adversarial: an adversarial app compiles under strict", () => {
 		)) as typeof import("../../src/emit/ts/__fixtures__/typecheck.ts")
 		const tsMorph = await import("ts-morph")
 		const kinds = { properties: { kind: { enum: ['a"b', "x\ny"], type: "string" } }, type: "object" }
-		const app = honeyDoc([
+		const app = httpDoc([
 			{ input: { search: kinds }, method: "GET", pattern: "/users/:user-id" },
 			{ errors: { "rate-limited": { status: 429 } }, method: "POST", pattern: "/state" },
 			{ method: "GET", pattern: "/files/*path" },

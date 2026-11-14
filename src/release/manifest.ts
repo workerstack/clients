@@ -66,9 +66,9 @@ function manifestPackage(): z.ZodType<ManifestPackage, ReleaseManifestInput["pac
 	return z.object({
 		bootstrapExclude: z.array(z.string()).optional(),
 		branch: z.string().default("main"),
+		clients: z.object({ options: z.record(z.string(), z.string()).default({}), target: z.enum(TARGETS) }).optional(),
 		commitMessage: z.string().min(1),
 		description: z.string().min(1).max(DESCRIPTION_MAX),
-		honey: z.object({ options: z.record(z.string(), z.string()).default({}), target: z.enum(TARGETS) }).optional(),
 		metadata: packageMetadata().optional(),
 		name: z.string().regex(SLUG),
 		registries: z.array(registry()).default([]),

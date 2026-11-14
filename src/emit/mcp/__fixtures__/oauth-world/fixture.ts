@@ -13,7 +13,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { written } from "../written.ts"
 import { generateMcpHandler } from "../../mounted.ts"
-import { HoneyError, honey } from "@workerstack/backend/http"
+import { HttpError, httpApp } from "@workerstack/backend/http"
 import { type McpHandler, mcp } from "@workerstack/backend/mcp"
 import { oauth } from "@workerstack/backend/mcp/oauth"
 import { generateOpenApi } from "@workerstack/backend/http/openapi"
@@ -21,7 +21,7 @@ import { createLogger } from "@workerstack/backend/logger"
 import * as z from "zod"
 
 /** The client the stub authorization server knows, pre-registered, and where it sends the user back. */
-export const CLIENT_ID = "honey-client"
+export const CLIENT_ID = "clients-client"
 export const REDIRECT_URI = "http://127.0.0.1/callback"
 
 /** The world running: the MCP endpoint, the issuer, the log of every request answered, and its stop. */
@@ -143,17 +143,19 @@ function authorizationServer(issuer: () => string, tokens: Map<string, Token>, l
 /** The orders app, its routes checking the token (audience `endpoint()`) and the scope each needs. */
 function ordersApp(endpoint: () => string, tokens: Map<string, Token>) {
 	/* an error the app answers 500 for reaches stderr, whatever NODE_ENV silences; stdout stays the leg's protocol */
-	const app = honey().logger(createLogger({ level: "error", write: (line) => void process.stderr.write(`${line}\n`) }))
+	const app = httpApp().logger(
+		createLogger({ level: "error", write: (line) => void process.stderr.write(`${line}\n`) }),
+	)
 	/** Throws the refusal of `request` for `needed`, its challenge in `www-authenticate`, unless its token carries it. */
 	const authorize = (request: Request, needed: string) => {
 		const token = tokens.get(/^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "")
 		if (token === undefined || token.audience !== endpoint()) {
 			const headers = { "www-authenticate": 'Bearer error="invalid_token"' }
-			throw new HoneyError({ errorKey: "invalid_token", headers, status: "unauthorized" })
+			throw new HttpError({ errorKey: "invalid_token", headers, status: "unauthorized" })
 		}
 		if (token.scope.includes(needed)) return
 		const headers = { "www-authenticate": `Bearer error="insufficient_scope", scope="orders:read ${needed}"` }
-		throw new HoneyError({ errorKey: "insufficient_scope", headers, status: "forbidden" })
+		throw new HttpError({ errorKey: "insufficient_scope", headers, status: "forbidden" })
 	}
 	app
 		.get("/orders")
@@ -175,7 +177,7 @@ function ordersApp(endpoint: () => string, tokens: Map<string, Token>) {
 }
 
 /** The orders app's mcpHandler, as the plugin writes it from the app's own document, imported. */
-async function handlerOf(app: ReturnType<typeof honey>): Promise<McpHandler> {
+async function handlerOf(app: ReturnType<typeof httpApp>): Promise<McpHandler> {
 	const document = generateOpenApi(app, { info: { title: "Orders", version: "1.0.0" }, securitySchemes: SCHEMES })
 	const { entry, files } = generateMcpHandler(document as unknown as Record<string, unknown>)
 	const dir = written({

@@ -100,7 +100,7 @@ export function csharpPaths(): Readonly<Record<string, unknown>> {
 			get: {
 				operationId: "csharp.errors",
 				responses: ok(S),
-				"x-honey-errors": {
+				"x-backend-errors": {
 					finalize: status(409),
 					foo_bar: status(409),
 					fooBar: status(422),

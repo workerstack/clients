@@ -100,7 +100,7 @@ export function describeDrift(packageName: string, gate: SpecDrift): string {
 	].join("\n")
 }
 
-/** Honey's manifest in `dir`: each generated path, relative to `dir`, with its sha256; undefined when there is none. */
+/** Backend's manifest in `dir`: each generated path, relative to `dir`, with its sha256; undefined when there is none. */
 export function generatedFiles(dir: string): Readonly<Record<string, string>> | undefined {
 	const file = join(dir, MANIFEST)
 	if (!existsSync(file)) return undefined
@@ -108,7 +108,7 @@ export function generatedFiles(dir: string): Readonly<Record<string, string>> | 
 	return files ?? {}
 }
 
-/** The paths, relative to `dir`, that honey's manifest in `dir` lists as generated; empty when there is none. */
+/** The paths, relative to `dir`, that clients' manifest in `dir` lists as generated; empty when there is none. */
 export function generatedPaths(dir: string): ReadonlySet<string> {
 	return new Set(Object.keys(generatedFiles(dir) ?? {}))
 }

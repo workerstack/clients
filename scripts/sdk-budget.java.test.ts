@@ -34,7 +34,7 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
  *     call's overrides;
  *   - the answer, 3,429 B: Answer 1,604, read as the call's type or as a Result; RawResponse 1,176, the raw box;
  *     Result 649, safe mode's Ok and Err;
- *   - the errors, 9,435 B: HoneyException 391, the base; ApiException 3,634, the status error with its key, detail,
+ *   - the errors, 9,435 B: HttpException 391, the base; ApiException 3,634, the status error with its key, detail,
  *     envelope and decodeBody; Envelope 4,691, the envelope's reader and the detail's sanitizer (R3); ErrorEnvelope
  *     719, its members;
  *   - auth, 1,442 B: Credential, the token and its single-flight refresh;
@@ -122,7 +122,7 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
  * Bit 21 i6, +1,230 B to 154,694 B: the client.safe() mirror, Result as Java's answer, and a 2xx past the cap read as
  * an answer. Cut first: safe mode's readers (jsonResult, textResult, bytesResult, noneResult and result, 448 B), the
  * cap's refusal helpers (Decode's within and refused) and `Result.status()`; the new docs tightened.
- * - SdkException.java +352: the answers' base, between HoneyException and ApiException (-2 B: its extends clause)
+ * - SdkException.java +352: the answers' base, between HttpException and ApiException (-2 B: its extends clause)
  *   and DecodeException, so the Err holds both by construction;
  * - Result.java +281: `isOk`, `fold(onOk, onErr)` (no pattern switch at --release 17) and `orElseThrow`, the Err's
  *   error typed SdkException;
@@ -132,8 +132,9 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
  *   ApiConnectionException, `over`, and the 2xx past the cap as its DecodeException after the stale settle;
  * - RequestOptions.java +132: `boxed(RawResponse)`, the caller's overrides with the twin's raw box;
  * - Decode.java -131: the body null past the cap, `exceeds` its one text; Exchange.java -6: `dial = true`.
+ * Plan 55, +61 B to 154,755 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
  */
-const JAVA_RUNTIME_BYTES = 154694
+const JAVA_RUNTIME_BYTES = 154755
 
 describe("the Java runtime within its byte budget (bit 16, the G14 analog)", () => {
 	it(

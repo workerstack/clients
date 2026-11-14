@@ -1,5 +1,5 @@
 /**
- * `honey-clients generate --app` (bit 19 h2, Q1): the SDKs, the CLI and MCP generated from a honey app module, its
+ * `clients generate --app` (bit 19 h2, Q1): the SDKs, the CLI and MCP generated from a backend app module, its
  * document made by the app's own core with the module's `openApi` export as its options (security schemes, the
  * invalidate check). `--spec` and `--app` name the document, so both at once is a usage error, never one silently
  * winning. Under `bun run` the bin hands the load to Bun, whose loaders the app may need, and a run ends once it has
@@ -28,11 +28,11 @@ import { MARK_KEY, markOf, reap } from "./gen/__fixtures__/survivors.ts"
 import { appProject, backend } from "./ir/__fixtures__/app-project.ts"
 import { SPAWN_TIMEOUT } from "./gen/__fixtures__/spawn-timeout.ts"
 
-const BIN = resolve(import.meta.dirname, "../bin/honey-clients.js")
+const BIN = resolve(import.meta.dirname, "../bin/clients.js")
 const REPO = resolve(import.meta.dirname, "..")
 const PINNED_BUN = withPinnedBun()
 const MARK = markOf()
-const HONEY = 'import { honey } from "@workerstack/backend/http"\n'
+const HTTP_APP = 'import { httpApp } from "@workerstack/backend/http"\n'
 
 const projects: (() => void)[] = []
 afterEach(() => {
@@ -123,10 +123,10 @@ describe("generate --app (bit 19 h2)", () => {
 	// v0: cb437d7688
 	it("generates the TypeScript SDK from an app module, no spec given", { timeout: SPAWN_TIMEOUT }, async () => {
 		const dir = project({
-			"src/app.ts": `${HONEY}export const app = honey().get("/health").meta({ operationId: "health.get" }).handler((c) => c.res.text("ok", "ok"))\n`,
+			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").meta({ operationId: "health.get" }).handler((c) => c.res.text("ok", "ok"))\n`,
 		})
 		const result = await run(["generate", "--app", "src/app.ts", "--target", "ts", "--out", "out"], dir)
-		expect([result.status, result.err, result.out.startsWith("honey-clients: generated")]).toEqual([0, "", true])
+		expect([result.status, result.err, result.out.startsWith("clients: generated")]).toEqual([0, "", true])
 		expect(textUnder(join(dir, "out/ts"))).toContain('"/health"')
 	})
 
@@ -135,7 +135,7 @@ describe("generate --app (bit 19 h2)", () => {
 		"refuses --spec beside --app, an --app with no value and an unknown flag, writing nothing",
 		{ timeout: SPAWN_TIMEOUT },
 		async () => {
-			const dir = project({ "src/app.ts": `${HONEY}export const app = honey()\n`, "stale.json": "{}" })
+			const dir = project({ "src/app.ts": `${HTTP_APP}export const app = httpApp()\n`, "stale.json": "{}" })
 			const firstLines = []
 			for (const argv of [
 				[...GENERATE, "--spec", "stale.json", "--app", "src/app.ts"],
@@ -144,9 +144,9 @@ describe("generate --app (bit 19 h2)", () => {
 			])
 				firstLines.push(await run(argv, dir).then(({ err, status }) => [status, err.split("\n")[0]]))
 			expect(firstLines).toEqual([
-				[1, "honey-clients: --spec and --app each name the document: give one"],
-				[1, "honey-clients: --app requires a value"],
-				[1, "honey-clients: unknown option --manifset"],
+				[1, "clients: --spec and --app each name the document: give one"],
+				[1, "clients: --app requires a value"],
+				[1, "clients: unknown option --manifset"],
 			])
 			expect(readdirSync(dir).sort()).toEqual(["node_modules", "src", "stale.json"])
 		},
@@ -159,11 +159,11 @@ describe("generate --app with the module's openApi options (bit 19 h2)", () => {
 		"takes a security scheme the module's openApi declares as declared, and the SDK sends it",
 		{ timeout: SPAWN_TIMEOUT },
 		async () => {
-			const route = `honey().get("/t").meta({ operationId: "t.get", security: "iaTesterKey" }).handler((c) => c.res.json("ok", {}))`
+			const route = `httpApp().get("/t").meta({ operationId: "t.get", security: "iaTesterKey" }).handler((c) => c.res.json("ok", {}))`
 			const scheme = `{ iaTesterKey: { in: "header", name: "x-ia-tester-key", type: "apiKey" } }`
 			const dir = project({
-				"src/bare.ts": `${HONEY}export const app = ${route}\n`,
-				"src/declared.ts": `${HONEY}export const app = ${route}\nexport const openApi = { info: { title: "t", version: "1" }, securitySchemes: ${scheme} }\n`,
+				"src/bare.ts": `${HTTP_APP}export const app = ${route}\n`,
+				"src/declared.ts": `${HTTP_APP}export const app = ${route}\nexport const openApi = { info: { title: "t", version: "1" }, securitySchemes: ${scheme} }\n`,
 			})
 			const bare = await run(["generate", "--app", "src/bare.ts", "--target", "ts", "--out", "bare"], dir)
 			const declared = await run(["generate", "--app", "src/declared.ts", ...GENERATE.slice(1)], dir)
@@ -181,10 +181,10 @@ describe("generate --app with the module's openApi options (bit 19 h2)", () => {
 		"says nothing of a mutation's missing invalidate when the module's openApi turns the check off",
 		{ timeout: SPAWN_TIMEOUT },
 		async () => {
-			const routes = `honey().post("/tables").meta({ operationId: "tables.create" }).handler((c) => c.res.text("ok", "ok")).get("/tables").meta({ operationId: "tables.list" }).handler((c) => c.res.text("ok", "ok"))`
+			const routes = `httpApp().post("/tables").meta({ operationId: "tables.create" }).handler((c) => c.res.text("ok", "ok")).get("/tables").meta({ operationId: "tables.list" }).handler((c) => c.res.text("ok", "ok"))`
 			const dir = project({
-				"src/checked.ts": `${HONEY}export const app = ${routes}\n`,
-				"src/off.ts": `${HONEY}export const app = ${routes}\nexport const openApi = { info: { title: "t", version: "1" }, invalidate: "off" }\n`,
+				"src/checked.ts": `${HTTP_APP}export const app = ${routes}\n`,
+				"src/off.ts": `${HTTP_APP}export const app = ${routes}\nexport const openApi = { info: { title: "t", version: "1" }, invalidate: "off" }\n`,
 			})
 			const targets = ["--target", "ts", "--target", "python"]
 			const checked = await run(["generate", "--app", "src/checked.ts", ...targets, "--out", "checked"], dir)
@@ -204,8 +204,8 @@ describe.skipIf(!PINNED_BUN)(`generate --app through the bin under Bun ${pinnedB
 				...process.env,
 				[MARK_KEY]: MARK,
 				...(bun === undefined
-					? { HONEY_NO_BUN_HANDOFF: "1" }
-					: { HONEY_NO_BUN_HANDOFF: "", npm_config_user_agent: "bun/1 npm/? node/v24 linux x64", npm_execpath: bun }),
+					? { CLIENTS_NO_BUN_HANDOFF: "1" }
+					: { CLIENTS_NO_BUN_HANDOFF: "", npm_config_user_agent: "bun/1 npm/? node/v24 linux x64", npm_execpath: bun }),
 			},
 			timeout: 60_000,
 		})
@@ -213,7 +213,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app through the bin under Bun ${pinnedB
 	// v0: aeff0f4b4d
 	it("hands the load to the Bun that started it, so a module Bun alone can load generates", () => {
 		const dir = project({
-			"src/app.ts": `import terms from "./terms.md"\n${HONEY}export const app = honey().get("/terms").handler((c) => c.res.text("ok", String(terms)))\n`,
+			"src/app.ts": `import terms from "./terms.md"\n${HTTP_APP}export const app = httpApp().get("/terms").handler((c) => c.res.text("ok", String(terms)))\n`,
 			"src/terms.md": "# Terms\n",
 		})
 		const run = bin(dir, ["generate", "--app", "src/app.ts", ...GENERATE.slice(1)], PINNED_BUN as string)
@@ -223,7 +223,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app through the bin under Bun ${pinnedB
 	// v0: 619b088296
 	it("ends once it has written, though the app's module left a timer running", () => {
 		const dir = project({
-			"src/app.ts": `${HONEY}export const app = honey().get("/health").handler((c) => c.res.text("ok", "ok"))\nsetInterval(() => {}, 1000)\n`,
+			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\nsetInterval(() => {}, 1000)\n`,
 		})
 		const started = Date.now()
 		const run = bin(dir, ["generate", "--app", "src/app.ts", ...GENERATE.slice(1)])
@@ -254,7 +254,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 		const run = onBun(dir)
 		expect([run.status, run.stderr, readFileSync(join(dir, "evaluations.log"), "utf8")]).toEqual([
 			1,
-			"honey-clients: boom at load\n",
+			"clients: boom at load\n",
 			"x",
 		])
 	}, 90_000)
@@ -263,11 +263,11 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 	 * hooked Error.prepareStackTrace, Bun throws "First argument must be an Error object" there */
 	it("generates from a module importing vite, a cold jiti cache", () => {
 		const dir = project({
-			"src/app.ts": `import { defaultClientConditions } from "vite"\n${HONEY}export const app = honey().get("/health").handler((c) => c.res.text("ok", "ok"))\nexport const conditions = defaultClientConditions\n`,
+			"src/app.ts": `import { defaultClientConditions } from "vite"\n${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\nexport const conditions = defaultClientConditions\n`,
 		})
 		symlinkSync(join(REPO, "node_modules/vite"), join(dir, "node_modules/vite"), "dir")
 		const run = onBun(dir)
-		expect([run.status, run.stderr, existsSync(join(dir, "out/ts/.honey-generated.json"))]).toEqual([0, "", true])
+		expect([run.status, run.stderr, existsSync(join(dir, "out/ts/.clients-generated.json"))]).toEqual([0, "", true])
 	}, 90_000)
 
 	it("reads a checkout core from its source, never a stale dist/ beside it", () => {
@@ -278,7 +278,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 		const dir = project({
 			"node_modules/@workerstack/backend/dist/openapi/register.js": stale("openapi/register"),
 			"node_modules/@workerstack/backend/dist/routing/app.js": stale("routing/app"),
-			"src/app.ts": `${HONEY}export const app = honey().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
+			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
 		})
 		const run = onBun(dir)
 		expect([run.status, run.stderr, existsSync(join(dir, "evaluations.log"))]).toEqual([0, "", false])
@@ -288,15 +288,15 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 /**
  * The bin on Bun over a fresh app, BUN_OPTIONS `options` after a preload that logs each Bun process the run starts and
  * ends the fourth itself, so a loop is bounded: its exit code, stderr and that count. `strip`: the preload also takes
- * --conditions=honey-source out of execArgv, as a Bun that stopped reporting it would.
+ * --conditions=backend-source out of execArgv, as a Bun that stopped reporting it would.
  */
 function counted(options: string, strip = false): [number | null, string, number] {
 	const dir = project({
-		"src/app.ts": `${HONEY}export const app = honey().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
+		"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
 	})
 	const starts = join(dir, "starts.log")
 	const unseen =
-		'const at = process.execArgv.indexOf("--conditions=honey-source")\nif (at >= 0) process.execArgv.splice(at, 1)\n'
+		'const at = process.execArgv.indexOf("--conditions=backend-source")\nif (at >= 0) process.execArgv.splice(at, 1)\n'
 	writeFileSync(
 		join(dir, "count.mjs"),
 		`import { appendFileSync, readFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(starts)}, "s")\nif (readFileSync(${JSON.stringify(starts)}, "utf8").length > 3) process.exit(9)\n${strip ? unseen : ""}`,
@@ -305,11 +305,11 @@ function counted(options: string, strip = false): [number | null, string, number
 	return [run.status, run.stderr, readFileSync(starts, "utf8").length]
 }
 
-describe.skipIf(!PINNED_BUN)(`the bin's honey-source hand-off on Bun ${pinnedBunVersion()} (bit 20)`, () => {
+describe.skipIf(!PINNED_BUN)(`the bin's backend-source hand-off on Bun ${pinnedBunVersion()} (bit 20)`, () => {
 	afterEach(() => void reap(MARK))
 
-	it("hands off to itself once without the honey-source condition, and not at all with it in BUN_OPTIONS", () => {
-		expect([counted(""), counted(" --conditions=honey-source")]).toEqual([
+	it("hands off to itself once without the backend-source condition, and not at all with it in BUN_OPTIONS", () => {
+		expect([counted(""), counted(" --conditions=backend-source")]).toEqual([
 			[0, "", 2],
 			[0, "", 1],
 		])
@@ -318,7 +318,7 @@ describe.skipIf(!PINNED_BUN)(`the bin's honey-source hand-off on Bun ${pinnedBun
 	it("refuses a second hand-off when its child does not see the condition, after exactly two starts", () => {
 		expect(counted("", true)).toEqual([
 			1,
-			"honey-clients: Bun hand-off loop: --conditions=honey-source not visible after re-exec\n",
+			"clients: Bun hand-off loop: --conditions=backend-source not visible after re-exec\n",
 			2,
 		])
 	}, 90_000)
@@ -334,7 +334,7 @@ describe("generate --app --watch (bit 19 h2)", () => {
 
 	it("generates again on each change of the app module", async () => {
 		const route = (path: string) =>
-			`${HONEY}export const app = honey().get("${path}").handler((c) => c.res.text("ok", "ok"))\n`
+			`${HTTP_APP}export const app = httpApp().get("${path}").handler((c) => c.res.text("ok", "ok"))\n`
 		const dir = project({ "src/app.ts": route("/first") })
 		const stop = new AbortController()
 		let stdout = ""
@@ -349,7 +349,7 @@ describe("generate --app --watch (bit 19 h2)", () => {
 		writeFileSync(join(dir, "src/app.ts"), route("/second"))
 		expect(await holds("/second")).toBe(true)
 		stop.abort()
-		expect([await watching, stdout]).toEqual([0, `honey-clients: watching ${join(dir, "src/app.ts")}\n`])
+		expect([await watching, stdout]).toEqual([0, `clients: watching ${join(dir, "src/app.ts")}\n`])
 	}, 90_000)
 })
 

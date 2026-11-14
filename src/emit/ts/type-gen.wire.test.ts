@@ -16,7 +16,7 @@ const typecheck = typechecker(tsMorph)
 const STRING = { type: "string" }
 const EMPTY_TREE: RouteTree = { root: { d: null, m: null, s: {}, w: null, ws: null }, routes: {}, v: 2 }
 
-/** A document of `operations` by path and method, each with `x-honey-route` set from its method and `pattern`. */
+/** A document of `operations` by path and method, each with `x-backend-route` set from its method and `pattern`. */
 function documentOf(operations: Record<string, Record<string, Json & { pattern?: string }>>): Json {
 	const paths = Object.fromEntries(
 		Object.entries(operations).map(([path, methods]) => [
@@ -24,7 +24,7 @@ function documentOf(operations: Record<string, Record<string, Json & { pattern?:
 			Object.fromEntries(
 				Object.entries(methods).map(([method, { pattern, ...op }]) => [
 					method,
-					{ responses: {}, ...op, "x-honey-route": `${method.toUpperCase()} ${pattern ?? path}` },
+					{ responses: {}, ...op, "x-backend-route": `${method.toUpperCase()} ${pattern ?? path}` },
 				]),
 			),
 		]),

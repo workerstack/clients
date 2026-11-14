@@ -20,7 +20,7 @@
 		"url": "git+https://github.com/workerstack/clients.git"
 	},
 	"bin": {
-		"honey-clients": "bin/honey-clients.js",
+		"clients": "bin/clients.js",
 		"installgen": "bin/installgen.js"
 	},
 	"files": [
@@ -31,22 +31,22 @@
 	"type": "module",
 	"exports": {
 		".": {
-			"honey-source": "./src/index.ts",
+			"clients-source": "./src/index.ts",
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
 		},
 		"./cli": {
-			"honey-source": "./src/cli.ts",
+			"clients-source": "./src/cli.ts",
 			"types": "./dist/cli.d.ts",
 			"default": "./dist/cli.js"
 		},
 		"./installers": {
-			"honey-source": "./src/installers/index.ts",
+			"clients-source": "./src/installers/index.ts",
 			"types": "./dist/installers/index.d.ts",
 			"default": "./dist/installers/index.js"
 		},
 		"./release": {
-			"honey-source": "./src/release/index.ts",
+			"clients-source": "./src/release/index.ts",
 			"types": "./dist/release/index.d.ts",
 			"default": "./dist/release/index.js"
 		},

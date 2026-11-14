@@ -218,7 +218,7 @@ describe("sdkMemberPaths: where each operation sits on the client", () => {
 /** A Standard Webhooks event `a.b`, as a document's `webhooks` declares it. */
 const AB_EVENT = {
 	post: {
-		"x-honey-webhook": "standard-webhooks",
+		"x-backend-webhook": "standard-webhooks",
 		requestBody: {
 			content: {
 				"application/json": {
@@ -247,7 +247,7 @@ describe("generateSdk: names it refuses, and renames that collide", () => {
 		["HTTPClient", "is a name the SDK's runtime"],
 		["SDKClient", "is a name the SDK's runtime"],
 		["serviceMap", "is a name the SDK's runtime"],
-		["Honey", "declares HoneySafe"],
+		["Http", "declares HttpSafe"],
 	])("refuses the name %s (it %s), pointing at --ts-name", (name, clash) => {
 		expect(() => generateSdk(doc(USERS), { name })).toThrow(clash)
 		expect(() => generateSdk(doc(USERS), { name })).toThrow("choose another name (--ts-name)")

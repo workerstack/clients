@@ -2,7 +2,7 @@
  * The Java SDK's error classes and error keys (bit 16 phase c1, C4): one `ApiException` subclass per common status, an
  * `UnexpectedStatusException` for the rest, and the transport and decode errors, each a class of its own, all written
  * here so the runtime holds only the bases. `ErrorKey` declares a constant per key the API names (in an operation's
- * `x-honey-errors` or as an error response's envelope keys, in code-unit order of the key), and a key whose body is an
+ * `x-backend-errors` or as an error response's envelope keys, in code-unit order of the key), and a key whose body is an
  * inline object gets a `<Key>Data` record, the type `decodeBody(Class)` reads its body into.
  */
 import type { IRResponse, IRSchema } from "../../ir/model.ts"
@@ -31,21 +31,21 @@ const STATUSES: readonly [number, string][] = [
 
 /** The non-status errors: their base class, and their constructor's parameters after the message. */
 const OTHER: readonly { name: string; base: string; cause: boolean; doc: string }[] = [
-	{ base: "HoneyException", cause: true, doc: "The call ran past its timeout.", name: "ApiTimeoutException" },
+	{ base: "HttpException", cause: true, doc: "The call ran past its timeout.", name: "ApiTimeoutException" },
 	{
-		base: "HoneyException",
+		base: "HttpException",
 		cause: true,
 		doc: "No answer: the connection failed or broke.",
 		name: "ApiConnectionException",
 	},
 	{
-		base: "HoneyException",
+		base: "HttpException",
 		cause: false,
 		doc: "A path param that is empty, `.` or `..`: nothing is sent.",
 		name: "PathParamException",
 	},
 	{
-		base: "HoneyException",
+		base: "HttpException",
 		cause: false,
 		doc: "A client or call configured in a way it cannot send.",
 		name: "ConfigException",
@@ -57,7 +57,7 @@ const OTHER: readonly { name: string; base: string; cause: boolean; doc: string 
 		name: "DecodeException",
 	},
 	{
-		base: "HoneyException",
+		base: "HttpException",
 		cause: true,
 		doc: "A hook or the auth refresh threw; its error is the cause.",
 		name: "HookException",

@@ -11,7 +11,7 @@ import { release, USAGE } from "./cli.ts"
 
 afterEach(removeRepos)
 
-const BIN = resolve(import.meta.dirname, "../../bin/honey-clients.js")
+const BIN = resolve(import.meta.dirname, "../../bin/clients.js")
 
 const CONFIG = {
 	codegen: ["node", "codegen.mjs"],
@@ -64,7 +64,7 @@ describe("release --config", () => {
 
 			expect(result).toEqual({
 				status: 1,
-				stderr: `honey-clients: release ${command}: --config <path> is required\n`,
+				stderr: `clients: release ${command}: --config <path> is required\n`,
 				stdout: "",
 			})
 		},
@@ -73,13 +73,13 @@ describe("release --config", () => {
 	it("names a value flag given no value as bootstrap's usage mistake", async () => {
 		const result = await captured((io) => release(["bootstrap", "--config"], io))
 
-		expect(result.stderr).toBe("honey-clients: release bootstrap: --config requires a value\n")
+		expect(result.stderr).toBe("clients: release bootstrap: --config requires a value\n")
 	})
 
 	it("prints a config that cannot load as its own message, with no usage prefix", async () => {
 		const result = await captured((io) => release(["sync", "--config", "nope.ts", "--validate-only"], io))
 
-		expect(result.stderr).toBe("honey-clients: nope.ts: no such release config\n")
+		expect(result.stderr).toBe("clients: nope.ts: no such release config\n")
 		expect(result.status).toBe(1)
 	})
 
@@ -88,9 +88,7 @@ describe("release --config", () => {
 
 		const result = await captured((io) => release(["sync", "--config", configOf(root), "--validate-only"], io))
 
-		expect(result.stderr).toBe(
-			"honey-clients: acme-release/release.config.ts: project: expected a slug, got undefined\n",
-		)
+		expect(result.stderr).toBe("clients: acme-release/release.config.ts: project: expected a slug, got undefined\n")
 	})
 
 	it("prints a thrown value that is no Error as itself", async () => {
@@ -98,7 +96,7 @@ describe("release --config", () => {
 
 		const result = await captured((io) => release(["sync", "--config", "c.ts"], io, { env }))
 
-		expect(result).toMatchObject({ status: 1, stderr: "honey-clients: env unreadable\n" })
+		expect(result).toMatchObject({ status: 1, stderr: "clients: env unreadable\n" })
 	})
 })
 
@@ -121,19 +119,19 @@ describe("release toolchains", () => {
 			const result = await captured((io) => release([command, flag], io))
 
 			expect(result.status).toBe(0)
-			expect(result.stdout).toMatch(new RegExp(`^usage: honey-clients release ${command} --config <path>\\n {6}\\S`))
+			expect(result.stdout).toMatch(new RegExp(`^usage: clients release ${command} --config <path>\\n {6}\\S`))
 		}
 	})
 
 	it("names a --config given no value and an unknown flag as its usage mistakes", async () => {
 		expect((await captured((io) => release(["toolchains", "--config"], io))).stderr).toBe(
-			"honey-clients: release toolchains: --config requires a value\n",
+			"clients: release toolchains: --config requires a value\n",
 		)
 		expect((await captured((io) => release(["toolchains", "--config", "--help"], io))).stderr).toBe(
-			"honey-clients: release toolchains: --config requires a value\n",
+			"clients: release toolchains: --config requires a value\n",
 		)
 		expect((await captured((io) => release(["toolchains", "--only", "x"], io))).stderr).toBe(
-			"honey-clients: release toolchains: unknown flag: --only\n",
+			"clients: release toolchains: unknown flag: --only\n",
 		)
 	})
 })
@@ -155,7 +153,7 @@ describe("release codegen", () => {
 
 		expect(await captured((io) => release(["codegen", "--config", configOf(root)], io))).toEqual({
 			status: 1,
-			stderr: "honey-clients: codegen (node fail.mjs) exited 1\n",
+			stderr: "clients: codegen (node fail.mjs) exited 1\n",
 			stdout: "",
 		})
 	})
@@ -166,7 +164,7 @@ function raise(value: string): never {
 	throw value
 }
 
-describe("honey-clients main", () => {
+describe("clients main", () => {
 	it(
 		"is what main runs for `release`, and the main usage names it",
 		async () => {
@@ -179,7 +177,7 @@ describe("honey-clients main", () => {
 	)
 })
 
-describe("honey-clients release from the bin", () => {
+describe("clients release from the bin", () => {
 	it.each([
 		[
 			"sync validates a config",

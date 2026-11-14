@@ -158,7 +158,7 @@ function defaultsOf(schemes?: Readonly<Record<string, unknown>>): string | undef
 
 /** The `_defaults` line for `header` and `prefix`, with no server and the default context's options (§2, Fc4). */
 const defaults = (header: string, prefix: string) =>
-	`private static readonly Defaults _defaults = new(null, "${header}", "${prefix}", HoneySdkJsonContext.Default.Options);`
+	`private static readonly Defaults _defaults = new(null, "${header}", "${prefix}", HttpSdkJsonContext.Default.Options);`
 
 describe("the auth header: the emitter hands the transport IR.auth's name and prefix (Go's scheme legs)", () => {
 	// parity: py http.auth.test.ts:157, go http.auth.test.ts:115-169
@@ -309,7 +309,7 @@ describe.skipIf(!DOTNET)("the auth refresh: a failing OnAuthExpired is the call'
 		const text = "on_auth_expired: driver: no token left"
 		expect({ error: run.trace?.calls[0]?.error, hops: hops.length, observed: run.observed }, run.stderr).toEqual({
 			error: plain({
-				chain: ["HookException", "HoneyException"],
+				chain: ["HookException", "HttpException"],
 				inner: "InvalidOperationException",
 				text,
 				type: "HookException",
@@ -347,7 +347,7 @@ async Task<bool> Get(string id)
         await c.Users.GetAsync(id);
         return true;
     }
-    catch (HoneyException)
+    catch (HttpException)
     {
         return false;
     }
@@ -390,7 +390,7 @@ catch (OperationCanceledException)
 {
     Note($"canceled {clock.ElapsedMilliseconds < 2000}");
 }
-catch (HoneyException e)
+catch (HttpException e)
 {
     Note($"{e.GetType().Name}: {e.Message}");
 }`

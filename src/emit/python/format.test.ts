@@ -75,7 +75,7 @@ describe("the emitted Python package through the ruff pass", () => {
 			expect(pass.seen.length).toBeGreaterThan(0)
 			const dir = written(
 				"runtime",
-				Object.fromEntries(Object.entries(runtime).map(([name, text]) => [join("_honey", name), text])),
+				Object.fromEntries(Object.entries(runtime).map(([name, text]) => [join("_http", name), text])),
 			)
 			expect(ruffGates(dir)).toEqual(CLEAN)
 		},
@@ -105,11 +105,11 @@ describe("the long-name package through the ruff pass (bit 21 i7a)", () => {
 			const files = emitted("long")
 			/* not vacuous: the pass reaches every .py file, and the client (both styles' classes in it) and the types run past 88 */
 			const long = (name: string) => (files[name] ?? "").split("\n").filter((line) => line.length > 88).length
-			const safe = [...(files["src/honey_sdk/client.py"] ?? "").matchAll(/^class (?:Async)?Safe\w+Resource:$/gm)].length
+			const safe = [...(files["src/http_sdk/client.py"] ?? "").matchAll(/^class (?:Async)?Safe\w+Resource:$/gm)].length
 			expect({
-				pastWidth: ["src/honey_sdk/client.py", "src/honey_sdk/types.py"].filter((name) => long(name) > 0),
+				pastWidth: ["src/http_sdk/client.py", "src/http_sdk/types.py"].filter((name) => long(name) > 0),
 				safe,
-			}).toEqual({ pastWidth: ["src/honey_sdk/client.py", "src/honey_sdk/types.py"], safe: 22 })
+			}).toEqual({ pastWidth: ["src/http_sdk/client.py", "src/http_sdk/types.py"], safe: 22 })
 			expect(await ruffGate(files)).toEqual({ ...CLEAN, reached: pythonNames(files), suppressed: [] })
 			const sdk = compiledPython("long")
 			expect(sdk.imported, sdk.stderr).toBe(true)
@@ -216,8 +216,8 @@ describe.skipIf(!PY)("the emitted Python package under mypy", () => {
 
 	// v0: bd0bef251f
 	it("types an array alias precisely: mypy rejects x: Tags = [1] and takes a list of str", () => {
-		expect(checked("types", 'from honey_sdk import Tags\n\nx: Tags = ["a"]\n')).toEqual([])
-		expect(checked("types", "from honey_sdk import Tags\n\nx: Tags = [1]\n").join("\n")).toContain(
+		expect(checked("types", 'from http_sdk import Tags\n\nx: Tags = ["a"]\n')).toEqual([])
+		expect(checked("types", "from http_sdk import Tags\n\nx: Tags = [1]\n").join("\n")).toContain(
 			'List item 0 has incompatible type "int"; expected "str"',
 		)
 	}, 300_000)

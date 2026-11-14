@@ -126,7 +126,7 @@ def sync_call(
     try:
         result = prepared.method(*prepared.args, **prepared.kwargs)
     except Exception as error:
-        if not lens.scripted and not isinstance(error, lens.module.HoneyError):
+        if not lens.scripted and not isinstance(error, lens.module.HttpError):
             raise
         return raised(error, lens, prepared.raw.status)
     return returned(result, prepared, runner.plan(call), lens)
@@ -170,7 +170,7 @@ async def async_call(
     except asyncio.CancelledError as error:
         return raised(error, lens)
     except Exception as error:
-        if not lens.scripted and not isinstance(error, lens.module.HoneyError):
+        if not lens.scripted and not isinstance(error, lens.module.HttpError):
             raise
         return raised(error, lens, prepared.raw.status)
     return returned(result, prepared, runner.plan(call), lens)

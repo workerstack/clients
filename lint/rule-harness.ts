@@ -94,17 +94,17 @@ function insideGitCheckout(dir: string): boolean {
 	return false
 }
 
-/** Runs the real oxlint binary with the honey plugin and only `honey/<name>` on, over the fixture. */
+/** Runs the real oxlint binary with the clients plugin and only `clients/<name>` on, over the fixture. */
 export function oxlintReports(name: string, fixture: Fixture): Report[] {
-	const dir = mkdtempSync(join(tmpdir(), "honey-lint-"))
+	const dir = mkdtempSync(join(tmpdir(), "clients-lint-"))
 	try {
 		/* oxlint applies a checkout's .gitignore even with --no-ignore, so a fixture inside one lints nothing */
 		if (insideGitCheckout(dir)) throw new Error(`TMPDIR ${tmpdir()} is inside a git checkout; set it outside one`)
 		const config = {
 			categories: { correctness: "off", suspicious: "off" },
-			jsPlugins: [{ name: "honey", specifier: PLUGIN }],
+			jsPlugins: [{ name: "clients", specifier: PLUGIN }],
 			plugins: [],
-			rules: { [`honey/${name}`]: "error" },
+			rules: { [`clients/${name}`]: "error" },
 		}
 		writeFileSync(join(dir, ".oxlintrc.json"), JSON.stringify(config))
 		for (const [file, code] of Object.entries(fixture)) {

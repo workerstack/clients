@@ -32,7 +32,7 @@ void ClientError
 /**
  * A checker over one in-memory project, the lib files parsed once and each check swapping the SDK and the consumer:
  * each diagnostic of `consumer` (or, with `all`, of every emitted file too) beside the SDK of `document`. `morph` is
- * ts-morph, which only a test file imports (honey/boundaries).
+ * ts-morph, which only a test file imports (clients/boundaries).
  */
 export function consumerChecker(morph: typeof import("ts-morph")) {
 	const { Project, ts } = morph

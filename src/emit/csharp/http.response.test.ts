@@ -63,7 +63,7 @@ const plain = (entry: Partial<CsError>) => ({
 const undecoded = (via: "result" | "return") =>
 	expect.objectContaining({
 		canceled: false,
-		chain: ["DecodeException", "SdkException", "HoneyException"],
+		chain: ["DecodeException", "SdkException", "HttpException"],
 		type: "DecodeException",
 		via,
 	})
@@ -71,14 +71,14 @@ const UNDECODED = undecoded("return")
 /** The DecodeException a 2xx past the cap is (bit 21 i5: an answer whose body was not read): no inner (§1 rules). */
 const capped = (limit: number) =>
 	plain({
-		chain: ["DecodeException", "SdkException", "HoneyException"],
+		chain: ["DecodeException", "SdkException", "HttpException"],
 		text: `the answer exceeds ${limit} bytes`,
 		type: "DecodeException",
 	})
 /** The deadline's ApiTimeoutException (phase b's text, kept); the canceled send is its inner. */
 const timedOut = (ms: number) =>
 	plain({
-		chain: ["ApiTimeoutException", "HoneyException"],
+		chain: ["ApiTimeoutException", "HttpException"],
 		inner: expect.any(String),
 		text: `GET /slow timed out after ${ms} ms`,
 		type: "ApiTimeoutException",
@@ -163,7 +163,7 @@ describe.skipIf(!DOTNET)(
 					{ error: UNDECODED, result: undefined },
 					{
 						error: plain({
-							chain: ["NotFoundException", "ApiStatusException", "SdkException", "HoneyException"],
+							chain: ["NotFoundException", "ApiStatusException", "SdkException", "HttpException"],
 							envelope: { extraKeys: [] },
 							key: null,
 							keyMember: null,
@@ -301,7 +301,7 @@ describe.skipIf(!DOTNET)("a refused connection is a transport error, never a can
 		const run = await driven().runCalls({ calls: [USER], setup: {} }, { url: closed }, { script: {} })
 		expect({ error: run.trace?.calls[0]?.error, observed: run.observed, status: run.status }, run.stderr).toEqual({
 			error: plain({
-				chain: ["ApiConnectionException", "HoneyException"],
+				chain: ["ApiConnectionException", "HttpException"],
 				inner: "HttpRequestException",
 				text: expect.any(String),
 				type: "ApiConnectionException",

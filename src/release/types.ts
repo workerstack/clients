@@ -4,7 +4,7 @@
  */
 import type { Target } from "../gen/targets.ts"
 
-/** The package metadata honey-clients writes into each generated package's manifest; every field is optional. */
+/** The package metadata clients writes into each generated package's manifest; every field is optional. */
 export type PackageMetadata = {
 	/** Authors, as `Name <email>`. */
 	readonly authors?: readonly string[]
@@ -32,11 +32,11 @@ export type PackageMetadata = {
 	readonly repository?: string
 }
 
-/** How honey-clients generates a package: its target, and that target's options by name. */
-export type HoneyRun = {
+/** How clients generates a package: its target, and that target's options by name. */
+export type ReleaseRun = {
 	/** The target's options, as `--<target>-<option>` takes them; none by default. */
 	readonly options?: Readonly<Record<string, string>>
-	/** The honey-clients target the package is generated with. */
+	/** The clients target the package is generated with. */
 	readonly target: Target
 }
 
@@ -63,8 +63,8 @@ export type ManifestPackageInput = {
 	readonly commitMessage: string
 	/** The package's one description: its public repo's, every registry's, and its first CHANGELOG entry. */
 	readonly description: string
-	/** How honey-clients generates it; absent for a package honey does not generate (the spec itself). */
-	readonly honey?: HoneyRun
+	/** How clients generates it; absent for a package backend does not generate (the spec itself). */
+	readonly clients?: ReleaseRun
 	/** This package's metadata over the product's; its keywords add to the product's. */
 	readonly metadata?: PackageMetadata
 	/** The package's slug: its dir beside the config, and the key bump's `RELEASE_VERSIONS` uses. */

@@ -146,7 +146,7 @@ internal sealed class Once : ITransportAdapter
 const BACKOFF = `${SETTLED}
 var once = new Once();
 var options = new TransportOptions { ReconnectDelay = TimeSpan.FromSeconds(5) };
-var rc = new ResumableConnection<Payload>("http://rt.test/feed", [once], HoneySdkJsonContext.Default.Payload, options);
+var rc = new ResumableConnection<Payload>("http://rt.test/feed", [once], HttpSdkJsonContext.Default.Payload, options);
 await rc.ConnectAsync();
 var e = rc.GetAsyncEnumerator();
 var reader = e.MoveNextAsync().AsTask();
@@ -262,7 +262,7 @@ try
         Note($"{e.Current.Data.N}");
     }
 }
-catch (HoneyException error)
+catch (HttpException error)
 {
     Note(error.GetType().Name);
 }
@@ -277,7 +277,7 @@ try
     await hooked.Ticks.StreamAsync();
     Note("opened");
 }
-catch (HoneyException error)
+catch (HttpException error)
 {
     Note($"{error.GetType().Name}: {error.Message}");
 }

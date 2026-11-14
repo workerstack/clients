@@ -15,10 +15,10 @@ const WORLD = new URL("./__fixtures__/oauth-world/serve.ts", import.meta.url).pa
 
 /** The world started, the Python session run against it, then the world's log of every request it answered. */
 async function run(): Promise<[Record<string, unknown>, OAuthTarget, readonly string[]]> {
-	/* backend resolved as every checkout process resolves it (honey-source), or as installed */
+	/* backend resolved as every checkout process resolves it (backend-source), or as installed */
 	const child = spawn(
 		"bun",
-		["--conditions=honey-source", "-e", `await (await import(${JSON.stringify(WORLD)})).main()`],
+		["--conditions=backend-source", "-e", `await (await import(${JSON.stringify(WORLD)})).main()`],
 		{
 			stdio: ["pipe", "pipe", "inherit"],
 		},
@@ -42,8 +42,8 @@ describe.skipIf(!withPython())("the mounted resource server under the Python cli
 		expect([saw, log], "what the client saw, then every request the world answered").toEqual([
 			{
 				authorizations: ["orders:read", "orders:read orders:write"],
-				created: expect.objectContaining({ _meta: { "honey/status": 201 }, structuredContent: { created: "o-2" } }),
-				read: expect.objectContaining({ _meta: { "honey/status": 200 }, structuredContent: { orders: ["o-1"] } }),
+				created: expect.objectContaining({ _meta: { "backend/status": 201 }, structuredContent: { created: "o-2" } }),
+				read: expect.objectContaining({ _meta: { "backend/status": 200 }, structuredContent: { orders: ["o-1"] } }),
 				tools: ["get_orders", "post_orders"],
 			},
 			[

@@ -1,5 +1,5 @@
 /**
- * honey/no-console (bit 20 scope): every file under src/, tests/ and lint/, tests, fixtures and helpers included,
+ * clients/no-console (bit 20 scope): every file under src/, tests/ and lint/, tests, fixtures and helpers included,
  * writes through the io a command is handed; only the scripts whose stdout is their protocol, each by exact path, may
  * touch console. A console call inside a string is no member expression.
  */
@@ -12,7 +12,7 @@ const rule = plugin.rules["no-console"]
 const MESSAGE = "console is for no source or test here: write through the io a command is handed"
 const LOG = 'console.log("x")\n'
 
-describe("honey/no-console", () => {
+describe("clients/no-console", () => {
 	it("rejects console in source", () => {
 		const fixture = {
 			"src/routing/app.ts": LOG,
@@ -49,7 +49,7 @@ describe("honey/no-console", () => {
 	})
 })
 
-describe("honey/no-console: what stays allowed", () => {
+describe("clients/no-console: what stays allowed", () => {
 	it("allows the same call inside a string a test spawns, and a property named console", () => {
 		const fixture = {
 			"src/build/cli.test.ts": 'export const child = "console.log(process.pid)"\n',
@@ -78,7 +78,7 @@ describe("honey/no-console: what stays allowed", () => {
 		expect(reportsOf(rule, fixture).map((report) => report.file)).toEqual(Object.keys(fixture))
 	})
 
-	it("fails oxlint through the honey plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
+	it("fails oxlint through the clients plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
 		const fixture = {
 			"src/routing/app.ts": LOG,
 			"tests/integration/conformance/gate.ts": LOG,

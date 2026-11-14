@@ -47,7 +47,7 @@ describe("readRelease on an old Node", () => {
 			const importModule = async () => ({ default: CONFIG })
 			await expect(
 				readRelease(configOf(root), { importModule, runtime: { nodeVersion, runtime: "node" } }),
-			).rejects.toThrow(`needs Node >= 22.18 (23.6 on Node 23; this is ${nodeVersion}); run honey-clients with Bun`)
+			).rejects.toThrow(`needs Node >= 22.18 (23.6 on Node 23; this is ${nodeVersion}); run clients with Bun`)
 		},
 	)
 

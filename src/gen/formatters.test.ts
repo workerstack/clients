@@ -13,12 +13,12 @@ import { FORMATTERS, findGofmt, findRuff, findRustfmt, formatterFor, missingForm
 
 /** A directory holding executables named `names`, as a PATH entry or an override's target. */
 function binaries(...names: readonly string[]): string {
-	const dir = mkdtempSync(join(tmpdir(), "honey-formatters-"))
+	const dir = mkdtempSync(join(tmpdir(), "clients-formatters-"))
 	for (const name of names) writeFileSync(join(dir, name), "", { mode: 0o755 })
 	return dir
 }
 
-const MISSING = join(tmpdir(), "honey-no-such-binary")
+const MISSING = join(tmpdir(), "clients-no-such-binary")
 
 describe("an override names the binary, and must name one that is there", () => {
 	it("honours each override ahead of PATH", () => {
@@ -56,7 +56,7 @@ describe("an override names the binary, and must name one that is there", () => 
 
 	it("prefers the toolchain's own rustfmt beside rustc over the rustup proxy on PATH", () => {
 		/* the proxy picks a toolchain by cwd, so the sysroot binary is the one that formats the same anywhere */
-		const toolchain = mkdtempSync(join(tmpdir(), "honey-rustup-"))
+		const toolchain = mkdtempSync(join(tmpdir(), "clients-rustup-"))
 		mkdirSync(join(toolchain, "bin"))
 		for (const name of ["rustc", "rustfmt"]) writeFileSync(join(toolchain, "bin", name), "", { mode: 0o755 })
 		const proxy = binaries("rustfmt")
@@ -108,7 +108,7 @@ describe("formatterFor builds the formatter each target's row names", () => {
 
 	it("loads oxfmt for ts, and none for a specifier that does not resolve", { timeout: SPAWN_TIMEOUT }, async () => {
 		expect(typeof (await formatterFor("ts", { env: {} }))).toBe("function")
-		expect(await formatterFor("ts", { env: {}, oxfmt: "@honey/no-such-oxfmt" })).toBeUndefined()
+		expect(await formatterFor("ts", { env: {}, oxfmt: "@backend/no-such-oxfmt" })).toBeUndefined()
 	})
 
 	it("builds none for a target with no row, so the dispatch is total", { timeout: SPAWN_TIMEOUT }, async () => {
@@ -127,21 +127,21 @@ describe("a formatter that is not there", () => {
 		const said: string[] = []
 		missingFormatter("python", pass, {}, (line) => said.push(line))
 		expect(said).toEqual([
-			"honey-clients: ruff was not found, so the python output is not formatted (install ruff, or set RUFF)\n",
+			"clients: ruff was not found, so the python output is not formatted (install ruff, or set RUFF)\n",
 		])
 	})
 
 	it("is fatal only where a pipeline asks for that, by its own variable", () => {
-		expect(() => missingFormatter("python", pass, { HONEY_REQUIRE_FORMATTERS: "1" }, () => undefined)).toThrow(
+		expect(() => missingFormatter("python", pass, { CLIENTS_REQUIRE_FORMATTERS: "1" }, () => undefined)).toThrow(
 			"ruff was not found",
 		)
 	})
 
-	it("is not fatal under HONEY_REQUIRE_TOOLCHAINS, which is the test harness's switch", () => {
+	it("is not fatal under CLIENTS_REQUIRE_TOOLCHAINS, which is the test harness's switch", () => {
 		/* CI sets that on six jobs to keep toolchain tests from skipping; reading it here turned every
 		   incidental generation without oxfmt into a hard failure and killed rc.10's release run */
 		const said: string[] = []
-		missingFormatter("python", pass, { HONEY_REQUIRE_TOOLCHAINS: "1" }, (line) => said.push(line))
+		missingFormatter("python", pass, { CLIENTS_REQUIRE_TOOLCHAINS: "1" }, (line) => said.push(line))
 		expect(said.length).toBe(1)
 	})
 
@@ -154,7 +154,7 @@ describe("a formatter that is not there", () => {
 	})
 
 	it("still stops for oxfmt when a pipeline demands formatters, quiet or not", () => {
-		expect(() => missingFormatter("ts", ts, { HONEY_REQUIRE_FORMATTERS: "1" }, () => undefined)).toThrow(
+		expect(() => missingFormatter("ts", ts, { CLIENTS_REQUIRE_FORMATTERS: "1" }, () => undefined)).toThrow(
 			"oxfmt was not found",
 		)
 	})

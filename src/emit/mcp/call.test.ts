@@ -116,7 +116,7 @@ describe("a tool call's wire (phase b)", SLOW, () => {
 				["POST", "/forms", undefined, "application/x-www-form-urlencoded", undefined],
 			],
 			{
-				_meta: { "honey/status": 200 },
+				_meta: { "backend/status": 200 },
 				content: [{ text: '{"id":"1"}', type: "text" }],
 				structuredContent: { id: "1" },
 			},
@@ -211,7 +211,7 @@ describe("a tool call's arguments (phase c)", SLOW, () => {
 					content: [{ text: JSON.stringify({ message: `Invalid arguments: ${why}` }), type: "text" }],
 					isError: true,
 				})),
-				{ _meta: { "honey/status": 200 }, content: [{ text: "{}", type: "text" }], structuredContent: {} },
+				{ _meta: { "backend/status": 200 }, content: [{ text: "{}", type: "text" }], structuredContent: {} },
 			],
 			["/items/1?sort=asc"],
 		])

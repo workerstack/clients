@@ -1,7 +1,7 @@
 /**
  * The Rust SDK speaks HTTP/1.1 (bit 19 d2, sweep item 10): against a server offering h2 and http/1.1 by ALPN, its
  * request arrives over http/1.1, as every SDK's does. reqwest built with its `http2` feature negotiated h2 (probe:
- * ~/.cache/honey-tmp/b19/probes/http-version.txt); the crate is built without it, so no client, a caller's
+ * ~/.cache/backend-tmp/b19/probes/http-version.txt); the crate is built without it, so no client, a caller's
  * `http_builder` included, can offer h2.
  */
 import { describe, expect, it } from "vitest"

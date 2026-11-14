@@ -2,7 +2,7 @@
  * A hook's `ctx.path` is the operation's path template as the document spells it (`/items/{id}`), never the
  * URL the call filled in (`/items/7`). That is what lets a hook key a table by operation — a read-your-writes
  * map, a per-route budget — instead of parsing an id back out. `onLog`'s `operation` is `METHOD` and the same
- * path, so one spelling serves both. 0.7.3 handed honey's own colon form (`/items/:id`), which a document
+ * path, so one spelling serves both. 0.7.3 handed backend's own colon form (`/items/:id`), which a document
  * never carries, and a client generated from a third party's document had no such form at all.
  */
 import { describe, expect, it } from "vitest"

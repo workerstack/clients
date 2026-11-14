@@ -1,6 +1,6 @@
 /**
  * An emitted Java SDK held to the pinned toolchain (java-env.ts), once per content hash: written under
- * `$HOME/.cache/honey-tmp/java/sdk/<hash>`, compiled by the 21 JDK's javac `--release 17 -Xlint:all -Werror` against
+ * `$HOME/.cache/backend-tmp/java/sdk/<hash>`, compiled by the 21 JDK's javac `--release 17 -Xlint:all -Werror` against
  * exactly the three pinned jars, and checked on demand by google-java-format `--dry-run` and one offline Gradle build.
  */
 import { createHash, randomUUID } from "node:crypto"
@@ -59,7 +59,7 @@ function walk(dir: string): string[] {
 }
 
 /** The environment variable that marks one build's Gradle processes: a forked daemon inherits its client's. */
-export const GRADLE_RUN = "HONEY_GRADLE_RUN"
+export const GRADLE_RUN = "CLIENTS_GRADLE_RUN"
 
 /** `/proc/<pid>/<file>`, its NULs as spaces, or "" for a process that ended since the listing. */
 function procText(pid: string, file: string): string {

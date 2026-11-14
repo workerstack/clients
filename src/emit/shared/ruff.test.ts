@@ -1,6 +1,6 @@
 /**
  * The Python post-pass (R2, Fb9): `ruffFormatter` as a `Formatter` for `formatFiles` under the extension key `py`,
- * every ruff the pinned one (python-env's `ruffPath`), and no configuration but its own (`--isolated`, honey-a8).
+ * every ruff the pinned one (python-env's `ruffPath`), and no configuration but its own (`--isolated`, clients-a8).
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"

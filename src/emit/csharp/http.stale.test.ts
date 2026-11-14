@@ -297,7 +297,7 @@ describe.skipIf(!DOTNET)("stale tracking through the public surface (consumer pr
 	/* ported from python/http.stale.test.ts:256 (runtime_check.py timed 2,000 lookups over 20,000 keys against
 	 * 0.5 s). A lookup bounded by the pattern keys costs about the same over 16 keys as over 16,384, one that scans
 	 * every entry grows with them, even by string equality alone; timed from the call to its request hook, no wire
-	 * cost hides that (honey-a8's redesign), and a ratio needs no machine's absolute speed */
+	 * cost hides that (clients-a8's redesign), and a ratio needs no machine's absolute speed */
 	it("looks a selector up without scanning every stale entry: 16,384 entries cost the work before the request hook under 4× what 16 do", async () => {
 		const run = await served(BUDGET_REPLIES, (server) =>
 			consume("http", "stale-budget", { base: server.url, body: BUDGET }),

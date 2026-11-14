@@ -128,7 +128,7 @@ describe.skipIf(!JAVA)("an SSE stream's failures and typed headers: thrown once,
 		]
 		const { run } = await drive(replies, [ticks(), ticks()], { script: {} })
 		const decoded = {
-			chain: ["DecodeException", "SdkException", "HoneyException"],
+			chain: ["DecodeException", "SdkException", "HttpException"],
 			status: undefined,
 			text: expect.stringMatching(/^an event's data does not decode: /),
 			type: "DecodeException",
@@ -155,7 +155,7 @@ describe.skipIf(!JAVA)("an SSE stream's failures and typed headers: thrown once,
 	})
 })
 
-const STATUS = ["ApiException", "SdkException", "HoneyException"]
+const STATUS = ["ApiException", "SdkException", "HttpException"]
 /** An error status at the open as the trace records it: its class, the status class, the text, via return. */
 const statusError = (type: string, status: number, message: string) => ({
 	error: { chain: [type, ...STATUS], status, text: `HTTP ${status}: ${message}`, type, via: "return" },
@@ -270,7 +270,7 @@ describe.skipIf(!JAVA)("what bounds an SSE call: the timeout its open, the reade
 		expect(got, `${run.stderr} elapsed ${elapsed}`).toEqual({
 			bounded: true,
 			error: {
-				chain: ["ApiTimeoutException", "HoneyException"],
+				chain: ["ApiTimeoutException", "HttpException"],
 				status: undefined,
 				text: "GET /ticks timed out after 300 ms",
 				type: "ApiTimeoutException",

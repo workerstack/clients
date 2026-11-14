@@ -58,7 +58,7 @@ const ws = (steps: NonNullable<Reply["ws"]>["steps"]): Reply => ({ status: 101, 
 const strings = (...texts: readonly string[]): Observed => ({ events: texts.map((data) => ({ data })), kind: "events" })
 /** A stream's OCE as traced: the method's token ended it (Fd2), via the stream (contract 50 §4.3). */
 const CANCELED = expect.objectContaining({ canceled: true, via: "stream" })
-const CONNECTION = ["ApiConnectionException", "HoneyException"]
+const CONNECTION = ["ApiConnectionException", "HttpException"]
 
 /** The registry document `key`'s call plans. */
 const plansOf = (key: StreamKey) => csharpCallPlans(FIXTURES[key].document())

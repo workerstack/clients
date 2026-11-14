@@ -89,8 +89,9 @@ const SLOW = { timeout: 120_000 }
  * read off its Result, an error status's JSON object body still its failure, +232 with the catch's dropped `data`;
  * SdkClient's `safe` and the twin walked, +11; the header naming the twin, +49), result.ts -47 (Answer the Result's
  * shape, failureOf's own two fields), mount.ts -55 (the dead `throwOnError: false`, field and value, cut). Bit 21 in all: +37,443 B over its start, 31,165 -> 68,608.
+ * Plan 55, +6 B to 58,598 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
  */
-const MCP_PORTABLE_BYTES = 58592
+const MCP_PORTABLE_BYTES = 58598
 /* the node part's own tail of that history: bit 21 g, +38 B to 10,016 B, and untouched since. */
 const MCP_NODE_BYTES = 10016
 

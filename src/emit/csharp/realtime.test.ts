@@ -124,7 +124,7 @@ const TYPES = [
 
 /** csc's errors for TYPES against `realtime`, each as `<the statement> → <CS code>: <message>`. */
 function findings(): string[] {
-	const source = program("HoneySdk", "HoneySdkClient", TYPES.join("\n"))
+	const source = program("HttpSdk", "HttpSdkClient", TYPES.join("\n"))
 	const lines = source.split("\n")
 	return checked("realtime", source).map((line) => {
 		const found = /^\((\d+),\d+\): error (CS\d+: .*)$/.exec(line)
@@ -141,7 +141,7 @@ Note($"{rc.State}"); await rc.DisposeAsync(); Note($"{rc.State}");`
 		const { hops, out, stderr } = await consumed("opened", [refused, sse([ev(1)], "hold")], body)
 		expect({ hops: hops.length, out: out?.main }, stderr).toEqual({ hops: 2, out: ["Connected", "Disconnected"] })
 		expect(findings()).toEqual([
-			`${WRONG} → CS0029: Cannot implicitly convert type 'HoneySdk.ResumableConnection<HoneySdk.Payload>' to 'HoneySdk.ResumableConnection<System.Text.Json.JsonElement>'`,
+			`${WRONG} → CS0029: Cannot implicitly convert type 'HttpSdk.ResumableConnection<HttpSdk.Payload>' to 'HttpSdk.ResumableConnection<System.Text.Json.JsonElement>'`,
 			`${CLAIMED} → CS1739: The best overload for 'ResumeAsync' does not have a parameter named 'reconnectToken2'`,
 		])
 	})
@@ -470,7 +470,7 @@ const RETURNS =
 const OPTS = "TransportOptions.Of(lastEventId, reconnectToken, protocols, maxReconnectAttempts, reconnectDelay)"
 const FIELDS =
 	"string? lastEventId = null, string? reconnectToken = null, IReadOnlyList<string>? protocols = null, int? maxReconnectAttempts = null, TimeSpan? reconnectDelay = null, RequestOptions? options = null, CancellationToken cancellationToken = default) =>"
-const CTX = "HoneySdkJsonContext.Default"
+const CTX = "HttpSdkJsonContext.Default"
 /** contract 50 §2.1's realtime lines, and `clash.feed`'s by the same rules (its clashing queries claimed `…2`) */
 const EMITTED = [
 	'    private static readonly Operation _live = new("GET", "/feed", [], Idempotent: false);',

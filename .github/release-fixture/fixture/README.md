@@ -14,7 +14,7 @@ What each job proves on every change to the workflows, this fixture or the relea
 Change a file here only together with a local bump run whose output is committed in the same commit:
 
 ```console
-RELEASE_FIXTURE_ANY_VERSION=1 node bin/honey-clients.js release bump --config .github/release-fixture/release.config.ts
+RELEASE_FIXTURE_ANY_VERSION=1 node bin/clients.js release bump --config .github/release-fixture/release.config.ts
 ```
 
 Otherwise the next `bump` job on `main` finds a change and opens a real release PR in `workerstack/clients`.

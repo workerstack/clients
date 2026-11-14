@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// The honey-clients bin (bit 17 phase h). A repository checkout (marked by tsconfig.json, which is not published)
-// runs the TypeScript source, natively on Bun (under the honey-source condition) and through jiti on Node, so a stale
+// The clients bin (bit 17 phase h). A repository checkout (marked by tsconfig.json, which is not published)
+// runs the TypeScript source, natively on Bun (under the backend-source condition) and through jiti on Node, so a stale
 // dist/ never runs; an installed package runs the compiled JavaScript on any runtime (the tarball ships dist/, not src/).
 import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
@@ -13,7 +13,7 @@ const checkout = existsSync(new URL("../tsconfig.json", import.meta.url))
 // `bun run` and `bunx` start this file through its node shebang, while what they run is meant for Bun: hand over to
 // the Bun that started us, which they name in npm_execpath. Once, never again in the child.
 function invokingBun() {
-	if (isBun || process.env.HONEY_NO_BUN_HANDOFF === "1") return null
+	if (isBun || process.env.CLIENTS_NO_BUN_HANDOFF === "1") return null
 	if (!process.env.npm_config_user_agent?.startsWith("bun/")) return null
 	const bun = process.env.npm_execpath
 	if (!bun || !/^bunx?(\.exe)?$/.test(basename(bun)) || !existsSync(bun)) return null
@@ -29,11 +29,11 @@ function handOff(bun, env) {
 	const forward = (signal) => child.kill(signal)
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(signal, forward)
 	child = spawn(bun, [fileURLToPath(import.meta.url), ...process.argv.slice(2)], {
-		env: { ...process.env, ...env, HONEY_NO_BUN_HANDOFF: "1" },
+		env: { ...process.env, ...env, CLIENTS_NO_BUN_HANDOFF: "1" },
 		stdio: "inherit",
 	})
 	child.on("error", (error) => {
-		console.error(`honey-clients: could not start ${bun}: ${error.message}`)
+		console.error(`clients: could not start ${bun}: ${error.message}`)
 		process.exit(1)
 	})
 	child.on("exit", (code, signal) => {
@@ -46,19 +46,19 @@ function handOff(bun, env) {
 	})
 }
 
-// A checkout on Bun runs under the honey-source condition: an --app module's checkout core then resolves to its
+// A checkout on Bun runs under the backend-source condition: an --app module's checkout core then resolves to its
 // source, never to an unbuilt or stale dist/ (bit 20). Set through BUN_OPTIONS when the caller did not, in the one
 // handoff, so a watch's generation children inherit it; Bun reports BUN_OPTIONS' flags in execArgv, so a Bun started
 // with it never hands off again.
-const SOURCE_CONDITION = "--conditions=honey-source"
+const SOURCE_CONDITION = "--conditions=backend-source"
 const unconditioned = isBun && checkout && !process.execArgv.includes(SOURCE_CONDITION)
-// The hand-off's backstop: its child carries HONEY_BUN_HANDOFF, the depth of hand-offs before it. A child that would
+// The hand-off's backstop: its child carries CLIENTS_BUN_HANDOFF, the depth of hand-offs before it. A child that would
 // hand off again (the condition set but not in its execArgv) refuses instead of re-running itself without end.
-const handOffDepth = Number(process.env.HONEY_BUN_HANDOFF ?? 0)
+const handOffDepth = Number(process.env.CLIENTS_BUN_HANDOFF ?? 0)
 const sourceEnv = checkout
 	? {
 			BUN_OPTIONS: `${process.env.BUN_OPTIONS ?? ""} ${SOURCE_CONDITION}`.trim(),
-			HONEY_BUN_HANDOFF: String(handOffDepth + 1),
+			CLIENTS_BUN_HANDOFF: String(handOffDepth + 1),
 		}
 	: {}
 
@@ -72,7 +72,7 @@ async function entry() {
 		return await import("../dist/cli.js")
 	} catch (error) {
 		if (error?.code === "ERR_MODULE_NOT_FOUND" && String(error.url).endsWith("/dist/cli.js")) {
-			console.error("honey-clients: dist/ is missing from this install. Reinstall it, or run it with Bun.")
+			console.error("clients: dist/ is missing from this install. Reinstall it, or run it with Bun.")
 			process.exit(1)
 		}
 		throw error
@@ -82,7 +82,7 @@ async function entry() {
 const bun = invokingBun()
 if (bun) handOff(bun, sourceEnv)
 else if (unconditioned && handOffDepth >= 1) {
-	console.error("honey-clients: Bun hand-off loop: --conditions=honey-source not visible after re-exec")
+	console.error("clients: Bun hand-off loop: --conditions=backend-source not visible after re-exec")
 	process.exit(1)
 } else if (unconditioned) handOff(process.execPath, sourceEnv)
 else {

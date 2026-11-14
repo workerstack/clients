@@ -138,7 +138,7 @@ describe.skipIf(!JAVA)("the cap's DecodeException in both styles, and the server
 				error: [
 					"return",
 					"DecodeException",
-					["DecodeException", "SdkException", "HoneyException"],
+					["DecodeException", "SdkException", "HttpException"],
 					"the answer exceeds 16 bytes",
 				],
 				observed: [{ kind: "decode", status: 200 }],
@@ -154,7 +154,7 @@ describe.skipIf(!JAVA)("the cap's DecodeException in both styles, and the server
 		expect({ error: call?.error, result: call?.result }, run.stderr).toEqual({
 			error: {
 				canceled: false,
-				chain: ["NotFoundException", "ApiException", "SdkException", "HoneyException"],
+				chain: ["NotFoundException", "ApiException", "SdkException", "HttpException"],
 				display: expect.any(String),
 				inner: null,
 				key: "member.missing",

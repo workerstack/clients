@@ -1,7 +1,7 @@
 /**
  * The tools the CLI's generated files are checked by (bit 17 phases e and g): bash from the system; fish, zsh and
  * PowerShell for the completion scripts and install.ps1; goreleaser for the release config; shellcheck for install.sh.
- * Each is the release `tool-pins.json` pins by sha256, extracted into `$HOME/.cache/honey-tmp/tools/<dir>` by
+ * Each is the release `tool-pins.json` pins by sha256, extracted into `$HOME/.cache/backend-tmp/tools/<dir>` by
  * `toolsInstall`'s command after its checksum passes; CI runs that command verbatim. zsh comes from
  * romkatv/zsh-bin, which publishes no digest: its pin is the sha256 of the release asset whose gpg signature checked
  * out against the author's key (8B060F8B9EB395614A669F2A90ACE942EB90C3DD). A missing pin fails where toolchains are
@@ -30,7 +30,7 @@ const pins = (): Record<Tool, Pin> =>
 	JSON.parse(readFileSync(resolve(import.meta.dirname, "tool-pins.json"), "utf8")) as Record<Tool, Pin>
 
 /** Where the pinned tools live. */
-const toolsDir = () => join(process.env.HOME ?? homedir(), ".cache/honey-tmp/tools")
+const toolsDir = () => join(process.env.HOME ?? homedir(), ".cache/backend-tmp/tools")
 
 /** A pinned tool's binary. */
 export const toolBin = (name: Tool) => join(toolsDir(), pins()[name].dir, pins()[name].bin)
@@ -49,7 +49,7 @@ export const hasTools = (): boolean =>
  */
 export function withTools(): boolean {
 	const present = hasTools()
-	if (!present && process.env.HONEY_REQUIRE_TOOLCHAINS === "1")
+	if (!present && process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1")
 		throw new Error(`the pinned tools are required here and are not installed: ${toolsInstall()}`)
 	return present
 }

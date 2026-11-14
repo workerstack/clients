@@ -133,7 +133,7 @@ export const MCP_ROWS: readonly Feature[] = [
 				{ ...call("files.get", "GET", "/v1/files/:name", { params: { name: "blob.bin" } }), mcp: { read: "content" } },
 			],
 			expect: [
-				mcp([{ mimeType: OCTET, sha256: SHA_256B, size: 256, type: "resource", uri: "honey://files_get/result" }]),
+				mcp([{ mimeType: OCTET, sha256: SHA_256B, size: 256, type: "resource", uri: "mcp://files_get/result" }]),
 			],
 			id: "resource",
 			wire: [hop("GET", "/v1/files/blob.bin", { headers: { accept: OCTET } })],

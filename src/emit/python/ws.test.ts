@@ -87,7 +87,7 @@ const TOKEN2 = '    await c.rooms.socket("r", reconnect_token2="t")'
 const SYNC = "sdk.SDK().rooms"
 const TYPED = [
 	"from typing import assert_type",
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"async def run(c: sdk.AsyncSDK) -> None:",
 	'    w: sdk.TypedWebSocket = await c.rooms.socket("r", since=3, protocols=["v2"], reconnect_token="t")',
 	'    _: sdk.TypedWebSocket = await c.plain.socket(protocols=("v1",))',

@@ -36,7 +36,7 @@ const ERR: Json = {
 					},
 					404: { description: "not found" },
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"item.locked": { schema: object({ until: STRING }), status: 423 },
 					item_locked: { status: 423 },
 					item_not_found: { status: 404 },
@@ -100,7 +100,7 @@ const surface = once(() =>
 	var ce *sdk.ClientError
 	var st interface{ Status() int }
 	note(errors.As(err, &ce), ce.StatusCode, errors.As(err, &st), st.Status())
-	raised := sdk.HoneyRaiseForStatus(&http.Response{StatusCode: 404, Header: http.Header{}, Body: http.NoBody}, []byte(\`{"message":"no such item"}\`))
+	raised := sdk.HttpRaiseForStatus(&http.Response{StatusCode: 404, Header: http.Header{}, Body: http.NoBody}, []byte(\`{"message":"no such item"}\`))
 	note(fmt.Sprintf("%T", raised), raised.Error())
 	section("envelope")
 	raw := \`{"status":422,"error_key":"item.invalid","status_key":"unprocessable_entity","message":"bad","fields":{"name":[{"error_key":"required","message":"is required","path":"name"}]},"success":false,"trace":"t1"}\`
@@ -301,7 +301,7 @@ goDescribe("the safe mirror's Result, from a consumer program (bit 21 i3)", () =
 				"GET http://api.test/items/i3",
 				'false true true true true {"id": true',
 				"GET http://api.test/items/i3",
-				"true honey: decode response: unexpected end of JSON input",
+				"true httpsdk: decode response: unexpected end of JSON input",
 			],
 			vet: [],
 		})
@@ -344,7 +344,7 @@ goDescribe("the safe mirror: a failure with no answer is the error return, never
 
 goDescribe("the runtime's error types, from a consumer program", () => {
 	// v0: 473e487f9f
-	it("reaches a 404 as *NotFoundError, *ClientError and any Status() int, as HoneyRaiseForStatus raises it", () => {
+	it("reaches a 404 as *NotFoundError, *ClientError and any Status() int, as HttpRaiseForStatus raises it", () => {
 		const run = surface()
 		expect(seen(run, "status"), run.stderr).toEqual({
 			built: true,
@@ -402,7 +402,7 @@ goDescribe("declared error keys: Err<Key> sentinels and <Key>Data bodies", () =>
 			built: true,
 			out: [
 				"item.locked item_locked item_not_found response.too_large",
-				"honey: response body exceeds MaxResponseBytes",
+				"httpsdk: response body exceeds MaxResponseBytes",
 				"GET http://api.test/items/i1",
 				"true false true",
 				"GET http://api.test/items/i2",
@@ -415,7 +415,7 @@ goDescribe("declared error keys: Err<Key> sentinels and <Key>Data bodies", () =>
 	}, 600_000)
 })
 
-/** honey's error envelope for one key: a body with this shape is the runtime's ErrorEnvelope, no type of its own. */
+/** backend's error envelope for one key: a body with this shape is the runtime's ErrorEnvelope, no type of its own. */
 const ENVELOPE = {
 	properties: {
 		error_key: { enum: ["order.closed"], type: "string" },
@@ -442,7 +442,7 @@ const KEYED: Json = {
 			post: {
 				operationId: "orders.close",
 				responses: { 204: { description: "closed" } },
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"order.closed": { schema: ENVELOPE, status: 409 },
 					"order.locked": { schema: LOCK, status: 423 },
 				},
@@ -452,7 +452,7 @@ const KEYED: Json = {
 			post: {
 				operationId: "orders.reopen",
 				responses: { 204: { description: "reopened" } },
-				"x-honey-errors": { "order.locked": { schema: object({ other: STRING }), status: 423 } },
+				"x-backend-errors": { "order.locked": { schema: object({ other: STRING }), status: 423 } },
 			},
 		},
 	},

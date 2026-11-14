@@ -18,8 +18,8 @@ import { guardNamed } from "../structure/mutation-harness.guards.ts"
 
 const REPO = resolve(import.meta.dirname, "../..")
 
-/* a C# guard named by HONEY_MUTANT reruns this file with its module's guard switched off (the harness's mock) */
-const mutant = guardNamed(process.env.HONEY_MUTANT)
+/* a C# guard named by CLIENTS_MUTANT reruns this file with its module's guard switched off (the harness's mock) */
+const mutant = guardNamed(process.env.CLIENTS_MUTANT)
 if (mutant !== undefined) {
 	vi.doMock(resolve(REPO, mutant.module), async (importOriginal) => {
 		const original = await importOriginal<Record<string, unknown>>()

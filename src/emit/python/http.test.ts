@@ -89,7 +89,7 @@ const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(
 
 /** The trace of a `user-id` value refused as a path segment (`path.py`). */
 const refused = plain({
-	chain: ["PathParamError", "HoneyError"],
+	chain: ["PathParamError", "HttpError"],
 	text: "path parameter 'user-id' is missing, empty, '.' or '..'",
 	type: "PathParamError",
 })
@@ -98,7 +98,7 @@ describe("the call plan: path params in path order, user-id taken as user_id", (
 	// v0: 5770bf39ca
 	it("names members.get's path params in path order, and both clients take org then user_id before the keywords", () => {
 		const document = FIXTURES.http.document()
-		const lines = (generatePythonSdk(document).files["src/honey_sdk/client.py"] ?? "").split("\n")
+		const lines = (generatePythonSdk(document).files["src/http_sdk/client.py"] ?? "").split("\n")
 		const keywords =
 			"ids: list[str] | None = None, maybe: str | None = None, page_size: int | None = None, options: RequestOptions | None = None"
 		const signature = (prefix: string) =>

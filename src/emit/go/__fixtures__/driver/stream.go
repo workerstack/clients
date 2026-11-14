@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	sdk "honey.test/driver/sdk"
+	sdk "backend.test/driver/sdk"
 )
 
 // stallAfter bounds every stream call: one that has not ended by then fails the run, so a
@@ -166,7 +166,7 @@ func driveSSE(s streamCall) streamed {
 	if broken != nil {
 		return streamed{err: broken}
 	}
-	if len(events) > 0 && noAnswerOf(failed) != "" && !strings.HasPrefix(failed.Error(), "honey: ") {
+	if len(events) > 0 && noAnswerOf(failed) != "" && !strings.HasPrefix(failed.Error(), "httpsdk: ") {
 		return streamed{err: fmt.Errorf("a stream's no-answer error the SDK did not wrap as a call's: %w", failed)}
 	}
 	if s.target != nil {

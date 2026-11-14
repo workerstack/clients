@@ -1,5 +1,5 @@
 /**
- * SPAWNING_HELPERS, what honey/spawn-timeout knows of another module, is exactly what the code says: every core and
+ * SPAWNING_HELPERS, what clients/spawn-timeout knows of another module, is exactly what the code says: every core and
  * gen module read with spawners.js's own AST walk to a fixed point (spawning-exports.ts), kept to the exports a test
  * file imports. A listed helper that stops spawning and a spawning helper left off both red, so the list cannot rot.
  * And the tree itself: every in-scope test file passes the rule, so a dropped timeout reds here as in lint.
@@ -43,7 +43,7 @@ describe("SPAWNING_HELPERS", { timeout: SPAWN_TIMEOUT }, () => {
 	})
 })
 
-describe("the tree under honey/spawn-timeout", { timeout: SPAWN_TIMEOUT }, () => {
+describe("the tree under clients/spawn-timeout", { timeout: SPAWN_TIMEOUT }, () => {
 	it("has no test or hook that spawns on vitest's default bound", () => {
 		const tests = files().filter((file) => file.endsWith(".test.ts"))
 		const fixture = Object.fromEntries(tests.map((file) => [file, readFileSync(join(REPO, file), "utf8")]))

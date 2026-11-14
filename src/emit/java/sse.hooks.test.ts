@@ -184,7 +184,7 @@ describe.skipIf(!JAVA)("an SSE open through a plain call's pipeline: the onRespo
 			run.stderr,
 		).toEqual({
 			error: plain({
-				chain: ["HookException", "HoneyException"],
+				chain: ["HookException", "HttpException"],
 				inner: "IllegalStateException",
 				text: "hook: bad",
 				type: "HookException",

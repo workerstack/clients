@@ -74,9 +74,7 @@ def python_error(error: BaseException, via: Via, envelope: bool) -> PythonError:
     """``error`` as the trace records it; an ``APIStatusError`` adds its status, key and message,
     and its envelope when ``envelope``."""
     names = [kind.__name__ for kind in type(error).__mro__]
-    chain = (
-        names[: names.index("HoneyError") + 1] if "HoneyError" in names else names[:1]
-    )
+    chain = names[: names.index("HttpError") + 1] if "HttpError" in names else names[:1]
     cause = error.__cause__
     out: PythonError = {
         "type": names[0],

@@ -5,7 +5,7 @@
  * step asserting the revision it runs under. A call is its tool (the operation's, by name), its parameters as the
  * tool's flat arguments, its body as `body` (bytes as base64), `take` and `lastEventId` as the collect's `max_events`
  * and `last_event_id`; the setup reaches it as the server's environment (the bearer as $CONFORMANCE_API_KEY). The observation is read from the result: the status from `_meta`
- * (honey/status), the data from structuredContent (a wrapped answer's `result` and `headers`) or the text, bytes from
+ * (backend/status), the data from structuredContent (a wrapped answer's `result` and `headers`) or the text, bytes from
  * a resource or image block, an error from an isError result's text, a stream from the collect's events. An MCP-only
  * row reads the server instead: its tool names, annotations, outputSchemas, tokens, or a result's content. Bit 21 d:
  * over HTTP, the same server serves `--http` on a port the OS picks, `MCP_TOKEN` its bearer, and every cell runs the
@@ -144,7 +144,7 @@ function observedOf(stepped: Stepped, spec: ToolSpec): Observed {
 /** A 2xx result as the grid observes it: its status from `_meta`, bytes, or data with a wrapped answer's headers. */
 function successOf(result: Record<string, unknown>, spec: ToolSpec): Observed {
 	const structured = result.structuredContent as Record<string, Json> | undefined
-	const status = (result._meta as { "honey/status": number })["honey/status"]
+	const status = (result._meta as { "backend/status": number })["backend/status"]
 	const [block] = result.content as Record<string, unknown>[]
 	if (block?.type === "resource" || block?.type === "image" || block?.type === "audio") {
 		const [bytes] = contentOf(result) as { sha256: string; size: number }[]
@@ -316,7 +316,7 @@ export function mcpMountedRunner(session: HttpSession, era: string, variant: str
 				"mcp.gen.ts": entry,
 				...Object.fromEntries(Object.entries(files).map(([name, text]) => [`mcp/${name}`, text])),
 			})
-			return startReferenceApp({ HONEY_CONFORMANCE_MCP: join(dir, "mcp.gen.ts") })
+			return startReferenceApp({ CLIENTS_CONFORMANCE_MCP: join(dir, "mcp.gen.ts") })
 		},
 		target: "mcp",
 		variant,

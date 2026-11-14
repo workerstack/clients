@@ -1,13 +1,13 @@
 /**
  * Processes a test file started that outlived their leg (bit 17 phase h): every child a file spawns carries the file's
- * own mark in its environment, inherited by anything it starts, so a leaked `honey-clients` (a `--watch` left running,
+ * own mark in its environment, inherited by anything it starts, so a leaked `clients` (a `--watch` left running,
  * a fake bun's sleep) is found by the mark alone and no other process on the machine is touched.
  */
 import { randomUUID } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 
 /** The environment variable the mark is under. */
-export const MARK_KEY = "HONEY_CODEGEN_TEST_MARK"
+export const MARK_KEY = "CLIENTS_CODEGEN_TEST_MARK"
 
 /** A fresh mark: one per test file. */
 export const markOf = (): string => randomUUID()

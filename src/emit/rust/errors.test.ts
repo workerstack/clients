@@ -66,7 +66,7 @@ impl std::fmt::Display for ErrorKey {
 }
 
 impl crate::ApiError {
-    /// honey's error key in the body: the declared one it names, else \`Other\`; \`None\` without one.
+    /// backend's error key in the body: the declared one it names, else \`Other\`; \`None\` without one.
     pub fn key(&self) -> Option<ErrorKey> {
         self.raw_key().map(ErrorKey::from)
     }

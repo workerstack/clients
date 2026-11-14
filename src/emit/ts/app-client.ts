@@ -1,6 +1,6 @@
 /**
  * The app-typed front (F1): `createClient<typeof app>(config)`, vendored into an app's `_gen/`. It
- * reads the app's `$routes` phantom structurally (D3), so the files import nothing from honey.
+ * reads the app's `$routes` phantom structurally (D3), so the files import nothing from backend.
  */
 import { FULL_RUNTIME, runtimeSource } from "./http.ts"
 
@@ -42,7 +42,7 @@ const TYPES = [
 	"ConnectionState",
 	"ErrorEnvelope",
 	"FieldError",
-	"HoneyClient",
+	"HttpClient",
 	"InferRoutes",
 	"LogEntry",
 	"OnRequestContext",

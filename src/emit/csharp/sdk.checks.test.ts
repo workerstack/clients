@@ -20,7 +20,7 @@ const GATE = 120_000
 
 /** Each fixture's namespace and client as its options name them (§6.1): `surface` renamed, the merged ones default. */
 const CLIENTS = {
-	fixtures: ["HoneySdk", "HoneySdkClient"],
+	fixtures: ["HttpSdk", "HttpSdkClient"],
 	surface: ["Acme", "AcmeClient"],
 } as const satisfies Partial<Record<FixtureKey, readonly [string, string]>>
 
@@ -90,8 +90,8 @@ const typed = (ops: Typed) => ["using var c = Client();", ops.get, ops.list, ops
 const converts = (statement: string, from: string, to: string) =>
 	at(statement, `CS0029: Cannot implicitly convert type '${from}' to '${to}'`)
 
-const USER = "HoneySdk.CrudUser"
-const LIST = "System.Collections.Generic.IReadOnlyList<HoneySdk.CrudUser>"
+const USER = "HttpSdk.CrudUser"
+const LIST = "System.Collections.Generic.IReadOnlyList<HttpSdk.CrudUser>"
 
 describe.skipIf(!DOTNET)("the success type, or its client.Safe twin's Result<T> (C#2, bit 21 i5)", () => {
 	it(
@@ -106,15 +106,15 @@ describe.skipIf(!DOTNET)("the success type, or its client.Safe twin's Result<T> 
 				safe: {
 					safe: [],
 					thrown: [
-						converts(misread.get, `HoneySdk.Result<${USER}>`, USER),
-						converts(misread.list, `HoneySdk.Result<${LIST}>`, LIST),
+						converts(misread.get, `HttpSdk.Result<${USER}>`, USER),
+						converts(misread.list, `HttpSdk.Result<${LIST}>`, LIST),
 					],
 				},
 				thrown: {
 					safe: [
-						converts(misbound.get, USER, `HoneySdk.Result<${USER}>`),
-						converts(misbound.list, LIST, `HoneySdk.Result<${LIST}>`),
-						converts(misbound.remove, "void", "HoneySdk.Result"),
+						converts(misbound.get, USER, `HttpSdk.Result<${USER}>`),
+						converts(misbound.list, LIST, `HttpSdk.Result<${LIST}>`),
+						converts(misbound.remove, "void", "HttpSdk.Result"),
 					],
 					thrown: [],
 				},

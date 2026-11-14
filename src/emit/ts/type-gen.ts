@@ -1,8 +1,8 @@
 /**
  * `generateTypes` (F3): an app's `_gen/types.gen.d.ts` — the `Routes` map, each route's ctx,
- * input, output, errors and meta, the route selectors with the `HoneyCodegen` augmentation, and
+ * input, output, errors and meta, the route selectors with the `HttpCodegen` augmentation, and
  * `BaseCtx`. Read from the app's OpenAPI document (the IR), its route tree (meta, O1) and the
- * extracted ctx types (middleware, env, taps, parsed inputs, O3), joined on `x-honey-route`.
+ * extracted ctx types (middleware, env, taps, parsed inputs, O3), joined on `x-backend-route`.
  */
 import type { ExtractedProp, ExtractedTypes } from "../../extract/extract.ts"
 import { type OpenApiDocument, toIR } from "../../ir/build.ts"
@@ -36,9 +36,9 @@ export type GenerateTypesOptions = {
 
 /* the names the file declares, which a component schema never takes */
 const RESERVED = [
-	"HoneyContext",
-	"HoneyError",
-	"HoneyMeta",
+	"HttpContext",
+	"HttpError",
+	"HttpMeta",
 	"Omit",
 	"Partial",
 	"Readonly",
@@ -50,7 +50,7 @@ const RESERVED = [
 
 /* the v1 error-factory signature of a key without a schema (core errors.ts ErrorFactoryOpts) */
 const STANDARD_FACTORY =
-	"(opts?: { cause?: unknown; fields?: Record<string, { error_key: string; message: string; path: string }[]>; headers?: Record<string, string>; vars?: Record<string, number | string> }) => HoneyError"
+	"(opts?: { cause?: unknown; fields?: Record<string, { error_key: string; message: string; path: string }[]>; headers?: Record<string, string>; vars?: Record<string, number | string> }) => HttpError"
 
 const EXTRACTORS: readonly (readonly [string, string])[] = [
 	["RouteCtx", "ctx"],
@@ -71,14 +71,14 @@ const objectText = (fields: readonly Field[]) =>
 const propsText = (props: readonly ExtractedProp[]) =>
 	objectText(props.map((p) => [`${quoteKey(p.name)}${p.optional ? "?" : ""}`, p.type]))
 
-/** The documented routes by route id; an operation without `x-honey-route` is reported and left out. */
+/** The documented routes by route id; an operation without `x-backend-route` is reported and left out. */
 function routesOf(ir: IR, report: (message: string) => void): Map<string, IROperation> {
 	const routes = new Map<string, IROperation>()
 	const missing: string[] = []
 	for (const op of ir.operations) {
 		const id = op.extensions.route
 		if (op.extensions.websocket === true) continue
-		if (id === undefined) missing.push(`${op.method} ${op.path}: no x-honey-route; left out of Routes`)
+		if (id === undefined) missing.push(`${op.method} ${op.path}: no x-backend-route; left out of Routes`)
 		/* `all()` and an optional param document one route as several operations: the first speaks for it */
 		if (id !== undefined && !routes.has(id)) routes.set(id, op)
 	}
@@ -166,7 +166,7 @@ function errorsOf(op: IROperation, ctx: Ctx): { factories: Field[]; fields: Fiel
 	const factory = (key: string) =>
 		shape(key) === "null"
 			? STANDARD_FACTORY
-			: `(data: ${shape(key)}, opts?: { cause?: unknown; headers?: Record<string, string> }) => HoneyError`
+			: `(data: ${shape(key)}, opts?: { cause?: unknown; headers?: Record<string, string> }) => HttpError`
 	return {
 		factories: keys.map((key) => [quoteKey(key), factory(key)]),
 		fields: [
@@ -186,8 +186,8 @@ function errorsOf(op: IROperation, ctx: Ctx): { factories: Field[]; fields: Fiel
 function ctxMeta(extracted: ExtractedTypes | null | undefined, literal: string): string {
 	const declared = extracted?.meta ?? null
 	/* the OpenAPI keys the declared meta does not redefine: a consumer that types `security` its own way holds
-	   that type in the handler, and intersecting honey's would conflict with it */
-	return declared === null ? literal : `Partial<Omit<HoneyMeta, keyof ${declared}>> & ${declared}`
+	   that type in the handler, and intersecting backend's would conflict with it */
+	return declared === null ? literal : `Partial<Omit<HttpMeta, keyof ${declared}>> & ${declared}`
 }
 
 /** `ctx.params`: the type a param schema gives it as extracted, else each of the pattern's params a string. */
@@ -232,7 +232,7 @@ function routeEntry(id: string, op: IROperation, options: GenerateTypesOptions, 
 function baseCtx(extracted: ExtractedTypes | null, name: string): string[] {
 	const env = extracted?.env ?? "Record<string, unknown>"
 	const taps = extracted?.taps ?? null
-	const parts = [taps === null ? `HoneyContext<${env}>` : `Omit<HoneyContext<${env}>, "tap">`]
+	const parts = [taps === null ? `HttpContext<${env}>` : `Omit<HttpContext<${env}>, "tap">`]
 	const middleware = extracted?.middleware ?? []
 	if (middleware.length > 0) parts.push(propsText(middleware))
 	if (taps !== null) parts.push("{ tap<K extends keyof TapMap>(key: K, payload: TapMap[K]): void }")
@@ -270,20 +270,20 @@ export function generateTypes(options: GenerateTypesOptions): string {
 	const ctx: Ctx = { names, resolve: (schema) => irToTs(schema, names) }
 	const hasErrors = [...routes.values()].some((op) => Object.keys(op.extensions.errors ?? {}).length > 0)
 	const selectors = [...routes.keys()].sort(compareCodeUnits)
-	/* HoneyMeta only when a declared meta is emitted: the ctx's meta is that type and the keys a route may add */
+	/* HttpMeta only when a declared meta is emitted: the ctx's meta is that type and the keys a route may add */
 	const declaredMeta = options.extracted?.meta ?? null
 	const imports = [
-		"HoneyContext",
+		"HttpContext",
 		"WithOutput",
-		...(hasErrors ? ["HoneyError"] : []),
-		...(declaredMeta === null ? [] : ["HoneyMeta"]),
+		...(hasErrors ? ["HttpError"] : []),
+		...(declaredMeta === null ? [] : ["HttpMeta"]),
 	]
 	const out = [`import type { ${imports.join(", ")} } from "@workerstack/backend/http"`]
 	out.push(...baseCtx(options.extracted, name))
 	if (selectors.length > 0) {
 		out.push(`export type RouteSelector = ${selectors.map(tsString).join(" | ")}`)
 		out.push(
-			'declare module "@workerstack/backend/http" {\n\tinterface HoneyCodegen {\n\t\trouteSelector: RouteSelector\n\t}\n}',
+			'declare module "@workerstack/backend/http" {\n\tinterface HttpCodegen {\n\t\trouteSelector: RouteSelector\n\t}\n}',
 		)
 	}
 	for (const schema of Object.keys(ir.schemas).sort(compareCodeUnits))

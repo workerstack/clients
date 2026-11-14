@@ -15,7 +15,7 @@ import { generateGoCli } from "../../src/emit/cli/module.ts"
 import { goCacheDir, goEnv, runGo, withGo } from "../../src/emit/go/__fixtures__/go-env.ts"
 
 /* the tag the snapshot stamps: distinctive, so its bytes in a binary are the -X value and nothing else */
-const STAMP = "v9.8.7-honey-stamp"
+const STAMP = "v9.8.7-clients-stamp"
 
 /** The shop CLI's v9 module (released to acme/shop) in a fresh git repo with one commit, tagged STAMP. */
 function repo(): string {
@@ -27,7 +27,7 @@ function repo(): string {
 		writeFileSync(join(dir, name), text)
 	}
 	const git = (...args: string[]) =>
-		spawnSync("git", ["-c", "user.name=honey", "-c", "user.email=honey@example.com", ...args], { cwd: dir })
+		spawnSync("git", ["-c", "user.name=clients", "-c", "user.email=clients@example.com", ...args], { cwd: dir })
 	git("init", "-q")
 	/* goreleaser reads the remote's URL (never fetches it); without one its snapshot drops the git state, the tag too */
 	git("remote", "add", "origin", "https://github.com/acme/shop.git")

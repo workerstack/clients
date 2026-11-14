@@ -62,7 +62,7 @@ const sha256 = (bytes: Buffer | string) => createHash("sha256").update(bytes).di
 const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(String), via: "return", ...entry })
 /** A DecodeError as traced: raised by the normal call, or the safe call's `Err` (`via: "result"`). */
 const decodeError = (text: string, safe = false) =>
-	plain({ chain: ["DecodeError", "HoneyError"], text, type: "DecodeError", via: safe ? "result" : "return" })
+	plain({ chain: ["DecodeError", "HttpError"], text, type: "DecodeError", via: safe ? "result" : "return" })
 
 /** The registry SDK `http` with the driver aimed at it, which must import. */
 function driven(): DrivenPythonSdk {
@@ -311,7 +311,7 @@ const at = (lines: readonly string[], line: string, message: string) => `${lines
 const HEADERS_INTO = [
 	"from typing import assert_type",
 	"",
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"",
 	"c = sdk.SDK()",
 	"h: sdk.ItemsGetHeaders = {}",
@@ -473,7 +473,7 @@ describe.skipIf(!PY)("an empty multipart body: the closing boundary alone", SLOW
 })
 
 const MULTIPART_TYPES = [
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"",
 	"c = sdk.SDK()",
 	'c.files.upload({"file": b"x"})',

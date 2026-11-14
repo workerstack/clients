@@ -2,7 +2,7 @@
  * Starts the conformance app (worker.ts) on workerd and prints `{"url","alt","drop"}` once the worker holds its three
  * origins. The app runs in Miniflare's workerd, the primary and the alt origin each a direct socket the OS assigned
  * (port 0, read back, never released and re-bound); the drop origin is a raw TCP front (drop-front.ts) in this process
- * relaying to the worker through Miniflare. Stops on SIGTERM, SIGINT or a closed stdin. With $HONEY_CONFORMANCE_MCP
+ * relaying to the worker through Miniflare. Stops on SIGTERM, SIGINT or a closed stdin. With $CLIENTS_CONFORMANCE_MCP
  * naming a generated MCP handler module, the worker mounts it at /v1/mcp.
  */
 import { fileURLToPath } from "node:url"
@@ -20,7 +20,7 @@ export { Alt }
 export default worker
 `
 	const result = await Bun.build({
-		conditions: ["honey-source", "workerd", "worker", "browser"],
+		conditions: ["backend-source", "workerd", "worker", "browser"],
 		entrypoints: ["worker-entry.ts"],
 		files: { "worker-entry.ts": entry },
 		format: "esm",
@@ -31,7 +31,7 @@ export default worker
 }
 
 async function main(): Promise<void> {
-	const script = await bundle(process.env.HONEY_CONFORMANCE_MCP)
+	const script = await bundle(process.env.CLIENTS_CONFORMANCE_MCP)
 	let miniflare: Miniflare | undefined
 	/* the drop front binds first and relays through `miniflare` once it is up, bodiless requests only (drop-front.ts) */
 	const drop = await listenDropFront({

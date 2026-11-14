@@ -7,7 +7,7 @@ import { declarationOf, declaredNames, walkPublic } from "./public-declarations.
  * read off the syntax, so oxlint can ask for it, and anything the walk cannot follow lands in `unknown` for the rule to
  * report: a form skipped in silence would pass a public gap. */
 
-const CONDITION = "honey-source"
+const CONDITION = "clients-source"
 
 function readManifest(dir) {
 	const path = join(dir, "package.json")

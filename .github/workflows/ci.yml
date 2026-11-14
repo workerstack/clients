@@ -98,7 +98,7 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       # gen compiles and runs the emitted Go SDK at the toolchain .go-version pins (GOTOOLCHAIN through
-      # its go-env fixture), with the module cache and the pinned toolchain under ~/.cache/honey-tmp/go
+      # its go-env fixture), with the module cache and the pinned toolchain under ~/.cache/backend-tmp/go
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: .go-version
@@ -106,7 +106,7 @@ jobs:
       # the pinned and floor toolchains, the WebSocket module and oasdiff's pin: a change in any saves a new cache
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/honey-tmp/go/mod
+          path: ~/.cache/backend-tmp/go/mod
           key: ${{ runner.os }}-gomod-test-${{ hashFiles('.go-version', 'src/emit/go/__fixtures__/go-env.ts', 'src/emit/go/sdk.ts', 'src/release/oasdiff.ts') }}
           restore-keys: ${{ runner.os }}-gomod-test-
       # the Go build cache and the compiled SDKs (go/__fixtures__/compiled.ts), each SDK dir named by the hash
@@ -118,8 +118,8 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/go/cache
-            ~/.cache/honey-tmp/go/sdk
+            ~/.cache/backend-tmp/go/cache
+            ~/.cache/backend-tmp/go/sdk
           key: >-
             ${{ runner.os }}-gobuild-${{ hashFiles('.go-version', 'src/emit/go/**',
             'src/emit/cli/**', 'src/emit/shared/**', 'src/ir/**',
@@ -136,17 +136,17 @@ jobs:
       - run: bun install --frozen-lockfile
       # the CLI's generated files are checked by pinned tools (cli/__fixtures__/tools.ts): fish, zsh and PowerShell for
       # the completion scripts and install.ps1, goreleaser for the release config, shellcheck for install.sh, each at the
-      # release tool-pins.json pins by sha256, under ~/.cache/honey-tmp/tools: the command a missing tool names
+      # release tool-pins.json pins by sha256, under ~/.cache/backend-tmp/tools: the command a missing tool names
       - name: Tools (tool-pins.json's fish, zsh, PowerShell, goreleaser and shellcheck)
-        run: P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/honey-tmp/tools" && mkdir -p "$D/dl" && for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")" && curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c - && rm -rf "${D:?}/${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial" && chmod +x "$D/$R.partial/$(jq -r --arg k "$k" '.[$k].bin' "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$k" || exit 1; done
+        run: P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/backend-tmp/tools" && mkdir -p "$D/dl" && for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")" && curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c - && rm -rf "${D:?}/${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial" && chmod +x "$D/$R.partial/$(jq -r --arg k "$k" '.[$k].bin' "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$k" || exit 1; done
       # the MCP server's legs drive it with the official clients (mcp/__fixtures__/clients.ts), pinned by client-lock.json:
       # npm ci checks every package's integrity
       - name: MCP clients (client-lock.json's @modelcontextprotocol/sdk and @modelcontextprotocol/client)
-        run: P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/honey-tmp/mcp-clients" && rm -rf "$D.partial" && mkdir -p "$D.partial" && cp "$P/client-pins.json" "$D.partial/package.json" && cp "$P/client-lock.json" "$D.partial/package-lock.json" && (cd "$D.partial" && npm ci --ignore-scripts --no-audit --no-fund) && sha256sum "$P/client-lock.json" | cut -d" " -f1 > "$D.partial/lock.sha256" && rm -rf "$D" && mv "$D.partial" "$D"
+        run: P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/backend-tmp/mcp-clients" && rm -rf "$D.partial" && mkdir -p "$D.partial" && cp "$P/client-pins.json" "$D.partial/package.json" && cp "$P/client-lock.json" "$D.partial/package-lock.json" && (cd "$D.partial" && npm ci --ignore-scripts --no-audit --no-fund) && sha256sum "$P/client-lock.json" | cut -d" " -f1 > "$D.partial/lock.sha256" && rm -rf "$D" && mv "$D.partial" "$D"
       # the TS SDK's JSR leg runs JSR's publish check in the CLI the release jsr-pins.json pins by sha256
-      # (ts/__fixtures__/jsr-cli.ts), under ~/.cache/honey-tmp/tools: the command a missing CLI names
+      # (ts/__fixtures__/jsr-cli.ts), under ~/.cache/backend-tmp/tools: the command a missing CLI names
       - name: JSR CLI (jsr-pins.json's publish checker)
-        run: P="$(git rev-parse --show-toplevel)/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/honey-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl" && curl -fsSL -o "$D/dl/$R.zip" "$(jq -r .url "$P")" && echo "$(jq -r .sha256 "$P")  $D/dl/$R.zip" | sha256sum -c - && rm -rf "${D:?}/${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && unzip -q "$D/dl/$R.zip" -d "$D/$R.partial" && chmod +x "$D/$R.partial/$(jq -r .bin "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$R.zip"
+        run: P="$(git rev-parse --show-toplevel)/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/backend-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl" && curl -fsSL -o "$D/dl/$R.zip" "$(jq -r .url "$P")" && echo "$(jq -r .sha256 "$P")  $D/dl/$R.zip" | sha256sum -c - && rm -rf "${D:?}/${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && unzip -q "$D/dl/$R.zip" -d "$D/$R.partial" && chmod +x "$D/$R.partial/$(jq -r .bin "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$R.zip"
       # gen's shard: thresholds off here, since a shard covers only what its projects run; gen-coverage holds the
       # merge to them. The blob carries the results and the coverage, and the default reporter prints the run.
       - name: gen (unit and go)
@@ -157,13 +157,13 @@ jobs:
           --reporter=default --reporter=blob --outputFile.blob="$RUNNER_TEMP/gen-blob/test.json"
         env:
           # a missing toolchain fails the run instead of skipping its tests
-          HONEY_REQUIRE_TOOLCHAINS: "1"
+          CLIENTS_REQUIRE_TOOLCHAINS: "1"
       # every SDK dir this run built or reused has a .complete newer than the start; the rest are stale
       # (their inputs changed), so the saved cache stays one run's SDKs instead of growing with each change.
       # Only the go project compiles SDKs, so the other shards use none of them.
       - name: Prune the Go SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/go/sdk -mindepth 2 -maxdepth 2 -name .complete
+          find ~/.cache/backend-tmp/go/sdk -mindepth 2 -maxdepth 2 -name .complete
           ! -newer "$RUNNER_TEMP/go-sdk-start" -printf '%h\0' | xargs -0r rm -rf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -196,14 +196,14 @@ jobs:
           cache: false
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/honey-tmp/go/mod
+          path: ~/.cache/backend-tmp/go/mod
           key: ${{ runner.os }}-gomod-test-${{ hashFiles('.go-version', 'src/emit/go/__fixtures__/go-env.ts', 'src/emit/go/sdk.ts', 'src/release/oasdiff.ts') }}
           restore-keys: ${{ runner.os }}-gomod-test-
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/go/cache
-            ~/.cache/honey-tmp/go/sdk
+            ~/.cache/backend-tmp/go/cache
+            ~/.cache/backend-tmp/go/sdk
           key: >-
             ${{ runner.os }}-gobuild-${{ hashFiles('.go-version', 'src/emit/go/**',
             'src/emit/cli/**', 'src/emit/shared/**', 'src/ir/**',
@@ -231,10 +231,10 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/rust/cargo
-            ~/.cache/honey-tmp/rust/target
-            ~/.cache/honey-tmp/rust/target-1.85.0
-            ~/.cache/honey-tmp/rust/sdk
+            ~/.cache/backend-tmp/rust/cargo
+            ~/.cache/backend-tmp/rust/target
+            ~/.cache/backend-tmp/rust/target-1.85.0
+            ~/.cache/backend-tmp/rust/sdk
           key: >-
             ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml', 'src/emit/rust/**',
             'src/emit/shared/**', 'src/ir/**', 'src/runtime/rust/**',
@@ -252,13 +252,13 @@ jobs:
           enable-cache: false
       - name: Python (uv.toml's uv, .python-version, and the PY_FLOOR interpreter)
         run: |
-          UV_CACHE_DIR="$HOME/.cache/honey-tmp/python/uv-cache" UV_TOOL_DIR="$HOME/.cache/honey-tmp/python/uv/tools" UV_TOOL_BIN_DIR="$HOME/.cache/honey-tmp/python/uv/bin" uv tool install --no-config --no-python-downloads uv=="$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' uv.toml)"
-          UV_CACHE_DIR="$HOME/.cache/honey-tmp/python/uv-cache" UV_PYTHON_INSTALL_DIR="$HOME/.cache/honey-tmp/python/pythons" UV_PYTHON_BIN_DIR="$HOME/.cache/honey-tmp/python/pybin" "$HOME/.cache/honey-tmp/python/uv/bin/uv" python install --no-bin "$(cat .python-version)" 3.11.4
+          UV_CACHE_DIR="$HOME/.cache/backend-tmp/python/uv-cache" UV_TOOL_DIR="$HOME/.cache/backend-tmp/python/uv/tools" UV_TOOL_BIN_DIR="$HOME/.cache/backend-tmp/python/uv/bin" uv tool install --no-config --no-python-downloads uv=="$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' uv.toml)"
+          UV_CACHE_DIR="$HOME/.cache/backend-tmp/python/uv-cache" UV_PYTHON_INSTALL_DIR="$HOME/.cache/backend-tmp/python/pythons" UV_PYTHON_BIN_DIR="$HOME/.cache/backend-tmp/python/pybin" "$HOME/.cache/backend-tmp/python/uv/bin/uv" python install --no-bin "$(cat .python-version)" 3.11.4
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/python/mypy
-            ~/.cache/honey-tmp/python/sdk
+            ~/.cache/backend-tmp/python/mypy
+            ~/.cache/backend-tmp/python/sdk
           key: >-
             ${{ runner.os }}-python-${{ hashFiles('.python-version', 'uv.toml', 'src/emit/python/**',
             'src/emit/shared/**', 'src/ir/**', 'src/runtime/python/**',
@@ -275,13 +275,13 @@ jobs:
       # gen runs every dotnet through its csharp-env fixture, installed as in gen-csharp (which says why)
       - name: .NET (global.json's SDK, and the seed restore)
         run: |
-          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/honey-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
+          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/dotnet/nuget
-            ~/.cache/honey-tmp/dotnet/sdk
-            ~/.cache/honey-tmp/dotnet/driver
+            ~/.cache/backend-tmp/dotnet/nuget
+            ~/.cache/backend-tmp/dotnet/sdk
+            ~/.cache/backend-tmp/dotnet/driver
           key: >-
             ${{ runner.os }}-dotnet-${{ hashFiles('global.json', 'src/emit/csharp/**',
             'src/emit/csharp/**/.editorconfig', 'src/emit/shared/**', 'src/ir/**', 'src/runtime/csharp/**',
@@ -294,16 +294,16 @@ jobs:
           restore-keys: ${{ runner.os }}-dotnet-
       # gen runs every java, javac, google-java-format and Gradle through its java-env fixture: each pin in
       # java-pins.json (three JDKs, the formatter, Gradle, the Jackson set) fetched and checked against its sha256,
-      # under ~/.cache/honey-tmp/java: the command a missing JDK names locally
+      # under ~/.cache/backend-tmp/java: the command a missing JDK names locally
       - name: Java (java-pins.json's JDKs, google-java-format, Gradle and the Jackson set)
         run: |
-          P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json" && D="$HOME/.cache/honey-tmp/java" && G="$(jq -r .googleJavaFormat.version "$P")" && W="$(jq -r .gradle.version "$P")" && mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp" && for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")" && curl -fsSL -o "$D/dl/$R.tar.gz" "$(jq -r --arg k "$k" '.jdk[$k].url' "$P")" && echo "$(jq -r --arg k "$k" '.jdk[$k].sha256' "$P")  $D/dl/$R.tar.gz" | sha256sum -c - && rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial" && tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1 && mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done && curl -fsSL -o "$D/toolchain/google-java-format-$G.jar" "$(jq -r --arg k "$k" '.googleJavaFormat.url' "$P")" && echo "$(jq -r --arg k "$k" '.googleJavaFormat.sha256' "$P")  $D/toolchain/google-java-format-$G.jar" | sha256sum -c - && curl -fsSL -o "$D/dl/gradle.zip" "$(jq -r --arg k "$k" '.gradle.url' "$P")" && echo "$(jq -r --arg k "$k" '.gradle.sha256' "$P")  $D/dl/gradle.zip" | sha256sum -c - && rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip" && for a in $(jq -r '.jackson.artifacts[].path' "$P"); do mkdir -p "$D/repo/$(dirname "$a")" && curl -fsSL -o "$D/repo/$a" "$(jq -r .jackson.repository "$P")/$a" && echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done
+          P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json" && D="$HOME/.cache/backend-tmp/java" && G="$(jq -r .googleJavaFormat.version "$P")" && W="$(jq -r .gradle.version "$P")" && mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp" && for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")" && curl -fsSL -o "$D/dl/$R.tar.gz" "$(jq -r --arg k "$k" '.jdk[$k].url' "$P")" && echo "$(jq -r --arg k "$k" '.jdk[$k].sha256' "$P")  $D/dl/$R.tar.gz" | sha256sum -c - && rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial" && tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1 && mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done && curl -fsSL -o "$D/toolchain/google-java-format-$G.jar" "$(jq -r --arg k "$k" '.googleJavaFormat.url' "$P")" && echo "$(jq -r --arg k "$k" '.googleJavaFormat.sha256' "$P")  $D/toolchain/google-java-format-$G.jar" | sha256sum -c - && curl -fsSL -o "$D/dl/gradle.zip" "$(jq -r --arg k "$k" '.gradle.url' "$P")" && echo "$(jq -r --arg k "$k" '.gradle.sha256' "$P")  $D/dl/gradle.zip" | sha256sum -c - && rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip" && for a in $(jq -r '.jackson.artifacts[].path' "$P"); do mkdir -p "$D/repo/$(dirname "$a")" && curl -fsSL -o "$D/repo/$a" "$(jq -r .jackson.repository "$P")/$a" && echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done
       # restored, never saved: gen-java owns it
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/java/sdk
-            ~/.cache/honey-tmp/java/gradle-home
+            ~/.cache/backend-tmp/java/sdk
+            ~/.cache/backend-tmp/java/gradle-home
           key: >-
             ${{ runner.os }}-java-${{ hashFiles('src/emit/java/**', 'src/emit/shared/**',
             'src/ir/**', 'src/runtime/java/**', 'tests/security/**',
@@ -313,7 +313,7 @@ jobs:
             'tests/integration/conformance/cells.ts',
             'tests/integration/conformance/matrix.ts') }}
           restore-keys: ${{ runner.os }}-java-
-      - run: mkdir -p ~/.cache/honey-tmp/rust/sdk && touch "$RUNNER_TEMP/rust-sdk-start"
+      - run: mkdir -p ~/.cache/backend-tmp/rust/sdk && touch "$RUNNER_TEMP/rust-sdk-start"
       - run: bun install --frozen-lockfile
       - name: gen (rust)
         run: >-
@@ -321,12 +321,12 @@ jobs:
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
           --reporter=default --reporter=blob --outputFile.blob="$RUNNER_TEMP/gen-blob/rust.json"
         env:
-          HONEY_REQUIRE_TOOLCHAINS: "1"
+          CLIENTS_REQUIRE_TOOLCHAINS: "1"
       # as in the test job: the saved cache keeps only the Rust SDKs this run built or reused. Only the rust
       # project compiles Rust SDKs
       - name: Prune the Rust SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/rust/sdk -mindepth 2 -maxdepth 2 -name .complete
+          find ~/.cache/backend-tmp/rust/sdk -mindepth 2 -maxdepth 2 -name .complete
           ! -newer "$RUNNER_TEMP/rust-sdk-start" -printf '%h\0' | xargs -0r rm -rf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -351,7 +351,7 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       # gen runs every Python command through its python-env fixture, with the uv uv.toml pins and the interpreters
-      # .python-version and PY_FLOOR name, all under ~/.cache/honey-tmp/python and linked nowhere (--no-bin).
+      # .python-version and PY_FLOOR name, all under ~/.cache/backend-tmp/python and linked nowhere (--no-bin).
       # setup-uv provides a uv at that pin (required-version fails any other), which installs the pinned uv into the
       # cache, which installs the interpreters: the commands a missing one names locally. None is cached: each
       # installs in about a second.
@@ -361,8 +361,8 @@ jobs:
           enable-cache: false
       - name: Python (uv.toml's uv, .python-version, and the PY_FLOOR interpreter)
         run: |
-          UV_CACHE_DIR="$HOME/.cache/honey-tmp/python/uv-cache" UV_TOOL_DIR="$HOME/.cache/honey-tmp/python/uv/tools" UV_TOOL_BIN_DIR="$HOME/.cache/honey-tmp/python/uv/bin" uv tool install --no-config --no-python-downloads uv=="$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' uv.toml)"
-          UV_CACHE_DIR="$HOME/.cache/honey-tmp/python/uv-cache" UV_PYTHON_INSTALL_DIR="$HOME/.cache/honey-tmp/python/pythons" UV_PYTHON_BIN_DIR="$HOME/.cache/honey-tmp/python/pybin" "$HOME/.cache/honey-tmp/python/uv/bin/uv" python install --no-bin "$(cat .python-version)" 3.11.4
+          UV_CACHE_DIR="$HOME/.cache/backend-tmp/python/uv-cache" UV_TOOL_DIR="$HOME/.cache/backend-tmp/python/uv/tools" UV_TOOL_BIN_DIR="$HOME/.cache/backend-tmp/python/uv/bin" uv tool install --no-config --no-python-downloads uv=="$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' uv.toml)"
+          UV_CACHE_DIR="$HOME/.cache/backend-tmp/python/uv-cache" UV_PYTHON_INSTALL_DIR="$HOME/.cache/backend-tmp/python/pythons" UV_PYTHON_BIN_DIR="$HOME/.cache/backend-tmp/python/pybin" "$HOME/.cache/backend-tmp/python/uv/bin/uv" python install --no-bin "$(cat .python-version)" 3.11.4
       # the gated SDKs and their mypy caches (python/__fixtures__/compiled.ts), keyed like gobuild and rust on every
       # input of a Python gate (toolchain-projects.test.ts holds it to that). uv's wheel cache is not saved: a venv
       # fetches its wheels once per run, then installs offline, and the markers that vouch for them go with it.
@@ -370,8 +370,8 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/python/mypy
-            ~/.cache/honey-tmp/python/sdk
+            ~/.cache/backend-tmp/python/mypy
+            ~/.cache/backend-tmp/python/sdk
           key: >-
             ${{ runner.os }}-python-${{ hashFiles('.python-version', 'uv.toml', 'src/emit/python/**',
             'src/emit/shared/**', 'src/ir/**', 'src/runtime/python/**',
@@ -385,7 +385,7 @@ jobs:
             'tests/integration/conformance/cells.ts',
             'tests/integration/conformance/matrix.ts') }}
           restore-keys: ${{ runner.os }}-python-
-      - run: mkdir -p ~/.cache/honey-tmp/python/sdk && touch "$RUNNER_TEMP/python-sdk-start"
+      - run: mkdir -p ~/.cache/backend-tmp/python/sdk && touch "$RUNNER_TEMP/python-sdk-start"
       - run: bun install --frozen-lockfile
       - name: gen (python)
         run: >-
@@ -393,10 +393,10 @@ jobs:
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
           --reporter=default --reporter=blob --outputFile.blob="$RUNNER_TEMP/gen-blob/python.json"
         env:
-          HONEY_REQUIRE_TOOLCHAINS: "1"
+          CLIENTS_REQUIRE_TOOLCHAINS: "1"
       - name: Prune the Python SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/python/sdk -mindepth 2 -maxdepth 2 -name .complete
+          find ~/.cache/backend-tmp/python/sdk -mindepth 2 -maxdepth 2 -name .complete
           ! -newer "$RUNNER_TEMP/python-sdk-start" -printf '%h\0' | xargs -0r rm -rf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -427,9 +427,9 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/dotnet/nuget
-            ~/.cache/honey-tmp/dotnet/sdk
-            ~/.cache/honey-tmp/dotnet/driver
+            ~/.cache/backend-tmp/dotnet/nuget
+            ~/.cache/backend-tmp/dotnet/sdk
+            ~/.cache/backend-tmp/dotnet/driver
           key: >-
             ${{ runner.os }}-dotnet-${{ hashFiles('global.json', 'src/emit/csharp/**',
             'src/emit/csharp/**/.editorconfig', 'src/emit/shared/**', 'src/ir/**', 'src/runtime/csharp/**',
@@ -441,12 +441,12 @@ jobs:
             'tests/integration/conformance/matrix.ts') }}
           restore-keys: ${{ runner.os }}-dotnet-
       # gen runs every dotnet through its csharp-env fixture: the global.json SDK from its tarball, checked
-      # against dotnet-sdk.sha512 before extraction, under ~/.cache/honey-tmp/dotnet, then the seed restore, the
+      # against dotnet-sdk.sha512 before extraction, under ~/.cache/backend-tmp/dotnet, then the seed restore, the
       # one NuGet fetch (none when the cache above holds its package): the command a missing SDK names locally
       - name: .NET (global.json's SDK, and the seed restore)
         run: |
-          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/honey-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
-      - run: mkdir -p ~/.cache/honey-tmp/dotnet/sdk && touch "$RUNNER_TEMP/csharp-sdk-start"
+          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
+      - run: mkdir -p ~/.cache/backend-tmp/dotnet/sdk && touch "$RUNNER_TEMP/csharp-sdk-start"
       - run: bun install --frozen-lockfile
       - name: gen (csharp)
         run: >-
@@ -454,10 +454,10 @@ jobs:
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
           --reporter=default --reporter=blob --outputFile.blob="$RUNNER_TEMP/gen-blob/csharp.json"
         env:
-          HONEY_REQUIRE_TOOLCHAINS: "1"
+          CLIENTS_REQUIRE_TOOLCHAINS: "1"
       - name: Prune the C# SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/dotnet/sdk -mindepth 2 -maxdepth 2 -name .complete
+          find ~/.cache/backend-tmp/dotnet/sdk -mindepth 2 -maxdepth 2 -name .complete
           ! -newer "$RUNNER_TEMP/csharp-sdk-start" -printf '%h\0' | xargs -0r rm -rf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -486,8 +486,8 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/java/sdk
-            ~/.cache/honey-tmp/java/gradle-home
+            ~/.cache/backend-tmp/java/sdk
+            ~/.cache/backend-tmp/java/gradle-home
           key: >-
             ${{ runner.os }}-java-${{ hashFiles('src/emit/java/**', 'src/emit/shared/**',
             'src/ir/**', 'src/runtime/java/**', 'tests/security/**',
@@ -499,11 +499,11 @@ jobs:
           restore-keys: ${{ runner.os }}-java-
       # gen runs every java, javac, google-java-format and Gradle through its java-env fixture: each pin in
       # java-pins.json (three JDKs, the formatter, Gradle, the Jackson set) fetched and checked against its sha256,
-      # under ~/.cache/honey-tmp/java: the command a missing JDK names locally
+      # under ~/.cache/backend-tmp/java: the command a missing JDK names locally
       - name: Java (java-pins.json's JDKs, google-java-format, Gradle and the Jackson set)
         run: |
-          P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json" && D="$HOME/.cache/honey-tmp/java" && G="$(jq -r .googleJavaFormat.version "$P")" && W="$(jq -r .gradle.version "$P")" && mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp" && for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")" && curl -fsSL -o "$D/dl/$R.tar.gz" "$(jq -r --arg k "$k" '.jdk[$k].url' "$P")" && echo "$(jq -r --arg k "$k" '.jdk[$k].sha256' "$P")  $D/dl/$R.tar.gz" | sha256sum -c - && rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial" && tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1 && mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done && curl -fsSL -o "$D/toolchain/google-java-format-$G.jar" "$(jq -r --arg k "$k" '.googleJavaFormat.url' "$P")" && echo "$(jq -r --arg k "$k" '.googleJavaFormat.sha256' "$P")  $D/toolchain/google-java-format-$G.jar" | sha256sum -c - && curl -fsSL -o "$D/dl/gradle.zip" "$(jq -r --arg k "$k" '.gradle.url' "$P")" && echo "$(jq -r --arg k "$k" '.gradle.sha256' "$P")  $D/dl/gradle.zip" | sha256sum -c - && rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip" && for a in $(jq -r '.jackson.artifacts[].path' "$P"); do mkdir -p "$D/repo/$(dirname "$a")" && curl -fsSL -o "$D/repo/$a" "$(jq -r .jackson.repository "$P")/$a" && echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done
-      - run: mkdir -p ~/.cache/honey-tmp/java/sdk && touch "$RUNNER_TEMP/java-sdk-start"
+          P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json" && D="$HOME/.cache/backend-tmp/java" && G="$(jq -r .googleJavaFormat.version "$P")" && W="$(jq -r .gradle.version "$P")" && mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp" && for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")" && curl -fsSL -o "$D/dl/$R.tar.gz" "$(jq -r --arg k "$k" '.jdk[$k].url' "$P")" && echo "$(jq -r --arg k "$k" '.jdk[$k].sha256' "$P")  $D/dl/$R.tar.gz" | sha256sum -c - && rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial" && tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1 && mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done && curl -fsSL -o "$D/toolchain/google-java-format-$G.jar" "$(jq -r --arg k "$k" '.googleJavaFormat.url' "$P")" && echo "$(jq -r --arg k "$k" '.googleJavaFormat.sha256' "$P")  $D/toolchain/google-java-format-$G.jar" | sha256sum -c - && curl -fsSL -o "$D/dl/gradle.zip" "$(jq -r --arg k "$k" '.gradle.url' "$P")" && echo "$(jq -r --arg k "$k" '.gradle.sha256' "$P")  $D/dl/gradle.zip" | sha256sum -c - && rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip" && for a in $(jq -r '.jackson.artifacts[].path' "$P"); do mkdir -p "$D/repo/$(dirname "$a")" && curl -fsSL -o "$D/repo/$a" "$(jq -r .jackson.repository "$P")/$a" && echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done
+      - run: mkdir -p ~/.cache/backend-tmp/java/sdk && touch "$RUNNER_TEMP/java-sdk-start"
       - run: bun install --frozen-lockfile
       - name: gen (java)
         run: >-
@@ -511,10 +511,10 @@ jobs:
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
           --reporter=default --reporter=blob --outputFile.blob="$RUNNER_TEMP/gen-blob/java.json"
         env:
-          HONEY_REQUIRE_TOOLCHAINS: "1"
+          CLIENTS_REQUIRE_TOOLCHAINS: "1"
       - name: Prune the Java SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/java/sdk -mindepth 1 -maxdepth 1 -type d
+          find ~/.cache/backend-tmp/java/sdk -mindepth 1 -maxdepth 1 -type d
           ! -newer "$RUNNER_TEMP/java-sdk-start" -print0 | xargs -0r rm -rf
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -559,9 +559,9 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      # the MCP server's conformance runner requires the pinned clients here (HONEY_REQUIRE_TOOLCHAINS): as in the test job
+      # the MCP server's conformance runner requires the pinned clients here (CLIENTS_REQUIRE_TOOLCHAINS): as in the test job
       - name: MCP clients (client-lock.json's @modelcontextprotocol/sdk and @modelcontextprotocol/client)
-        run: P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/honey-tmp/mcp-clients" && rm -rf "$D.partial" && mkdir -p "$D.partial" && cp "$P/client-pins.json" "$D.partial/package.json" && cp "$P/client-lock.json" "$D.partial/package-lock.json" && (cd "$D.partial" && npm ci --ignore-scripts --no-audit --no-fund) && sha256sum "$P/client-lock.json" | cut -d" " -f1 > "$D.partial/lock.sha256" && rm -rf "$D" && mv "$D.partial" "$D"
+        run: P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/backend-tmp/mcp-clients" && rm -rf "$D.partial" && mkdir -p "$D.partial" && cp "$P/client-pins.json" "$D.partial/package.json" && cp "$P/client-lock.json" "$D.partial/package-lock.json" && (cd "$D.partial" && npm ci --ignore-scripts --no-audit --no-fund) && sha256sum "$P/client-lock.json" | cut -d" " -f1 > "$D.partial/lock.sha256" && rm -rf "$D" && mv "$D.partial" "$D"
       # the pinned Go, the same as the test job and every local run; emitted go.mod files keep the go
       # 1.24 floor (`omitzero` on tri-state fields), which go vet enforces
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -571,11 +571,11 @@ jobs:
       # the pinned and floor toolchains, the WebSocket module and oasdiff's pin: a change in any saves a new cache
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/honey-tmp/go/mod
+          path: ~/.cache/backend-tmp/go/mod
           key: ${{ runner.os }}-gomod-harness-${{ hashFiles('.go-version', 'src/emit/go/__fixtures__/go-env.ts', 'src/emit/go/sdk.ts') }}
           restore-keys: ${{ runner.os }}-gomod-harness-
       # gen runs every Python command through its python-env fixture, with the uv uv.toml pins and the interpreters
-      # .python-version and PY_FLOOR name, all under ~/.cache/honey-tmp/python and linked nowhere (--no-bin).
+      # .python-version and PY_FLOOR name, all under ~/.cache/backend-tmp/python and linked nowhere (--no-bin).
       # setup-uv provides a uv at that pin (required-version fails any other), which installs the pinned uv into the
       # cache, which installs the interpreters: the commands a missing one names locally. None is cached: each
       # installs in about a second.
@@ -585,8 +585,8 @@ jobs:
           enable-cache: false
       - name: Python (uv.toml's uv, .python-version, and the PY_FLOOR interpreter)
         run: |
-          UV_CACHE_DIR="$HOME/.cache/honey-tmp/python/uv-cache" UV_TOOL_DIR="$HOME/.cache/honey-tmp/python/uv/tools" UV_TOOL_BIN_DIR="$HOME/.cache/honey-tmp/python/uv/bin" uv tool install --no-config --no-python-downloads uv=="$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' uv.toml)"
-          UV_CACHE_DIR="$HOME/.cache/honey-tmp/python/uv-cache" UV_PYTHON_INSTALL_DIR="$HOME/.cache/honey-tmp/python/pythons" UV_PYTHON_BIN_DIR="$HOME/.cache/honey-tmp/python/pybin" "$HOME/.cache/honey-tmp/python/uv/bin/uv" python install --no-bin "$(cat .python-version)" 3.11.4
+          UV_CACHE_DIR="$HOME/.cache/backend-tmp/python/uv-cache" UV_TOOL_DIR="$HOME/.cache/backend-tmp/python/uv/tools" UV_TOOL_BIN_DIR="$HOME/.cache/backend-tmp/python/uv/bin" uv tool install --no-config --no-python-downloads uv=="$(sed -n 's/^required-version = "==\(.*\)"$/\1/p' uv.toml)"
+          UV_CACHE_DIR="$HOME/.cache/backend-tmp/python/uv-cache" UV_PYTHON_INSTALL_DIR="$HOME/.cache/backend-tmp/python/pythons" UV_PYTHON_BIN_DIR="$HOME/.cache/backend-tmp/python/pybin" "$HOME/.cache/backend-tmp/python/uv/bin/uv" python install --no-bin "$(cat .python-version)" 3.11.4
       # gen compiles the emitted Rust at the toolchain rust-toolchain.toml pins (RUSTUP_TOOLCHAIN through its
       # rust-env fixture) and checks it at the RUST_FLOOR toolchain. A bare install reads the file; the default
       # follows it, so any other cargo in the job runs the pin too. Toolchains are not cached: a minimal one
@@ -599,14 +599,14 @@ jobs:
       # gen runs every dotnet through its csharp-env fixture, installed as in gen-csharp (which says why)
       - name: .NET (global.json's SDK, and the seed restore)
         run: |
-          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/honey-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
+          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
       # restored, never saved: gen-csharp owns it; the served SDK builds here each run
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/dotnet/nuget
-            ~/.cache/honey-tmp/dotnet/sdk
-            ~/.cache/honey-tmp/dotnet/driver
+            ~/.cache/backend-tmp/dotnet/nuget
+            ~/.cache/backend-tmp/dotnet/sdk
+            ~/.cache/backend-tmp/dotnet/driver
           key: >-
             ${{ runner.os }}-dotnet-${{ hashFiles('global.json', 'src/emit/csharp/**',
             'src/emit/csharp/**/.editorconfig', 'src/emit/shared/**', 'src/ir/**', 'src/runtime/csharp/**',
@@ -619,16 +619,16 @@ jobs:
           restore-keys: ${{ runner.os }}-dotnet-
       # gen runs every java, javac, google-java-format and Gradle through its java-env fixture: each pin in
       # java-pins.json (three JDKs, the formatter, Gradle, the Jackson set) fetched and checked against its sha256,
-      # under ~/.cache/honey-tmp/java: the command a missing JDK names locally
+      # under ~/.cache/backend-tmp/java: the command a missing JDK names locally
       - name: Java (java-pins.json's JDKs, google-java-format, Gradle and the Jackson set)
         run: |
-          P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json" && D="$HOME/.cache/honey-tmp/java" && G="$(jq -r .googleJavaFormat.version "$P")" && W="$(jq -r .gradle.version "$P")" && mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp" && for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")" && curl -fsSL -o "$D/dl/$R.tar.gz" "$(jq -r --arg k "$k" '.jdk[$k].url' "$P")" && echo "$(jq -r --arg k "$k" '.jdk[$k].sha256' "$P")  $D/dl/$R.tar.gz" | sha256sum -c - && rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial" && tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1 && mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done && curl -fsSL -o "$D/toolchain/google-java-format-$G.jar" "$(jq -r --arg k "$k" '.googleJavaFormat.url' "$P")" && echo "$(jq -r --arg k "$k" '.googleJavaFormat.sha256' "$P")  $D/toolchain/google-java-format-$G.jar" | sha256sum -c - && curl -fsSL -o "$D/dl/gradle.zip" "$(jq -r --arg k "$k" '.gradle.url' "$P")" && echo "$(jq -r --arg k "$k" '.gradle.sha256' "$P")  $D/dl/gradle.zip" | sha256sum -c - && rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip" && for a in $(jq -r '.jackson.artifacts[].path' "$P"); do mkdir -p "$D/repo/$(dirname "$a")" && curl -fsSL -o "$D/repo/$a" "$(jq -r .jackson.repository "$P")/$a" && echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done
+          P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json" && D="$HOME/.cache/backend-tmp/java" && G="$(jq -r .googleJavaFormat.version "$P")" && W="$(jq -r .gradle.version "$P")" && mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp" && for k in $(jq -r '.jdk | keys[]' "$P"); do R="$(jq -r --arg k "$k" '.jdk[$k].release' "$P")" && curl -fsSL -o "$D/dl/$R.tar.gz" "$(jq -r --arg k "$k" '.jdk[$k].url' "$P")" && echo "$(jq -r --arg k "$k" '.jdk[$k].sha256' "$P")  $D/dl/$R.tar.gz" | sha256sum -c - && rm -rf "$D/toolchain/$R" "$D/toolchain/$R.partial" && mkdir -p "$D/toolchain/$R.partial" && tar -xzf "$D/dl/$R.tar.gz" -C "$D/toolchain/$R.partial" --strip-components=1 && mv "$D/toolchain/$R.partial" "$D/toolchain/$R" && rm "$D/dl/$R.tar.gz" || exit 1; done && curl -fsSL -o "$D/toolchain/google-java-format-$G.jar" "$(jq -r --arg k "$k" '.googleJavaFormat.url' "$P")" && echo "$(jq -r --arg k "$k" '.googleJavaFormat.sha256' "$P")  $D/toolchain/google-java-format-$G.jar" | sha256sum -c - && curl -fsSL -o "$D/dl/gradle.zip" "$(jq -r --arg k "$k" '.gradle.url' "$P")" && echo "$(jq -r --arg k "$k" '.gradle.sha256' "$P")  $D/dl/gradle.zip" | sha256sum -c - && rm -rf "$D/toolchain/gradle-$W" && unzip -q "$D/dl/gradle.zip" -d "$D/toolchain" && rm "$D/dl/gradle.zip" && for a in $(jq -r '.jackson.artifacts[].path' "$P"); do mkdir -p "$D/repo/$(dirname "$a")" && curl -fsSL -o "$D/repo/$a" "$(jq -r .jackson.repository "$P")/$a" && echo "$(jq -r --arg a "$a" '.jackson.artifacts[] | select(.path == $a) | .sha256' "$P")  $D/repo/$a" | sha256sum -c - || exit 1; done
       # restored, never saved: gen-java owns it
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/java/sdk
-            ~/.cache/honey-tmp/java/gradle-home
+            ~/.cache/backend-tmp/java/sdk
+            ~/.cache/backend-tmp/java/gradle-home
           key: >-
             ${{ runner.os }}-java-${{ hashFiles('src/emit/java/**', 'src/emit/shared/**',
             'src/ir/**', 'src/runtime/java/**', 'tests/security/**',
@@ -642,10 +642,10 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/rust/cargo
-            ~/.cache/honey-tmp/rust/target
-            ~/.cache/honey-tmp/rust/target-1.85.0
-            ~/.cache/honey-tmp/rust/sdk
+            ~/.cache/backend-tmp/rust/cargo
+            ~/.cache/backend-tmp/rust/target
+            ~/.cache/backend-tmp/rust/target-1.85.0
+            ~/.cache/backend-tmp/rust/sdk
           key: >-
             ${{ runner.os }}-rust-harness-${{ hashFiles('rust-toolchain.toml', 'src/emit/rust/**',
             'src/emit/shared/**', 'src/ir/**', 'src/runtime/rust/**',
@@ -663,8 +663,8 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
-            ~/.cache/honey-tmp/python/mypy
-            ~/.cache/honey-tmp/python/sdk
+            ~/.cache/backend-tmp/python/mypy
+            ~/.cache/backend-tmp/python/sdk
           key: >-
             ${{ runner.os }}-python-harness-${{ hashFiles('.python-version', 'uv.toml', 'src/emit/python/**',
             'src/emit/shared/**', 'src/ir/**', 'src/runtime/python/**',
@@ -682,17 +682,17 @@ jobs:
       - run: bun install --frozen-lockfile
       # the release leg (cli-harness.release.test.ts) checks with goreleaser and shellcheck: the test job's tool install
       - name: Tools (tool-pins.json's fish, zsh, PowerShell, goreleaser and shellcheck)
-        run: P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/honey-tmp/tools" && mkdir -p "$D/dl" && for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")" && curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c - && rm -rf "${D:?}/${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial" && chmod +x "$D/$R.partial/$(jq -r --arg k "$k" '.[$k].bin' "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$k" || exit 1; done
-      - run: mkdir -p ~/.cache/honey-tmp/rust/sdk && touch "$RUNNER_TEMP/rust-sdk-start"
-      - run: mkdir -p ~/.cache/honey-tmp/python/sdk && touch "$RUNNER_TEMP/python-sdk-start"
+        run: P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/backend-tmp/tools" && mkdir -p "$D/dl" && for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")" && curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c - && rm -rf "${D:?}/${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial" && chmod +x "$D/$R.partial/$(jq -r --arg k "$k" '.[$k].bin' "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$k" || exit 1; done
+      - run: mkdir -p ~/.cache/backend-tmp/rust/sdk && touch "$RUNNER_TEMP/rust-sdk-start"
+      - run: mkdir -p ~/.cache/backend-tmp/python/sdk && touch "$RUNNER_TEMP/python-sdk-start"
       - run: bun run test:harness
         env:
           # a Python problem fails the job instead of skipping the Python SDK tests
-          HONEY_REQUIRE_PYTHON: "1"
+          CLIENTS_REQUIRE_PYTHON: "1"
           # a missing Go, Rust, Python or .NET fails gen's conformance and harness files for it instead of skipping them
-          HONEY_REQUIRE_TOOLCHAINS: "1"
+          CLIENTS_REQUIRE_TOOLCHAINS: "1"
           # each conformance cell's observation, for the conformance job's gate
-          HONEY_CONFORMANCE_RECORD: ${{ runner.temp }}/conformance-cells
+          CLIENTS_CONFORMANCE_RECORD: ${{ runner.temp }}/conformance-cells
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: conformance-cells
@@ -702,11 +702,11 @@ jobs:
       # as in the test job: the saved cache keeps only the Rust SDKs this run built or reused
       - name: Prune the Rust SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/rust/sdk -mindepth 2 -maxdepth 2 -name .complete
+          find ~/.cache/backend-tmp/rust/sdk -mindepth 2 -maxdepth 2 -name .complete
           ! -newer "$RUNNER_TEMP/rust-sdk-start" -printf '%h\0' | xargs -0r rm -rf
       - name: Prune the Python SDKs this run did not use
         run: >-
-          find ~/.cache/honey-tmp/python/sdk -mindepth 2 -maxdepth 2 -name .complete
+          find ~/.cache/backend-tmp/python/sdk -mindepth 2 -maxdepth 2 -name .complete
           ! -newer "$RUNNER_TEMP/python-sdk-start" -printf '%h\0' | xargs -0r rm -rf
 
   # the release's conformance gate (bit 19): every cell of every target held by the harness's record (compareCell),

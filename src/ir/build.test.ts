@@ -208,14 +208,14 @@ describe("toIR: webhooks", () => {
 		])
 	})
 
-	it("reads an x-honey-signature in a document it did not write as any unknown extension: ignored, never refused", () => {
+	it("reads an x-backend-signature in a document it did not write as any unknown extension: ignored, never refused", () => {
 		const plain = toIR(withWebhooks({ hook: posted() })).webhooks
 		for (const signature of [
 			{ algorithm: "hmac-sha256", encoding: "hex", header: "X-Signature" },
 			{ algorithm: "md5" },
 			"hmac",
 		])
-			expect(toIR(withWebhooks({ hook: posted({ "x-honey-signature": signature }) })).webhooks).toEqual(plain)
+			expect(toIR(withWebhooks({ hook: posted({ "x-backend-signature": signature }) })).webhooks).toEqual(plain)
 	})
 })
 
@@ -245,7 +245,7 @@ describe("toIR: the SDK emitters' fixture documents", () => {
 /** A Standard Webhooks event `type` as core documents it: the marker and the `{ type, timestamp, data }` envelope. */
 const marked = (type: string, data: Json, envelope: Json = {}) => ({
 	post: {
-		"x-honey-webhook": "standard-webhooks",
+		"x-backend-webhook": "standard-webhooks",
 		requestBody: {
 			content: {
 				"application/json": {
@@ -305,16 +305,16 @@ describe("toIR: Standard Webhooks events", () => {
 	it("refuses a marked webhook it could not verify into a typed event, naming it", () => {
 		const read = (hook: Json) => () => toIR(withWebhooks({ "batch.complete": hook }))
 		expect(read(marked("batch.failed", BATCH))).toThrow(
-			'x-honey-webhook on webhook "batch.complete": the envelope\'s type const is "batch.failed", not the webhook\'s name',
+			'x-backend-webhook on webhook "batch.complete": the envelope\'s type const is "batch.failed", not the webhook\'s name',
 		)
 		expect(read(marked("batch.complete", BATCH, { properties: { type: { const: "batch.complete" } } }))).toThrow(
-			'x-honey-webhook on webhook "batch.complete": the body is not a { type, timestamp, data } envelope',
+			'x-backend-webhook on webhook "batch.complete": the body is not a { type, timestamp, data } envelope',
 		)
-		expect(read({ post: { "x-honey-webhook": "standard-webhooks", responses: {} } })).toThrow(
-			'x-honey-webhook on webhook "batch.complete": the body is not a { type, timestamp, data } envelope',
+		expect(read({ post: { "x-backend-webhook": "standard-webhooks", responses: {} } })).toThrow(
+			'x-backend-webhook on webhook "batch.complete": the body is not a { type, timestamp, data } envelope',
 		)
-		expect(read({ post: { ...marked("batch.complete", BATCH).post, "x-honey-webhook": "other" } })).toThrow(
-			'x-honey-webhook on webhook "batch.complete": "other" is not standard-webhooks',
+		expect(read({ post: { ...marked("batch.complete", BATCH).post, "x-backend-webhook": "other" } })).toThrow(
+			'x-backend-webhook on webhook "batch.complete": "other" is not standard-webhooks',
 		)
 	})
 })

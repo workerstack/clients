@@ -356,7 +356,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "honey-sdk"
+name = "http-sdk"
 version = "0.1.0"
 dependencies = [
  "bytes",

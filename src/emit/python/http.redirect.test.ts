@@ -179,7 +179,7 @@ describe.skipIf(!PY)("redirects: a cross-origin hop is followed only under follo
 		expect(
 			{ error: [error?.type, error?.chain, error?.status], hops: hops.length, observed: run.observed },
 			run.stderr,
-		).toEqual({ error: ["APIStatusError", ["APIStatusError", "HoneyError"], 307], hops: 1, observed: [refusedAs(307)] })
+		).toEqual({ error: ["APIStatusError", ["APIStatusError", "HttpError"], 307], hops: 1, observed: [refusedAs(307)] })
 	})
 
 	it.each(CLIENTS)("%s: keeps a hop back to the first origin stripped", async (client) => {
@@ -270,8 +270,8 @@ describe.skipIf(!PY)("redirects: a caller's httpx2 client is stripped too on a c
 		const { hops, run } = await drive(client, [moved(302, "primary", "/echo"), OK], [HOP], { script })
 		expect({ hops: hops.map(marked), observed: run.observed }, run.stderr).toEqual({
 			hops: [
-				{ agent: "honey-driver", builder: "b", to: "primary /hop" },
-				{ agent: "honey-driver", builder: "b", to: "primary /echo" },
+				{ agent: "clients-driver", builder: "b", to: "primary /hop" },
+				{ agent: "clients-driver", builder: "b", to: "primary /echo" },
 			],
 			observed: [OK_DATA],
 		})
@@ -283,8 +283,8 @@ describe.skipIf(!PY)("redirects: a caller's httpx2 client is stripped too on a c
 			const { hops, run } = await drive(client, [AWAY, OK], [HOP], { script, setup: FOLLOW })
 			const landed = { ...redirected(hops[1]), ...marked(hops[1]) }
 			expect({ landed, leaving: marked(hops[0]), observed: run.observed }, run.stderr).toEqual({
-				landed: { ...LANDED, agent: "honey-driver", builder: undefined },
-				leaving: { agent: "honey-driver", builder: "b", to: "primary /hop" },
+				landed: { ...LANDED, agent: "clients-driver", builder: undefined },
+				leaving: { agent: "clients-driver", builder: "b", to: "primary /hop" },
 				observed: [OK_DATA],
 			})
 		},

@@ -1,6 +1,6 @@
 /**
  * The vendored C# runtime, as the files a C# SDK ships under `Runtime/` (H9/F5): `runtime/csharp/*.cs`, read here
- * and nowhere else (the F8 mutation target), each emitted as committed but for its one `namespace Honey.Runtime;`
+ * and nowhere else (the F8 mutation target), each emitted as committed but for its one `namespace Http.Runtime;`
  * line, which becomes the SDK's own namespace (Fb2), so `using <RootNamespace>;` reaches the client, the config,
  * the exceptions and the models alike. Every API ships the core, SSE among it; a WebSocket or realtime API adds the
  * socket and its dial, and a realtime API the adapters and the connection (contract 50 §2).
@@ -52,7 +52,7 @@ const REALTIME: readonly string[] = [
 ]
 
 /* the one line each committed file holds, swapped for the SDK's namespace */
-const NAMESPACE = /^namespace Honey\.Runtime;$/m
+const NAMESPACE = /^namespace Http\.Runtime;$/m
 
 /* a top-level type at column 0: its modifiers, its kind, its name (type parameters after it are not part of it) */
 const TOP_LEVEL =

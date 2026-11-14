@@ -22,7 +22,7 @@ const FLOOR = withRust(RUST_FLOOR)
 
 const REPO = resolve(import.meta.dirname, "../..")
 
-const mutant = guardNamed(process.env.HONEY_MUTANT)
+const mutant = guardNamed(process.env.CLIENTS_MUTANT)
 if (mutant !== undefined) {
 	vi.doMock(resolve(REPO, mutant.module), async (importOriginal) => {
 		const original = await importOriginal<Record<string, unknown>>()

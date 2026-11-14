@@ -226,7 +226,7 @@ export function http(): Json {
 	}
 }
 
-/** honey's error envelope for `status`, its `error_key` one of `keys` (the Go `errors.test.ts` ENVELOPE). */
+/** backend's error envelope for `status`, its `error_key` one of `keys` (the Go `errors.test.ts` ENVELOPE). */
 export function envelope(status: number, keys: readonly string[]): Json {
 	const field = object({ error_key: STRING, message: STRING, path: STRING })
 	return object({
@@ -239,7 +239,7 @@ export function envelope(status: number, keys: readonly string[]): Json {
 	})
 }
 
-/** The operations whose `x-honey-errors` the keys come from: the first schema of a repeated key wins. */
+/** The operations whose `x-backend-errors` the keys come from: the first schema of a repeated key wins. */
 function errorPaths(): Json {
 	const declared = {
 		"item.locked": { schema: object({ until: STRING }), status: 423 },
@@ -254,13 +254,13 @@ function errorPaths(): Json {
 	}
 	return {
 		"/a": {
-			post: { operationId: "orders.close", responses: { 204: { description: "closed" } }, "x-honey-errors": close },
+			post: { operationId: "orders.close", responses: { 204: { description: "closed" } }, "x-backend-errors": close },
 		},
 		"/b": {
 			post: {
 				operationId: "orders.reopen",
 				responses: { 204: { description: "reopened" } },
-				"x-honey-errors": { "order.locked": { schema: object({ other: STRING }), status: 423 } },
+				"x-backend-errors": { "order.locked": { schema: object({ other: STRING }), status: 423 } },
 			},
 		},
 		"/items/{id}": {
@@ -271,7 +271,7 @@ function errorPaths(): Json {
 					200: { ...media("application/json", ref("Item")), description: "ok" },
 					404: { ...media("application/json", ref("E404")), description: "missing" },
 				},
-				"x-honey-errors": declared,
+				"x-backend-errors": declared,
 			},
 		},
 		"/users": errorKeys.paths["/users"],

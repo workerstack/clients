@@ -6,7 +6,7 @@ export { defineRelease, RELEASE_VERSIONS_ENV } from "./manifest.ts"
 export { loadRelease } from "./load.ts"
 export type {
 	Committer,
-	HoneyRun,
+	ReleaseRun,
 	ManifestPackage,
 	ManifestPackageInput,
 	PackageMetadata,

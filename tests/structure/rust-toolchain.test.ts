@@ -69,7 +69,7 @@ describe("Rust runs through rust-env.ts only", () => {
 		).toEqual([true, true, true, false, false])
 	})
 
-	it("hands out one binary path, rustfmt's, and only to the formatter adapter or honey's own override", () => {
+	it("hands out one binary path, rustfmt's, and only to the formatter adapter or clients' own override", () => {
 		expect(Object.keys(env).filter((name) => /path/i.test(name))).toEqual(["rustfmtPath"])
 		/* as python-toolchain.test.ts: the adapter, or the `RUSTFMT` override a generation reads. Nothing else. */
 		const sunk = (text: string) => count(text, "rustfmtFormatter(rustfmtPath(") + count(text, "RUSTFMT: rustfmtPath(")
@@ -166,10 +166,10 @@ describe("the toolchains a run compiles with", () => {
 		"never installs a missing toolchain: it skips, or fails naming the install where Rust is required",
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
-			vi.stubEnv("HONEY_REQUIRE_TOOLCHAINS", "")
-			vi.stubEnv("HONEY_REQUIRE_RUST", "")
+			vi.stubEnv("CLIENTS_REQUIRE_TOOLCHAINS", "")
+			vi.stubEnv("CLIENTS_REQUIRE_RUST", "")
 			expect(withRust("0.0.0")).toBe(false)
-			vi.stubEnv("HONEY_REQUIRE_RUST", "1")
+			vi.stubEnv("CLIENTS_REQUIRE_RUST", "1")
 			expect(() => withRust("0.0.0")).toThrow("rustup toolchain install 0.0.0 --profile minimal")
 		},
 	)

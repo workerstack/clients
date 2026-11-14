@@ -57,7 +57,7 @@ export type TargetRunner = {
 
 const APP = fileURLToPath(new URL("./app/launcher.ts", import.meta.url))
 /** where each cell's observation is recorded for the release's conformance gate (gate.ts); unset, nowhere */
-const RECORD = process.env.HONEY_CONFORMANCE_RECORD
+const RECORD = process.env.CLIENTS_CONFORMANCE_RECORD
 /**
  * An origin nothing listens on, so a connection there is refused (ECONNREFUSED): port 2 is privileged, so no test binds
  * it and the OS never assigns it. Not port 1, which the CLI's exit-codes row dials: the Fetch standard's blocked-port
@@ -130,8 +130,8 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 
 /** Spawn the reference app, `env` beside this process's, wait for both listeners, and fetch its document. */
 export async function startReferenceApp(env: Readonly<Record<string, string>> = {}): Promise<ReferenceApp> {
-	/* backend resolved as every checkout process resolves it (honey-source), or as installed */
-	const child = spawn("bun", ["--conditions=honey-source", APP], {
+	/* backend resolved as every checkout process resolves it (backend-source), or as installed */
+	const child = spawn("bun", ["--conditions=backend-source", APP], {
 		env: { ...process.env, ...env },
 		stdio: ["pipe", "pipe", "pipe"],
 	})

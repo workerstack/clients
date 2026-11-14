@@ -118,7 +118,7 @@ function drive(replies: readonly Reply[], calls: readonly Call[], options: Optio
 }
 type Options = { readonly base?: (url: string) => string; readonly script?: Script; readonly setup?: Setup }
 
-/** A Go error of no wrapping honey type, as the trace records it. */
+/** A Go error of no wrapping backend type, as the trace records it. */
 const plain = (entry: Partial<GoError>) => ({
 	canceled: false,
 	deadline: false,

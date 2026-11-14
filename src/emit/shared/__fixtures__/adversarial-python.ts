@@ -74,7 +74,7 @@ function zzOp() {
 			requestBody: { ...json(ref("Shadowing")), required: true },
 			responses: ok({ items: { type: "integer" }, type: "array" }),
 			summary: "Ends with a backslash \\",
-			"x-honey-errors": {
+			"x-backend-errors": {
 				mro: status(409),
 				_missing_: status(409),
 				name: status(null),

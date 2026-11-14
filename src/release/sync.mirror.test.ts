@@ -138,7 +138,7 @@ afterEach(() => {
 })
 
 async function run(root: string, extra: Partial<SyncOptions> = {}) {
-	/* openapi has no honey manifest, so the gate is never asked; one that throws proves it */
+	/* openapi has no clients manifest, so the gate is never asked; one that throws proves it */
 	const specGate = () => Promise.reject(new Error("the spec gate was asked"))
 	const { packages } = await readRelease(path.join(root, "acme-release", "release.config.ts"), {})
 	const [result] = await syncAll(packages, {

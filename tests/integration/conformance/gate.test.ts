@@ -20,7 +20,7 @@ const GATE = "tests/integration/conformance/gate.ts"
 
 const dirs: string[] = []
 const scratch = () => {
-	const dir = mkdtempSync(join(tmpdir(), "honey-conformance-gate-"))
+	const dir = mkdtempSync(join(tmpdir(), "clients-conformance-gate-"))
 	dirs.push(dir)
 	return dir
 }
@@ -48,8 +48,8 @@ describe("the release waits on the harness and its gate", () => {
 
 	it("records every cell the harness runs, with every toolchain required", { timeout: SPAWN_TIMEOUT }, () => {
 		const harness = step("harness", "bun run test:harness")
-		expect(harness?.env?.HONEY_REQUIRE_TOOLCHAINS).toBe("1")
-		const recorded = harness?.env?.HONEY_CONFORMANCE_RECORD
+		expect(harness?.env?.CLIENTS_REQUIRE_TOOLCHAINS).toBe("1")
+		const recorded = harness?.env?.CLIENTS_CONFORMANCE_RECORD
 		expect(recorded).toEqual(expect.stringMatching(/\S/))
 		const upload = step("harness", "actions/upload-artifact@")
 		expect(upload?.with?.path).toBe(recorded)

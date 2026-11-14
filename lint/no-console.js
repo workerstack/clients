@@ -28,6 +28,6 @@ export const rule = {
 }
 
 export default {
-	meta: { name: "honey" },
+	meta: { name: "clients" },
 	rules: { "no-console": rule },
 }

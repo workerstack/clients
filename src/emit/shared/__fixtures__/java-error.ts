@@ -1,6 +1,6 @@
 /**
  * A Java call's error as the Java driver traces it (bit 16 phase c1; the Java analog of `CsError`, protocol.ts):
- * `type` is the simple class name, `chain` runs from it up to and including the SDK's `HoneyException` (or `[type]`
+ * `type` is the simple class name, `chain` runs from it up to and including the SDK's `HttpException` (or `[type]`
  * outside the SDK), `display` is the first line of `toString()`, and an `ApiException` adds its status, key, the
  * `ErrorKey` constant's name, its detail and, with `envelope`, its envelope members.
  */
@@ -9,7 +9,7 @@ type Json = null | boolean | number | string | readonly Json[] | { readonly [key
 export type JavaError = {
 	/** `e.getClass().getSimpleName()` */
 	readonly type: string
-	/** the simple names from the class up to and including `HoneyException`; `[type]` outside the SDK */
+	/** the simple names from the class up to and including `HttpException`; `[type]` outside the SDK */
 	readonly chain: readonly string[]
 	/** `e.getMessage()` */
 	readonly text: string

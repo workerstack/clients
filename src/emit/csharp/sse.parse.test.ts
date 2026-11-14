@@ -301,7 +301,7 @@ async function inMemory(name: string, body: string): Promise<Run> {
 
 /**
  * Each case's chunks in its own section through `Text.StreamAsync`: each event's data (over 16 characters, as its
- * length) until the end (`end`) or the first `HoneyException` (`<type>: <message>`).
+ * length) until the end (`end`) or the first `HttpException` (`<type>: <message>`).
  */
 const PARSER = `var MiB = 1 << 20;
 byte[] Ascii(string s) => System.Text.Encoding.ASCII.GetBytes(s);
@@ -321,7 +321,7 @@ async Task Fed(string section, params byte[][] chunks)
         }
         Note("end");
     }
-    catch (HoneyException e) { Note($"{e.GetType().Name}: {e.Message}"); }
+    catch (HttpException e) { Note($"{e.GetType().Name}: {e.Message}"); }
 }
 await Fed("event", Joined(ok, oneEvent));
 await Fed("eventApart", ok, oneEvent);

@@ -23,11 +23,11 @@ type Prepared = { body: BodyInit | undefined; headers: Headers; url: URL }
 export type Call = { method: string; opts: RequestOptions; path: string; refreshes?: false | undefined }
 
 /** The realtime loop's refresh key, exported by the SDK under no name. */
-export const REFRESH_AUTH: unique symbol = /* @__PURE__ */ Symbol("honey.refreshAuth")
+export const REFRESH_AUTH: unique symbol = /* @__PURE__ */ Symbol("http.refreshAuth")
 
 /** The send and the config, for the stream functions beside the client. */
-export const SEND: unique symbol = /* @__PURE__ */ Symbol("honey.send")
-export const CONFIG: unique symbol = /* @__PURE__ */ Symbol("honey.config")
+export const SEND: unique symbol = /* @__PURE__ */ Symbol("http.send")
+export const CONFIG: unique symbol = /* @__PURE__ */ Symbol("http.config")
 
 /** One operation of a generated SDK: the call, how it is read, and its stale view for the hooks. */
 export type Operation = Call & {

@@ -72,7 +72,7 @@ describe("ErrorKey's inline schemas", () => {
 			get: {
 				operationId,
 				responses: { 204: { description: "done" } },
-				"x-honey-errors": { "item.locked": inline },
+				"x-backend-errors": { "item.locked": inline },
 			},
 		})
 		const files = generateJavaSdk(doc({ "/a": twice("a.get"), "/b": twice("b.get") }, { servers })).files

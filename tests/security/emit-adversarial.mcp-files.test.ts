@@ -21,7 +21,7 @@ import { fileOf, type Read } from "../../src/runtime/mcp/files.ts"
 import { type Disk, fileReader } from "../../src/runtime/mcp/reader.ts"
 import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
 
-const HOME = join(process.env.HOME ?? "", ".cache/honey-tmp/gen-mcp")
+const HOME = join(process.env.HOME ?? "", ".cache/backend-tmp/gen-mcp")
 const NODE_DISK: Disk = { open, realpath, stat }
 
 /** A fresh tree: the root with its files, links, FIFO and socket, and a directory outside it holding secrets. */

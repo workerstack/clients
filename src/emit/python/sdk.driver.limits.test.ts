@@ -35,7 +35,7 @@ async function drive(
 
 /** A Python error as the trace records it: no cause and the method's own raise unless given, any repr. */
 const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(String), via: "return", ...entry })
-const config = (text: string) => plain({ chain: ["ConfigError", "HoneyError"], text, type: "ConfigError" })
+const config = (text: string) => plain({ chain: ["ConfigError", "HttpError"], text, type: "ConfigError" })
 
 /** A streamed 64 MiB body coded as `coding`, whose coded size is a small fraction of it: a bomb past a 1 MiB cap. */
 const bomb = (coding: "br" | "deflate" | "gzip" | "zstd"): Reply => ({
@@ -64,7 +64,7 @@ describe.skipIf(!PY)(
 				).toEqual({
 					encoding: "gzip, deflate, zstd",
 					error: plain({
-						chain: ["DecodeError", "HoneyError"],
+						chain: ["DecodeError", "HttpError"],
 						text: `HTTP 200: the body exceeds ${MiB} bytes`,
 						type: "DecodeError",
 					}),
@@ -151,7 +151,7 @@ describe.skipIf(!PY)(
 					run.stderr,
 				).toEqual({
 					error: expect.objectContaining({
-						chain: ["ConfigError", "HoneyError"],
+						chain: ["ConfigError", "HttpError"],
 						text: "the X-Bad header's value cannot be sent",
 					}),
 					hops: 0,

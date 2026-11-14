@@ -1,7 +1,7 @@
 //! A call's outcome as the grid observes it, read through `.with_response()` and the SDK's accessors:
 //! the data and the status (with the typed response headers when the plan declares them); a binary
 //! answer's size and SHA-256; the raw response for `raw: true`; an error status as `error` with its
-//! body and honey error key (`ApiError::key()`); a lapsed timeout as `timeout`. Every error is also
+//! body and backend error key (`ApiError::key()`); a lapsed timeout as `timeout`. Every error is also
 //! traced (`trace::rust_error`); one the grid has no outcome for observes nothing, which fails an
 //! unscripted run and is `null` in a scripted one. A stream's events and frames are read in
 //! stream.rs, socket.rs and live.rs. Either style is read through `Settles`: the safe one strictly,

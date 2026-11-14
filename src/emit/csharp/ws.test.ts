@@ -85,7 +85,7 @@ const endOf = ({ error, stream }: Trace<CsError>["calls"][number]) => ({
 
 /** csc's errors for `lines` (statements of a consumer's Main) against `ws`, each as `<the statement> → <CS code>: <message>`. */
 function findings(lines: readonly string[]): string[] {
-	const source = program("HoneySdk", "HoneySdkClient", lines.join("\n"))
+	const source = program("HttpSdk", "HttpSdkClient", lines.join("\n"))
 	const rows = source.split("\n")
 	return checked("ws", source).map((line) => {
 		const found = /^\((\d+),\d+\): error (CS\d+: .*)$/.exec(line)

@@ -4,7 +4,7 @@
  * answers the type and throws an error status; its twin on the client's `safe()` mirror is sdk-mirror.ts's (bit 21 i6).
  * A body is sent by its declared media type:
  * JSON as the mapper writes it, a form urlencoded, text as its raw bytes, binary as sized bytes or a one-shot stream,
- * multipart as hand-built parts under a `honey-<uuid>` boundary.
+ * multipart as hand-built parts under a `clients-<uuid>` boundary.
  */
 import type { IRSchema } from "../../ir/model.ts"
 import type { SdkOp } from "../../ir/sdk-model.ts"

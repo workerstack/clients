@@ -1,8 +1,8 @@
 # Releasing a product's public packages
 
 `@workerstack/clients` releases a product's public packages from the private repo that generates them. One
-`release.config.ts` lists the packages. `honey-clients release bump` cuts each package's next version from what
-changed. `honey-clients release sync` mirrors each package into its own public repo and pushes the `v<version>` tag.
+`release.config.ts` lists the packages. `clients release bump` cuts each package's next version from what
+changed. `clients release sync` mirrors each package into its own public repo and pushes the `v<version>` tag.
 Each public repo's `release.yml` then publishes on that tag through OIDC, with no registry token stored anywhere.
 Three reusable workflows in `workerstack/clients` run these steps in CI, so a consumer repo only writes short callers.
 
@@ -59,7 +59,10 @@ export default defineRelease({
 			description: "<one line: the repo's, every registry's, and the first CHANGELOG entry>",
 			topics: ["<product>", "cli"],
 			commitMessage: "chore: generate from openapi spec",
-			honey: { target: "cli", options: { binaryName: "<bin>", modulePath: "github.com/<org>/cli", repo: "<org>/cli" } },
+			clients: {
+				target: "cli",
+				options: { binaryName: "<bin>", modulePath: "github.com/<org>/cli", repo: "<org>/cli" },
+			},
 		},
 		{
 			name: "sdk-typescript",
@@ -67,7 +70,7 @@ export default defineRelease({
 			description: "<one line>",
 			topics: ["<product>", "sdk"],
 			commitMessage: "chore: generate from openapi spec",
-			honey: { target: "ts" },
+			clients: { target: "ts" },
 			registries: [{ kind: "npm" }, { kind: "jsr" }],
 		},
 	],
@@ -78,19 +81,19 @@ export default defineRelease({
 })
 ```
 
-| Field                         | Meaning                                                                                                                                            |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `project`                     | The product's slug: each package's `<project>/<name>` key, and what codegen filters on                                                             |
-| `codegen`                     | The argv that regenerates every package, run from the repo root. Bump runs it again with `RELEASE_VERSIONS` (JSON, package name to version) set    |
-| `toolchains`                  | Optional, none by default. The `system.config.ts` dep names codegen needs; the workflows install them in this order                                |
-| `committer`                   | Optional. The identity sync commits as (`public-sync[bot]` by default); a GitHub App's bot address works                                           |
-| `homepage`                    | https. Every public repo's website and every registry's homepage                                                                                   |
-| `metadata`                    | Optional. Package metadata every generated package carries (authors, license, keywords and the rest); a package's own `metadata` wins over it      |
-| `packages[].honey`            | How honey-clients generates the package: its target and that target's options. Absent for a hand-kept package (one that publishes the spec itself) |
-| `packages[].registries`       | Where the public repo's rendered `release.yml` publishes: `npm`, `jsr`, `pypi`, `crates`, `go`, `nuget`, `maven`, or `github` with `assets`        |
-| `packages[].branch`           | The public repo's branch sync pushes to, `main` by default                                                                                         |
-| `packages[].bootstrapExclude` | Globs the first push leaves out, so the next sync adds them as their own commit                                                                    |
-| `spec`                        | The committed spec codegen builds from (repo-relative), and the URL prod serves it at (the deployed spec gate)                                     |
+| Field                         | Meaning                                                                                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `project`                     | The product's slug: each package's `<project>/<name>` key, and what codegen filters on                                                          |
+| `codegen`                     | The argv that regenerates every package, run from the repo root. Bump runs it again with `RELEASE_VERSIONS` (JSON, package name to version) set |
+| `toolchains`                  | Optional, none by default. The `system.config.ts` dep names codegen needs; the workflows install them in this order                             |
+| `committer`                   | Optional. The identity sync commits as (`public-sync[bot]` by default); a GitHub App's bot address works                                        |
+| `homepage`                    | https. Every public repo's website and every registry's homepage                                                                                |
+| `metadata`                    | Optional. Package metadata every generated package carries (authors, license, keywords and the rest); a package's own `metadata` wins over it   |
+| `packages[].clients`          | How clients generates the package: its target and that target's options. Absent for a hand-kept package (one that publishes the spec itself)    |
+| `packages[].registries`       | Where the public repo's rendered `release.yml` publishes: `npm`, `jsr`, `pypi`, `crates`, `go`, `nuget`, `maven`, or `github` with `assets`     |
+| `packages[].branch`           | The public repo's branch sync pushes to, `main` by default                                                                                      |
+| `packages[].bootstrapExclude` | Globs the first push leaves out, so the next sync adds them as their own commit                                                                 |
+| `spec`                        | The committed spec codegen builds from (repo-relative), and the URL prod serves it at (the deployed spec gate)                                  |
 
 ## New product checklist
 
@@ -108,19 +111,19 @@ export default defineRelease({
    - Maven Central has no OIDC: verify the namespace, generate a Portal user token, create a GPG key whose public half
      is on `keys.openpgp.org`, and add the four `MAVEN_*` secrets to the SDK's repo (see [Secrets](#secrets)).
    - Go: nothing to register; the workflow's `proxy.golang.org` fetch indexes the tag.
-   - A CLI's channels are honey `cli` options, each optional: a Homebrew tap repo, a Scoop bucket repo, a
+   - A CLI's channels are clients `cli` options, each optional: a Homebrew tap repo, a Scoop bucket repo, a
      `microsoft/winget-pkgs` fork, an AUR account with an SSH key. Each one's token goes in the CLI's repo.
 3. Create a GitHub App with `contents: write`, `workflows: write` (sync pushes each repo's `release.yml`) and
    `administration: write` (sync sets each repo's description, homepage and topics), install it on the org's public repos, and store its ID and private key as two Actions secrets in the private repo.
 4. Write `release.config.ts` with a dir per package, add the prerequisites above, and check the config:
-   `honey-clients release sync --config <path> --validate-only`. A CLI also needs a hand `README.md` and `LICENSE`;
-   honey writes its `.goreleaser.yaml` and `.github/workflows/release.yml`.
-5. Publishing needs no workflow edits: every public tree carries a `release.yml` (the CLI's from honey, the rest
+   `clients release sync --config <path> --validate-only`. A CLI also needs a hand `README.md` and `LICENSE`;
+   clients writes its `.goreleaser.yaml` and `.github/workflows/release.yml`.
+5. Publishing needs no workflow edits: every public tree carries a `release.yml` (the CLI's from clients, the rest
    rendered from `registries`). Before the first real tag, run a repo's `release.yml` by hand with `workflow_dispatch`
    to see each registry accept it. A repo whose version is already live must get that tag pushed by hand before its
    first `release.yml` lands, or sync tags and republishes it.
 6. First release: commit the spec (bump records the commit a release is cut from), run the bump caller (or
-   `honey-clients release bump --config <path>` locally), and merge the release PR. Each package releases 1.0.0 with
+   `clients release bump --config <path>` locally), and merge the release PR. Each package releases 1.0.0 with
    its `description` as the entry. The next sync tags each package.
 7. Verify: each public repo's `release` run is green (`gh run list -R <org>/<package> -w release`), its GitHub release
    has its assets, each registry serves the new version, and a CLI's tap, bucket, winget PR and AUR package show it.
@@ -134,9 +137,9 @@ the same set-up: checkout, Node 24 (the release config loads as TypeScript), Bun
 `bun install --frozen-lockfile`, each `toolchains` name through `system install <name> --upgrade` at its
 `system.config.ts` pin with those tools first on PATH, then `release codegen`.
 
-Each workflow also takes `cli`, the command that runs honey-clients, split on spaces. It defaults to
-`bun x --no-install honey-clients`, the bin a consumer's `@workerstack/clients` install links. A consumer leaves it
-unset. This repo's own release fixture passes `node bin/honey-clients.js`, because bun never links a root package's
+Each workflow also takes `cli`, the command that runs clients, split on spaces. It defaults to
+`bun x --no-install clients`, the bin a consumer's `@workerstack/clients` install links. A consumer leaves it
+unset. This repo's own release fixture passes `node bin/clients.js`, because bun never links a root package's
 own bin.
 
 ```yaml
@@ -216,11 +219,11 @@ be pushed and which `v<version>` tags would be created. It leaves out the push, 
 ## CLI
 
 ```
-honey-clients release bump --config <path> [--major]
-honey-clients release sync --config <path> [--only <names>] [--dry-run] [--validate-only]
-honey-clients release bootstrap --config <path> (--all | --only <names>) [--force-bootstrap]
-honey-clients release codegen --config <path>
-honey-clients release toolchains --config <path>
+clients release bump --config <path> [--major]
+clients release sync --config <path> [--only <names>] [--dry-run] [--validate-only]
+clients release bootstrap --config <path> (--all | --only <names>) [--force-bootstrap]
+clients release codegen --config <path>
+clients release toolchains --config <path>
 ```
 
 - `bump` regenerates, decides each package's release, gates generated output on prod, writes versions, regenerates at
@@ -234,7 +237,7 @@ honey-clients release toolchains --config <path>
 ## Versioning
 
 `bump` runs the product's codegen, then compares each package with what its `.release-state.json` recorded at the last
-release. It compares the generated output (honey's `.honey-generated.json` map, or the spec itself for a hand-kept
+release. It compares the generated output (backend's `.clients-generated.json` map, or the spec itself for a hand-kept
 package) and the tracked hand files (version lines normalized, the CHANGELOG and the state file left out). Nothing
 moved means no release, even when the spec moved.
 
@@ -260,24 +263,24 @@ releases every bumped package on the next sync. Never delete or move a pushed ta
 ## Deployed spec gate
 
 Generated code may only describe operations prod serves. The gate fetches `spec.deployedUrl` and compares it with the
-committed spec by canonical sha. Sync refuses a package whose changed paths include a file honey generated. Bump
+committed spec by canonical sha. Sync refuses a package whose changed paths include a file clients generated. Bump
 refuses the whole run, hand-kept packages included, when a generated package whose output changed would release. On
 drift both print both shas and the operations on either side. Deploy, then rerun the bump caller; sync reruns on its
 schedule.
 
 ## Channels
 
-| Package kind               | Channel                                                                                       | Published by                            |
-| -------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------- |
-| CLI                        | GitHub Release: archives, `checksums.txt` signed by cosign, build attestations, `version.txt` | honey's `release.yml` in the CLI's repo |
-| CLI                        | Homebrew cask, Scoop manifest, winget PR, AUR `<bin>-bin`, deb/rpm/apk assets (each optional) | the same, with its channel's secret     |
-| TypeScript SDK, MCP server | npm (provenance), JSR                                                                         | the rendered `release.yml`              |
-| Go SDK                     | the Go proxy (`proxy.golang.org` fetch of the tag)                                            | the rendered `release.yml`              |
-| Python SDK                 | PyPI (attestations)                                                                           | the rendered `release.yml`              |
-| Rust SDK                   | crates.io                                                                                     | the rendered `release.yml`              |
-| C# SDK                     | NuGet                                                                                         | the rendered `release.yml`              |
-| Java SDK                   | Maven Central (GPG-signed bundle through the Central Portal)                                  | the rendered `release.yml`              |
-| OpenAPI spec               | GitHub Release with `openapi.json`                                                            | the rendered `release.yml`              |
+| Package kind               | Channel                                                                                       | Published by                              |
+| -------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| CLI                        | GitHub Release: archives, `checksums.txt` signed by cosign, build attestations, `version.txt` | backend's `release.yml` in the CLI's repo |
+| CLI                        | Homebrew cask, Scoop manifest, winget PR, AUR `<bin>-bin`, deb/rpm/apk assets (each optional) | the same, with its channel's secret       |
+| TypeScript SDK, MCP server | npm (provenance), JSR                                                                         | the rendered `release.yml`                |
+| Go SDK                     | the Go proxy (`proxy.golang.org` fetch of the tag)                                            | the rendered `release.yml`                |
+| Python SDK                 | PyPI (attestations)                                                                           | the rendered `release.yml`                |
+| Rust SDK                   | crates.io                                                                                     | the rendered `release.yml`                |
+| C# SDK                     | NuGet                                                                                         | the rendered `release.yml`                |
+| Java SDK                   | Maven Central (GPG-signed bundle through the Central Portal)                                  | the rendered `release.yml`                |
+| OpenAPI spec               | GitHub Release with `openapi.json`                                                            | the rendered `release.yml`                |
 
 A rendered `release.yml` checks the tag against the version each registry publishes from, publishes, and retries until
 the registry serves the version. A rejected or repeated upload fails the run; a rerun is `workflow_dispatch` with the

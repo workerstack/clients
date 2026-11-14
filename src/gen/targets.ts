@@ -1,8 +1,8 @@
 /**
- * The targets honey-clients generates and each target's options (plan 39 8.1): the table the CLI reads
+ * The targets clients generates and each target's options (plan 39 8.1): the table the CLI reads
  * `--<target>-<option>` from, and what a caller holding a run as data (a release manifest) checks it with, so a new
  * target or option reaches that caller with no change of its own. The schemas are Standard Schemas (v1), the kind
- * honey takes everywhere, so any validator that reads one checks a run before it reaches `generated`.
+ * clients takes everywhere, so any validator that reads one checks a run before it reaches `generated`.
  */
 
 import { authorName, type Metadata } from "../emit/shared/metadata.ts"
@@ -133,7 +133,7 @@ export type TargetOptionsSchema<T extends Target> = {
 		/** The Standard Schema version. */
 		readonly version: 1
 		/** Who made the schema. */
-		readonly vendor: "honey-clients"
+		readonly vendor: "clients"
 		/** Checks `value` as `T`'s options: its option names only, each a non-empty string, a switch true or false. */
 		readonly validate: (value: unknown) => OptionsResult<T>
 		/** The types the schema reads and answers, for a caller to infer from; never set at runtime. */
@@ -177,7 +177,7 @@ function schemaOf<T extends Target>(target: T): TargetOptionsSchema<T> {
 				const issues = given.flatMap(([key, option]) => issueOf(target, key, option) ?? [])
 				return issues.length > 0 ? { issues } : { value: Object.fromEntries(given) as TargetOptions<T> }
 			},
-			vendor: "honey-clients",
+			vendor: "clients",
 			version: 1,
 		},
 	}

@@ -35,7 +35,7 @@ export type DrivenJavaSdk = CompiledJavaSdk & {
 	 * run `cell` on one client aimed at `origins.url` (`alt`, `drop`, `refused`: the other origins a call may name), under `script` when given, with
 	 * `jvmArgs` on the JVM's command line, on the `jdk` release's java (21 by default; the SDK and the driver are
 	 * `--release 17`, so 17 and 25 run the same classes). `probe` runs the probe class instead of the driver: the driver's run, then the
-	 * process-global `jdk.httpclient.allowRestrictedHeaders` reported on stderr after it (`honey-probe …=`).
+	 * process-global `jdk.httpclient.allowRestrictedHeaders` reported on stderr after it (`clients-probe …=`).
 	 */
 	runCalls(
 		cell: DriverCell,
@@ -74,7 +74,7 @@ const DRIVER_BOUND_MS = 30_000
 const PROBE = `public final class Probe {
   public static void main(String[] args) throws Exception {
     Runtime.getRuntime().addShutdownHook(new Thread(() -> System.err.println(
-        "honey-probe allowRestrictedHeaders=" + System.getProperty("jdk.httpclient.allowRestrictedHeaders"))));
+        "clients-probe allowRestrictedHeaders=" + System.getProperty("jdk.httpclient.allowRestrictedHeaders"))));
     Driver.main(args);
   }
 }

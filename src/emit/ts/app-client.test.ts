@@ -194,7 +194,7 @@ describe("createClient: the safe object", () => {
 
 describe("the client object", () => {
 	// v0: a42bc08c59
-	it("prints as [object HoneyClient] and is not a thenable", async () => {
+	it("prints as [object HttpClient] and is not a thenable", async () => {
 		const { calls, fetch } = recordingFetch()
 		const api = (await front()).createClient({ baseURL: "https://api.example.com", fetch })
 		expect([
@@ -202,7 +202,7 @@ describe("the client object", () => {
 			Object.prototype.toString.call(api),
 			(api as { then?: unknown }).then,
 			(await Promise.resolve(api)) === api,
-		]).toEqual(["[object HoneyClient]", "[object HoneyClient]", undefined, true])
+		]).toEqual(["[object HttpClient]", "[object HttpClient]", undefined, true])
 		expect(calls).toEqual([])
 	})
 })

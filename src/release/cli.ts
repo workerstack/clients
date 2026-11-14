@@ -1,5 +1,5 @@
 /**
- * `honey-clients release bump|sync|bootstrap|codegen|toolchains --config <path>`: cut a product's versions, mirror its
+ * `clients release bump|sync|bootstrap|codegen|toolchains --config <path>`: cut a product's versions, mirror its
  * packages into their public repos, and make the first push to a new one, all from the product's `release.config.ts`.
  * `codegen` and `toolchains` serve the release workflows: what to install before codegen, and codegen run alone.
  */
@@ -20,8 +20,8 @@ const TOOLCHAINS_USAGE = `toolchains --config <path>
       print the config's toolchains, one per line: the system.config.ts names its codegen needs
 `
 
-/** What `honey-clients release` prints when it is given no command, or one it does not know. */
-export const USAGE = `usage: honey-clients release <command> --config <path> [options]
+/** What `clients release` prints when it is given no command, or one it does not know. */
+export const USAGE = `usage: clients release <command> --config <path> [options]
 
   bump --config <path> [--major]
       regenerate, then release each package whose output or hand files changed: any API change is a minor,
@@ -43,7 +43,7 @@ async function bump(argv: readonly string[], ctx: ReleaseContext): Promise<numbe
 async function codegen(argv: readonly string[], ctx: ReleaseContext): Promise<number> {
 	const parsed = parseConfigOnly(argv)
 	if (parsed.help) {
-		ctx.out(`usage: honey-clients release ${CODEGEN_USAGE}`)
+		ctx.out(`usage: clients release ${CODEGEN_USAGE}`)
 		return 0
 	}
 	regenerate(await ctx.load(parsed.config), ctx.env)
@@ -54,7 +54,7 @@ async function codegen(argv: readonly string[], ctx: ReleaseContext): Promise<nu
 async function toolchains(argv: readonly string[], ctx: ReleaseContext): Promise<number> {
 	const parsed = parseConfigOnly(argv)
 	if (parsed.help) {
-		ctx.out(`usage: honey-clients release ${TOOLCHAINS_USAGE}`)
+		ctx.out(`usage: clients release ${TOOLCHAINS_USAGE}`)
 		return 0
 	}
 	for (const name of (await ctx.load(parsed.config)).toolchains) ctx.out(`${name}\n`)
@@ -77,7 +77,7 @@ export type ReleaseOptions = {
 }
 
 /**
- * Runs `honey-clients release <argv>`: the exit code it ends with. A usage mistake is one line naming the command; any
+ * Runs `clients release <argv>`: the exit code it ends with. A usage mistake is one line naming the command; any
  * other failure is its message, never a stack.
  */
 export async function release(argv: readonly string[], io: Io, options: ReleaseOptions = {}): Promise<number> {
@@ -101,7 +101,7 @@ export async function release(argv: readonly string[], io: Io, options: ReleaseO
 		return await COMMANDS[command](rest, ctx)
 	} catch (error) {
 		const prefix = error instanceof ReleaseUsageError ? `release ${command}: ` : ""
-		io.err(`honey-clients: ${prefix}${error instanceof Error ? error.message : String(error)}\n`)
+		io.err(`clients: ${prefix}${error instanceof Error ? error.message : String(error)}\n`)
 		return 1
 	}
 }

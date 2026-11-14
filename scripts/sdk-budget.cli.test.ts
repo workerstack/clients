@@ -84,8 +84,9 @@ const REPO = resolve(import.meta.dirname, "..")
  * - bit 19 e, +199 B to 55,555 B: log.go's secretsOf redacts a realtime dial's reconnect_token and last_event_id query
  *   values and its Last-Event-ID header (+164), +35 of comments.
  * A change raises it only by the bytes of a named feature, dead code cut first.
+ * Plan 55, +18 B to 55,573 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
  */
-const CLI_RUNTIME_BYTES = 55555
+const CLI_RUNTIME_BYTES = 55573
 
 describe("the CLI runtime within its byte budget (bit 17, the G14 analog)", () => {
 	it(

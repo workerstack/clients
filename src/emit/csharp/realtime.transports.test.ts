@@ -70,7 +70,7 @@ internal sealed class Fake(TransportKind kind, IEnumerable<Conn?> conns) : ITran
 
 internal static class Rt
 {
-    public static readonly System.Text.Json.Serialization.Metadata.JsonTypeInfo<JsonElement> Element = HoneySdkJsonContext.Default.JsonElement;
+    public static readonly System.Text.Json.Serialization.Metadata.JsonTypeInfo<JsonElement> Element = HttpSdkJsonContext.Default.JsonElement;
     private static readonly System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Text.Json.Nodes.JsonNode> Node =
         (System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Text.Json.Nodes.JsonNode>)JsonSerializerOptions.Default.GetTypeInfo(typeof(System.Text.Json.Nodes.JsonNode));
     public static string J(params object?[] items) => JsonSerializer.Serialize(items);

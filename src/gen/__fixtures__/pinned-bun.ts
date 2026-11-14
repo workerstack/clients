@@ -1,8 +1,8 @@
 /**
  * The Bun that package.json's packageManager pins (bit 17 phase i): the bin's legs run under it, never PATH's newest,
  * since a newer Bun parses what the pinned one panics on (1.3.11 on a statement starting with a local named
- * `declare`). Found by HONEY_PINNED_BUN, then `mise where bun@<version>`, then ~/.bun/bin/bun, each only at the pinned
- * version; under HONEY_REQUIRE_TOOLCHAINS (CI) a missing one is a failure naming the version, elsewhere a skip.
+ * `declare`). Found by CLIENTS_PINNED_BUN, then `mise where bun@<version>`, then ~/.bun/bin/bun, each only at the pinned
+ * version; under CLIENTS_REQUIRE_TOOLCHAINS (CI) a missing one is a failure naming the version, elsewhere a skip.
  */
 import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
@@ -30,28 +30,28 @@ function miseBun(version: string, env: NodeJS.ProcessEnv): string | undefined {
 }
 
 /**
- * The pinned Bun's path: HONEY_PINNED_BUN (refused when it is another version), else mise's, else ~/.bun's, each
+ * The pinned Bun's path: CLIENTS_PINNED_BUN (refused when it is another version), else mise's, else ~/.bun's, each
  * taken only when it runs and prints `version`; undefined when none does.
  */
 export function findPinnedBun(env: NodeJS.ProcessEnv = process.env, version = pinnedBunVersion()): string | undefined {
-	const named = env.HONEY_PINNED_BUN
+	const named = env.CLIENTS_PINNED_BUN
 	if (named !== undefined && named !== "") {
 		const found = versionOf(named)
 		if (found !== version)
-			throw new Error(`HONEY_PINNED_BUN ${named} is Bun ${found || "(not runnable)"}, not the pinned ${version}`)
+			throw new Error(`CLIENTS_PINNED_BUN ${named} is Bun ${found || "(not runnable)"}, not the pinned ${version}`)
 		return named
 	}
 	const candidates = [miseBun(version, env), join(env.HOME ?? homedir(), ".bun", "bin", "bun")]
 	return candidates.find((bun) => bun !== undefined && existsSync(bun) && versionOf(bun) === version)
 }
 
-/** The pinned Bun for a leg: its path, or undefined to skip; a failure instead under HONEY_REQUIRE_TOOLCHAINS. */
+/** The pinned Bun for a leg: its path, or undefined to skip; a failure instead under CLIENTS_REQUIRE_TOOLCHAINS. */
 export function withPinnedBun(env: NodeJS.ProcessEnv = process.env): string | undefined {
 	const bun = findPinnedBun(env)
-	if (bun === undefined && env.HONEY_REQUIRE_TOOLCHAINS === "1") {
+	if (bun === undefined && env.CLIENTS_REQUIRE_TOOLCHAINS === "1") {
 		const version = pinnedBunVersion()
 		throw new Error(
-			`Bun ${version} (package.json's packageManager) is required here and is not found: set HONEY_PINNED_BUN, or run mise install bun@${version}`,
+			`Bun ${version} (package.json's packageManager) is required here and is not found: set CLIENTS_PINNED_BUN, or run mise install bun@${version}`,
 		)
 	}
 	return bun

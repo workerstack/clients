@@ -83,7 +83,7 @@ const inferred = (type: string) => shown(type.replace("CrudUser", "TypedDict({'e
 const returns = (wrap: (type: string) => string, safe: boolean) => [
 	"from typing import assert_type",
 	"",
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"",
 	"c = sdk.SDK()",
 	...OPS.map(([call, type]) => `assert_type(c${safe ? ".safe" : ""}.crud.users.${call}, ${code(wrap(type))})`),
@@ -132,7 +132,7 @@ describe.skipIf(!PY)("client.safe's Result narrows, and the removed safe mode no
 			const lines = [
 				"from typing import assert_type",
 				"",
-				"import honey_sdk as sdk",
+				"import http_sdk as sdk",
 				"",
 				"",
 				"def read(r: sdk.Result[sdk.CrudUser]) -> None:",
@@ -162,7 +162,7 @@ describe.skipIf(!PY)("client.safe's Result narrows, and the removed safe mode no
 		"refuses the removed safe mode's pattern: SDKResult, and .data or .error read off a call; and a wrong-arm read",
 		() => {
 			const lines = [
-				"import honey_sdk as sdk",
+				"import http_sdk as sdk",
 				"",
 				"c = sdk.SDK()",
 				'r = c.crud.users.get("1")',
@@ -209,7 +209,7 @@ describe.skipIf(!PY)("streams: AsyncSDK only", () => {
 		"has no stream method on SDK, which mypy rejects reaching, and each on AsyncSDK",
 		() => {
 			const lines = [
-				"import honey_sdk as sdk",
+				"import http_sdk as sdk",
 				"",
 				"s = sdk.SDK()",
 				...STREAMS.map((path) => `s.${path}`),

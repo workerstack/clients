@@ -99,7 +99,7 @@ const UNAUTHORIZED: Observed = {
 /** An `APIStatusError` subclass the method raised, as the trace records it. */
 const statusError = (type: string, status: number, key: string, message: string): PythonError => ({
 	cause: null,
-	chain: [type, "APIStatusError", "HoneyError"],
+	chain: [type, "APIStatusError", "HttpError"],
 	key,
 	keyMember: key.toUpperCase(),
 	message,
@@ -312,7 +312,7 @@ pyDescribe("typed errors", () => {
 pyDescribe("cancellation", () => {
 	// v0: a63ac3d393
 	it.each(CLIENTS)("%s: ends a call canceled before it starts as CanceledError, with nothing sent", async (client) => {
-		/* V0BUG: v0's sync path raised asyncio.CancelledError (a BaseException) and accepted CancelledError or RuntimeError; v1 raises CanceledError(HoneyError) on both clients, and v0's cancel_token= is options["cancel"] (G3) */
+		/* V0BUG: v0's sync path raised asyncio.CancelledError (a BaseException) and accepted CancelledError or RuntimeError; v1 raises CanceledError(HttpError) on both clients, and v0's cancel_token= is options["cancel"] (G3) */
 		const run = await scripted(
 			{ calls: [createUser({ email: `o-${client}@py.test`, name: "O" })], setup: VALID },
 			client,
@@ -322,7 +322,7 @@ pyDescribe("cancellation", () => {
 			[null],
 			{
 				cause: null,
-				chain: ["CanceledError", "HoneyError"],
+				chain: ["CanceledError", "HttpError"],
 				repr: "CanceledError('the call was canceled')",
 				text: "the call was canceled",
 				type: "CanceledError",

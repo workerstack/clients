@@ -5,7 +5,7 @@
  * is already valid source.
  */
 
-/** The oxfmt options emitted code is formatted with: honey's own style. */
+/** The oxfmt options emitted code is formatted with: clients' own style. */
 export type FormatOptions = { readonly printWidth: number; readonly semi: boolean; readonly useTabs: boolean }
 
 /** A formatter as the post-pass calls it: oxfmt's `format`, or another target's adapted to it. */

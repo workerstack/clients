@@ -1,7 +1,7 @@
 /**
  * Toolchain parity (G10, G11) for Python: gen runs Python only through `src/emit/python/__fixtures__/python-env.ts`,
  * under the uv `uv.toml` pins and the interpreters `.python-version` and `PY_FLOOR` name, all inside
- * `$HOME/.cache/honey-tmp/python` (the uv a bootstrap installs there, never the user's own), and CI installs
+ * `$HOME/.cache/backend-tmp/python` (the uv a bootstrap installs there, never the user's own), and CI installs
  * exactly those, so a local run and a CI run use the same uv and interpreters to the patch. As with Rust,
  * importing the env file does not license a raw spawn: every uv, python, ruff and mypy goes through its
  * runners. Nothing lands in `~/.local/bin`. No gate outside the registry (G17, at most 16 documents) but the
@@ -69,7 +69,7 @@ describe("Python runs through python-env.ts only", () => {
 		).toEqual([true, true, true, false, false])
 	})
 
-	it("hands out one binary path, ruff's, and only to the formatter adapter or honey's own override", () => {
+	it("hands out one binary path, ruff's, and only to the formatter adapter or clients' own override", () => {
 		expect(Object.keys(env).filter((name) => /path/i.test(name))).toEqual(["ruffPath"])
 		/*
 		 * Two sinks, one invariant: the caller names the binary, so the format is the same wherever it runs.
@@ -192,13 +192,13 @@ describe("CI installs the uv uv.toml pins and the interpreters .python-version a
 	})
 })
 
-/** The `~/.local/bin` entries that link into the honey cache. */
+/** The `~/.local/bin` entries that link into the backend-tmp cache. */
 function linkedIntoCache(): string[] {
 	const bin = join(process.env.HOME ?? homedir(), ".local/bin")
 	if (!existsSync(bin)) return []
 	return readdirSync(bin).filter((name) => {
 		const path = join(bin, name)
-		return lstatSync(path).isSymbolicLink() && resolve(bin, readlinkSync(path)).includes("/.cache/honey-tmp/")
+		return lstatSync(path).isSymbolicLink() && resolve(bin, readlinkSync(path)).includes("/.cache/backend-tmp/")
 	})
 }
 
@@ -210,7 +210,7 @@ describe("the uv and interpreters a run uses", () => {
 		vi.unstubAllEnvs()
 	})
 
-	it.skipIf(!PIN)("runs the pinned uv from the honey cache, whatever the user's own uv is", () => {
+	it.skipIf(!PIN)("runs the pinned uv from the backend-tmp cache, whatever the user's own uv is", () => {
 		expect(env.runUv(["--version"], { cwd: pythonCacheDir("tmp") }).stdout).toMatch(
 			new RegExp(`^uv ${pinnedUv().replaceAll(".", "\\.")}[ \n]`),
 		)
@@ -261,10 +261,10 @@ describe("what a run never does", () => {
 		"never installs a missing interpreter: it skips, or fails naming the install where Python is required",
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
-			vi.stubEnv("HONEY_REQUIRE_TOOLCHAINS", "")
-			vi.stubEnv("HONEY_REQUIRE_PYTHON", "")
+			vi.stubEnv("CLIENTS_REQUIRE_TOOLCHAINS", "")
+			vi.stubEnv("CLIENTS_REQUIRE_PYTHON", "")
 			expect(withPython("0.0.1")).toBe(false)
-			vi.stubEnv("HONEY_REQUIRE_PYTHON", "1")
+			vi.stubEnv("CLIENTS_REQUIRE_PYTHON", "1")
 			expect(() => withPython("0.0.1")).toThrow(pythonInstall(["0.0.1"]))
 		},
 	)
@@ -273,18 +273,18 @@ describe("what a run never does", () => {
 		"never runs another uv: without the pinned one it skips, or fails naming its install",
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
-			vi.stubEnv("HONEY_REQUIRE_TOOLCHAINS", "")
-			vi.stubEnv("HONEY_REQUIRE_PYTHON", "")
+			vi.stubEnv("CLIENTS_REQUIRE_TOOLCHAINS", "")
+			vi.stubEnv("CLIENTS_REQUIRE_PYTHON", "")
 			vi.stubEnv("HOME", pythonCacheDir("tmp", "no-uv"))
 			expect(withPython()).toBe(false)
-			vi.stubEnv("HONEY_REQUIRE_TOOLCHAINS", "1")
+			vi.stubEnv("CLIENTS_REQUIRE_TOOLCHAINS", "1")
 			expect(() => withPython()).toThrow(uvInstall(pinnedUv()))
 		},
 	)
 
 	it("links nothing into ~/.local/bin: interpreters install with --no-bin, uv's links stay in the cache", () => {
 		expect(PY_INSTALL).toContain(" python install --no-bin ")
-		expect(BOOTSTRAP).toContain('UV_TOOL_BIN_DIR="$HOME/.cache/honey-tmp/python/uv/bin" ')
+		expect(BOOTSTRAP).toContain('UV_TOOL_BIN_DIR="$HOME/.cache/backend-tmp/python/uv/bin" ')
 		expect(readdirSync(pythonCacheDir("pybin"))).toEqual([])
 		expect(linkedIntoCache()).toEqual([])
 	})

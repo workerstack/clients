@@ -123,7 +123,7 @@ goDescribe("SSE framing through the emitted SDK: the 1 MiB line cap", () => {
 		expect(errorOf(over?.error)).toEqual({
 			sdkTypes: [],
 			sentinels: { ErrSSEEventTooLarge: false, ErrSSELineTooLong: true },
-			text: "honey: sse line exceeds 1 MiB",
+			text: "httpsdk: sse line exceeds 1 MiB",
 			via: "stream",
 		})
 		expect({
@@ -172,7 +172,7 @@ goDescribe("SSE framing through the emitted SDK: the 8 MiB event cap", () => {
 		const capped = {
 			sdkTypes: [],
 			sentinels: { ErrSSEEventTooLarge: true, ErrSSELineTooLong: false },
-			text: "honey: sse event exceeds 8 MiB",
+			text: "httpsdk: sse event exceeds 8 MiB",
 			via: "stream",
 		}
 		expect([tooLarge, nineLines].map((call) => [errorOf(call?.error), call?.stream])).toEqual([

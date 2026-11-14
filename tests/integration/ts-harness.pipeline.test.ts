@@ -195,7 +195,7 @@ describe("the safe twin's errors (bit 21 i1: an Err holding the error the normal
 	})
 
 	// v0: e77953a398
-	it("answers a thrown HoneyError 404 as an Err: 404, not_found", async () => {
+	it("answers a thrown HttpError 404 as an Err: 404, not_found", async () => {
 		const result = await client({ headers: VALID }).safe.users.get({ params: { id: "user-999999" } })
 		expect(errOf(result)).toEqual({ errorKey: "not_found", name: "NotFoundError", response: 404, status: 404 })
 	})

@@ -6,7 +6,7 @@ import asyncio
 import os
 import sys
 
-from honey_sdk import APIStatusError, AsyncSDK, ClientConfig, DecodeError, Err, Ok
+from http_sdk import APIStatusError, AsyncSDK, ClientConfig, DecodeError, Err, Ok
 
 
 def new_client() -> AsyncSDK:

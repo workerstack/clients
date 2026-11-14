@@ -7,12 +7,12 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
 const GENERATORS_READ = [
+	"x-backend-error",
+	"x-backend-errors",
+	"x-backend-route",
+	"x-backend-webhook",
+	"x-backend-wildcard",
 	"x-deprecated",
-	"x-honey-error",
-	"x-honey-errors",
-	"x-honey-route",
-	"x-honey-webhook",
-	"x-honey-wildcard",
 	"x-idempotency-key",
 	"x-invalidate",
 	"x-mcp",

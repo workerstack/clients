@@ -180,7 +180,7 @@ goDescribe("an SSE method: iter.Seq2[SSEEvent[T], error], T from the declared ev
 		expect(
 			{ error: call?.error && { sdk: sdkTypes(call.error), text: call.error.text, via: call.error.via } },
 			run.stderr,
-		).toEqual({ error: { sdk: [], text: expect.stringMatching(/^honey: decode sse event:/), via: "stream" } })
+		).toEqual({ error: { sdk: [], text: expect.stringMatching(/^httpsdk: decode sse event:/), via: "stream" } })
 		expect({ observed: run.observed, stream: call?.stream }).toEqual({
 			observed: [TICKED],
 			stream: { retry: [0], yields: 2 },
@@ -427,8 +427,8 @@ goDescribe("an SSE open through a plain call's pipeline: the OnResponse hooks", 
 		const unread = { events: [], kind: "events" }
 		expect({ errors, observed: failing.run.observed, released: next.released() }, failing.run.stderr).toEqual({
 			errors: [
-				["stream", "honey: OnResponse hook: bad"],
-				["stream", "honey: OnResponse hook: bad"],
+				["stream", "httpsdk: OnResponse hook: bad"],
+				["stream", "httpsdk: OnResponse hook: bad"],
 			],
 			observed: [unread, unread],
 			released: true,

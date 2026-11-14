@@ -1,5 +1,5 @@
 /**
- * The vendored Python runtime, as the files a Python SDK ships under `src/<pkg>/_honey/` (H9/F5):
+ * The vendored Python runtime, as the files a Python SDK ships under `src/<pkg>/_http/` (H9/F5):
  * `runtime/python/*.py`, read here and nowhere else (the F8 mutation target), emitted verbatim. The WebSocket
  * module ships for a WebSocket or realtime API and the realtime modules for a realtime API, so a plain HTTP SDK
  * carries neither them nor the `httpx2[ws]` extra.

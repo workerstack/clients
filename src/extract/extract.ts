@@ -49,10 +49,10 @@ export type ExtractedTypes = {
 	taps: string | null
 }
 
-/* the type-only members every honey app carries */
+/* the type-only members every backend app carries */
 const APP_MEMBERS = ["$ctx", "$env", "$taps"]
 
-/* the declared meta, read when the app carries it: an app from an older honey has no $meta and still extracts */
+/* the declared meta, read when the app carries it: an app from an older backend has no $meta and still extracts */
 const META_MEMBER = "$meta"
 
 type PackageInfo = { dir: string; json: Record<string, unknown> }
@@ -201,7 +201,7 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 	})
 	if (members.includes(undefined)) {
 		const missing = APP_MEMBERS.filter((_, index) => members[index] === undefined)
-		throw new Error(`Export "${exportName}" is not a honey app: it carries no ${missing.join(", ")}`)
+		throw new Error(`Export "${exportName}" is not a backend app: it carries no ${missing.join(", ")}`)
 	}
 	const [ctx, env, tapsType] = members as ts.Type[]
 	const metaSym = appType.getProperty(META_MEMBER)

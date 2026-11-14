@@ -16,7 +16,7 @@ type FixturePackage = {
 	repo: string
 	commitMessage?: string
 	description?: string
-	honey?: unknown
+	clients?: unknown
 	registries?: unknown[]
 	topics?: unknown[]
 }
@@ -270,20 +270,22 @@ describe("loadPackages registries", () => {
 		const root = await repo()
 		product(root, [
 			{
-				honey: { options: { packageId: "Acme.Sdk" }, target: "csharp" },
+				clients: { options: { packageId: "Acme.Sdk" }, target: "csharp" },
 				name: "sdk-csharp",
 				registries: [{ kind: "nuget" }],
 				repo: "acme/sdk-csharp",
 			},
 			{
-				honey: { options: { groupId: "com.acme" }, target: "java" },
+				clients: { options: { groupId: "com.acme" }, target: "java" },
 				name: "sdk-java",
 				registries: [{ kind: "maven" }],
 				repo: "acme/sdk-java",
 			},
 		])
 
-		const byName = Object.fromEntries((await loadPackages(root)).map((p) => [p.name, [p.honey?.target, p.registries]]))
+		const byName = Object.fromEntries(
+			(await loadPackages(root)).map((p) => [p.name, [p.clients?.target, p.registries]]),
+		)
 		expect(byName).toEqual({
 			"sdk-csharp": ["csharp", [{ kind: "nuget" }]],
 			"sdk-java": ["java", [{ kind: "maven" }]],
@@ -419,7 +421,7 @@ describe("loadRelease refusing a config it cannot read", () => {
 		)
 	})
 
-	it("types a config by returning it unchanged, with a metadata field for every one honey-clients reads", () => {
+	it("types a config by returning it unchanged, with a metadata field for every one clients reads", () => {
 		const config = { codegen: CODEGEN, homepage: HOMEPAGE, packages: [SDK], project: "acme", spec: SPEC }
 		expect(defineRelease(config)).toBe(config)
 		expectTypeOf<keyof PackageMetadata>().toEqualTypeOf<MetadataField>()

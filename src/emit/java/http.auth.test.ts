@@ -217,7 +217,7 @@ describe.skipIf(!JAVA)("the auth refresh: a failing OnAuthExpired is the call's 
 		const text = "on_auth_expired: driver: no token left"
 		expect({ error: callOf(run.trace, 0)?.error, hops: hops.length, observed: run.observed }, run.stderr).toEqual({
 			error: plain({
-				chain: ["HookException", "HoneyException"],
+				chain: ["HookException", "HttpException"],
 				inner: "IllegalStateException",
 				text,
 				type: "HookException",

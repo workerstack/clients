@@ -1,6 +1,6 @@
 /**
  * Emitted Go, compiled: the files an emitter writes land under
- * `$HOME/.cache/honey-tmp/go/sdk/<content hash>/` and are built and vetted with the pinned toolchain
+ * `$HOME/.cache/backend-tmp/go/sdk/<content hash>/` and are built and vetted with the pinned toolchain
  * (go-env), so a test proves the text it asserts is Go the pinned compiler accepts — vet included,
  * which is what enforces the module's `go` floor. A floor leg passes `toolchain: GO_FLOOR` to build
  * and vet under that oldest admitted Go itself. An optional consumer program (`main`, under
@@ -65,7 +65,7 @@ export type DrivenSdk = Compiled & {
 /* the check program's binary, beside the module it is built from */
 const BINARY = "check"
 /* the import path the driver's sources name the SDK by, replaced with the SDK's module path */
-const DRIVER_IMPORT = '"honey.test/driver/sdk"'
+const DRIVER_IMPORT = '"backend.test/driver/sdk"'
 
 /** The files to write: the SDK, and the check program under `cmd/check` when one is given. */
 function withMain(files: Readonly<Record<string, string>>, main: Main | undefined): [string, string][] {

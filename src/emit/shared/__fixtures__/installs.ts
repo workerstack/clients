@@ -18,10 +18,10 @@ export const PY_FLOOR = "3.11.4"
 export const RUST_FLOOR = "1.85.0"
 
 /* gen's Python cache root as an install line spells it, for a shell to expand */
-const PYTHON_ROOT = "$HOME/.cache/honey-tmp/python"
+const PYTHON_ROOT = "$HOME/.cache/backend-tmp/python"
 
 /**
- * The command that installs uv `version` into the honey cache, run by any uv (the user's, or CI's setup-uv), which
+ * The command that installs uv `version` into the backend-tmp cache, run by any uv (the user's, or CI's setup-uv), which
  * it leaves as it is: no `uv.toml` (the user's or the repo's) steers it, no Python downloads for the tool's own
  * venv, and its links go in the cache's `uv/bin`, never `~/.local/bin`.
  */
@@ -62,7 +62,7 @@ export const DOTNET_SETTINGS = {
 } as const
 
 /**
- * The command that installs SDK `version` into the honey cache, from anywhere in the repo: Microsoft's tarball,
+ * The command that installs SDK `version` into the backend-tmp cache, from anywhere in the repo: Microsoft's tarball,
  * checked against `dotnet-sdk.sha512` before anything is extracted, extracted whole or not at all, then the seed
  * restore under the env every run uses, the one NuGet fetch (the build-time package an AOT-compatible build
  * pulls), so every later restore is offline. Its HOME is the cache's, since the fetch's certificate checks write
@@ -75,7 +75,7 @@ export function dotnetInstall(version: string): string {
 		.join(" ")
 	return [
 		`V=${version}`,
-		`D="$HOME/.cache/honey-tmp/dotnet"`,
+		`D="$HOME/.cache/backend-tmp/dotnet"`,
 		`F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__"`,
 		`T="$D/toolchain/$V"`,
 		`mkdir -p "$D/dl" "$D/home" "$D/tmp"`,
@@ -96,7 +96,7 @@ const fetchLine = (query: string, out: string) =>
 	`curl -fsSL -o "${out}" "$(jq -r --arg k "$k" '${query}.url' "$P")" && echo "$(jq -r --arg k "$k" '${query}.sha256' "$P")  ${out}" | sha256sum -c -`
 
 /**
- * The command that installs every Java pin into the honey cache, from anywhere in the repo: each JDK tarball, the
+ * The command that installs every Java pin into the backend-tmp cache, from anywhere in the repo: each JDK tarball, the
  * google-java-format jar, the Gradle zip and the Jackson set, each checked against `java-pins.json`'s sha256 before
  * it is kept, each JDK extracted whole or not at all.
  */
@@ -120,7 +120,7 @@ export function javaInstall(): string {
 	].join(" && ")
 	return [
 		`P="$(git rev-parse --show-toplevel)/src/emit/java/__fixtures__/java-pins.json"`,
-		`D="$HOME/.cache/honey-tmp/java"`,
+		`D="$HOME/.cache/backend-tmp/java"`,
 		`G="$(jq -r .googleJavaFormat.version "$P")"`,
 		`W="$(jq -r .gradle.version "$P")"`,
 		`mkdir -p "$D/dl" "$D/toolchain" "$D/repo" "$D/tmp"`,
@@ -137,7 +137,7 @@ export function javaInstall(): string {
  */
 export function toolsInstall(): string {
 	return [
-		`P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/honey-tmp/tools" && mkdir -p "$D/dl"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/cli/__fixtures__/tool-pins.json" && D="$HOME/.cache/backend-tmp/tools" && mkdir -p "$D/dl"`,
 		`for k in $(jq -r 'keys[]' "$P"); do U="$(jq -r --arg k "$k" '.[$k].url' "$P")" && R="$(jq -r --arg k "$k" '.[$k].dir' "$P")"`,
 		`curl -fsSL -o "$D/dl/$k" "$U" && echo "$(jq -r --arg k "$k" '.[$k].sha256' "$P")  $D/dl/$k" | sha256sum -c -`,
 		`rm -rf "\${D:?}/\${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && tar -xf "$D/dl/$k" -C "$D/$R.partial"`,
@@ -151,7 +151,7 @@ export function toolsInstall(): string {
  */
 export function jsrCliInstall(): string {
 	return [
-		`P="$(git rev-parse --show-toplevel)/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/honey-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/ts/__fixtures__/jsr-pins.json" && D="$HOME/.cache/backend-tmp/tools" && R="$(jq -r .dir "$P")" && mkdir -p "$D/dl"`,
 		`curl -fsSL -o "$D/dl/$R.zip" "$(jq -r .url "$P")" && echo "$(jq -r .sha256 "$P")  $D/dl/$R.zip" | sha256sum -c -`,
 		`rm -rf "\${D:?}/\${R:?}" "$D/$R.partial" && mkdir -p "$D/$R.partial" && unzip -q "$D/dl/$R.zip" -d "$D/$R.partial"`,
 		`chmod +x "$D/$R.partial/$(jq -r .bin "$P")" && mv "$D/$R.partial" "$D/$R" && rm "$D/dl/$R.zip"`,
@@ -161,7 +161,7 @@ export function jsrCliInstall(): string {
 /** The command that installs the pinned MCP clients, from anywhere in the repo: verified by npm ci, kept whole or not at all. */
 export function clientsInstall(): string {
 	return [
-		`P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/honey-tmp/mcp-clients"`,
+		`P="$(git rev-parse --show-toplevel)/src/emit/mcp/__fixtures__" && D="$HOME/.cache/backend-tmp/mcp-clients"`,
 		`rm -rf "$D.partial" && mkdir -p "$D.partial" && cp "$P/client-pins.json" "$D.partial/package.json"`,
 		`cp "$P/client-lock.json" "$D.partial/package-lock.json"`,
 		`(cd "$D.partial" && npm ci --ignore-scripts --no-audit --no-fund)`,

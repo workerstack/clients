@@ -127,7 +127,7 @@ function newClient(
 		server === undefined
 			? [
 					"Config.BaseURL is required: the API declares no server.",
-					`panic(${goString("honey: Config.BaseURL is empty and the API declares no server")})`,
+					`panic(${goString("httpsdk: Config.BaseURL is empty and the API declares no server")})`,
 				]
 			: [`An empty Config.BaseURL defaults to the API's first server, ${server}.`, `cfg.BaseURL = ${goString(server)}`]
 	return [

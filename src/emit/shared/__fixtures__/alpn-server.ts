@@ -3,8 +3,8 @@
  * leg can hold an SDK to HTTP/1.1 when a server would speak h2. A child process trusts the CA through SSL_CERT_FILE
  * (Go, Rust, OpenSSL) or NODE_EXTRA_CA_CERTS (Node, Bun), which `trusted` sets for the span of one run.
  *
- * TEST-ONLY, INSECURE KEY MATERIAL, PUBLISHED ON PURPOSE: the CA ("honey test CA (test only, insecure)"), the leaf
- * ("honey test leaf for 127.0.0.1 (test only, insecure)", valid to 2126) and the leaf's private key below exist only so
+ * TEST-ONLY, INSECURE KEY MATERIAL, PUBLISHED ON PURPOSE: the CA ("clients test CA (test only, insecure)"), the leaf
+ * ("clients test leaf for 127.0.0.1 (test only, insecure)", valid to 2126) and the leaf's private key below exist only so
  * this fixture can speak TLS on loopback. The CA's own key was discarded when it signed the leaf. None of it protects
  * anything; never trust this CA or reuse this key outside a test.
  */
@@ -16,36 +16,36 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 const CA = `-----BEGIN CERTIFICATE-----
-MIIBtDCCAVmgAwIBAgIUcwFItJwaUN+PE+KYtKvpUT7WWJ0wCgYIKoZIzj0EAwIw
-LjEsMCoGA1UEAwwjaG9uZXkgdGVzdCBDQSAodGVzdCBvbmx5LCBpbnNlY3VyZSkw
-IBcNMjYxMDI1MTEwODUzWhgPMjEyNjEwMDExMTA4NTNaMC4xLDAqBgNVBAMMI2hv
-bmV5IHRlc3QgQ0EgKHRlc3Qgb25seSwgaW5zZWN1cmUpMFkwEwYHKoZIzj0CAQYI
-KoZIzj0DAQcDQgAEZg0XzZeg3paR/wKjOrfUGnCLhuw6FEe55OXvkwTJXF8ahWl0
-jQVL3LAy0C+pGC8rgJlca17OUmOXJT0tqkTcMKNTMFEwHQYDVR0OBBYEFKvk/PaW
-pvMeQQcl24hIcsFmnylLMB8GA1UdIwQYMBaAFKvk/PaWpvMeQQcl24hIcsFmnylL
-MA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSQAwRgIhANg9ddVbKwOfsZ+Q
-Al8bQyLD0DSz3wPGuw39glTnxDz8AiEA1R3siccMb3drmg1f9ycEI4UWHuzscf44
-YXpOy2QFxzw=
+MIIBxjCCAW2gAwIBAgIUezkG1vaeTXj8zc7AXi30uXUNOkYwCgYIKoZIzj0EAwIw
+MDEuMCwGA1UEAwwlY2xpZW50cyB0ZXN0IENBICh0ZXN0IG9ubHksIGluc2VjdXJl
+KTAgFw0yNjExMTQwOTA2MDZaGA8yMTI2MTAyMTA5MDYwNlowMDEuMCwGA1UEAwwl
+Y2xpZW50cyB0ZXN0IENBICh0ZXN0IG9ubHksIGluc2VjdXJlKTBZMBMGByqGSM49
+AgEGCCqGSM49AwEHA0IABB5svDfkxvaPEMBahzVWIMBMGwSB+/lQJt+vTzn08f4b
+GXUIsKcqMdvEfPN1EDpXfD4hxsXCia05mJVXA21NsjSjYzBhMB0GA1UdDgQWBBRH
+o34IjkEmXGBpUFN0mcmm1xXZHzAfBgNVHSMEGDAWgBRHo34IjkEmXGBpUFN0mcmm
+1xXZHzAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQD
+AgNHADBEAiB6D90pDeWBmkjox7vo2d3WIjR3DdQr4NVH3JFz+JCSMwIgJ2XAip2y
+SaNftPa93vz646dUXjKFRL8BXL5KaxaCtj0=
 -----END CERTIFICATE-----`
 
 const CERT = `-----BEGIN CERTIFICATE-----
-MIIB8jCCAZegAwIBAgIUWaPR+5SwzKa4ba6Zlx4IooJeFyAwCgYIKoZIzj0EAwIw
-LjEsMCoGA1UEAwwjaG9uZXkgdGVzdCBDQSAodGVzdCBvbmx5LCBpbnNlY3VyZSkw
-IBcNMjYxMDI1MTEwODUzWhgPMjEyNjEwMDExMTA4NTNaMD4xPDA6BgNVBAMMM2hv
-bmV5IHRlc3QgbGVhZiBmb3IgMTI3LjAuMC4xICh0ZXN0IG9ubHksIGluc2VjdXJl
-KTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABB/AqWgOXvFjZfVbz25+8vqA9z9G
-Mn1/iqwYqE4ioeweLSQxXxQXRkgHII/9HrWBX01loapmRSoPc/7P1ezWlA6jgYAw
-fjAPBgNVHREECDAGhwR/AAABMAkGA1UdEwQCMAAwCwYDVR0PBAQDAgeAMBMGA1Ud
-JQQMMAoGCCsGAQUFBwMBMB0GA1UdDgQWBBTk28TrFszHgpRVDP5QAvTBOySgozAf
-BgNVHSMEGDAWgBSr5Pz2lqbzHkEHJduISHLBZp8pSzAKBggqhkjOPQQDAgNJADBG
-AiEAjk0b+9qbvbnovjhY186FcbMVVetH3Rym7ooN/dOJkrwCIQDx/XWYwmHZDkbM
-fow2/5aBFSO3LzQFApoVf5aoC5Jyhw==
+MIIB9jCCAZugAwIBAgIUdP2yLkDL7/VK/sdskhIJ6Yg7eqwwCgYIKoZIzj0EAwIw
+MDEuMCwGA1UEAwwlY2xpZW50cyB0ZXN0IENBICh0ZXN0IG9ubHksIGluc2VjdXJl
+KTAgFw0yNjExMTQwOTA2MDZaGA8yMTI2MTAyMTA5MDYwNlowQDE+MDwGA1UEAww1
+Y2xpZW50cyB0ZXN0IGxlYWYgZm9yIDEyNy4wLjAuMSAodGVzdCBvbmx5LCBpbnNl
+Y3VyZSkwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQmH1YVzUCKM+Ga9k5xqwQn
+c8ZxnbH61QON3K97f1mB207av5j+4anYw/io7ej8xXs5PpRlj78xmbjNeoTyK1vs
+o4GAMH4wDwYDVR0RBAgwBocEfwAAATAJBgNVHRMEAjAAMAsGA1UdDwQEAwIHgDAT
+BgNVHSUEDDAKBggrBgEFBQcDATAdBgNVHQ4EFgQU2YsVOwmX6VvkAFZJxA9ODmtG
+erYwHwYDVR0jBBgwFoAUR6N+CI5BJlxgaVBTdJnJptcV2R8wCgYIKoZIzj0EAwID
+SQAwRgIhAJJ0qKyQKOUbArfsyYRBmeNy0aO6eHKFl6VroWR5Zd07AiEAuglYjpBi
+k8S3T0e7YTda0Ze2axKxUFKVLu9A7P0qDjg=
 -----END CERTIFICATE-----`
 
 const KEY = `-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgrAyBex/B/QEesTp5
-N/R4xqzxcS9/bH5SrmSKWUXFZgKhRANCAAQfwKloDl7xY2X1W89ufvL6gPc/RjJ9
-f4qsGKhOIqHsHi0kMV8UF0ZIByCP/R61gV9NZaGqZkUqD3P+z9Xs1pQO
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQghuikhxLnzLbxpglW
+hg2WRte5KEi/k+yVdJD+Q8xwOguhRANCAAQmH1YVzUCKM+Ga9k5xqwQnc8ZxnbH6
+1QON3K97f1mB207av5j+4anYw/io7ej8xXs5PpRlj78xmbjNeoTyK1vs
 -----END PRIVATE KEY-----`
 
 /** One request as the server saw it: the ALPN protocol its TLS session negotiated, and its HTTP version. */
@@ -77,7 +77,7 @@ export async function alpnServer(): Promise<AlpnServer> {
 
 /** `run` with SSL_CERT_FILE naming the test CA, so the child processes it spawns trust the server; restored after. */
 export async function trusted<T>(run: () => Promise<T>): Promise<T> {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/tls")
+	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/tls")
 	mkdirSync(dir, { recursive: true })
 	const file = join(dir, "test-ca.pem")
 	writeFileSync(file, `${CA}\n`)

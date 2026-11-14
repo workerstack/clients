@@ -2,7 +2,7 @@
  * The one way gen runs Rust (G10): every `cargo`, `rustc` and `rustfmt` a test, the conformance runner or
  * the harness spawns goes through here, so it runs the toolchain `rust-toolchain.toml` pins — the same
  * channel locally and in CI, which installs it from that file — with its caches under
- * `$HOME/.cache/honey-tmp/rust/` (never /tmp, 00-rules). `RUSTUP_AUTO_INSTALL=0` makes a missing toolchain
+ * `$HOME/.cache/backend-tmp/rust/` (never /tmp, 00-rules). `RUSTUP_AUTO_INSTALL=0` makes a missing toolchain
  * fail instead of downloading one. A structure test forbids a Rust spawn elsewhere.
  */
 import { type SpawnSyncReturns, spawnSync } from "node:child_process"
@@ -21,7 +21,7 @@ export function pinnedRust(): string {
 
 /** Where gen's Rust caches live: one area under the toolchain cache, made on first use. */
 export function rustCacheDir(...parts: string[]): string {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/rust", ...parts)
+	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/rust", ...parts)
 	mkdirSync(dir, { recursive: true })
 	return dir
 }
@@ -96,7 +96,7 @@ export function hasRust(toolchain = pinnedRust()): boolean {
 
 /** Whether a missing Rust must fail rather than skip: CI and the pre-push battery set one of these. */
 export function rustRequired(): boolean {
-	return process.env.HONEY_REQUIRE_TOOLCHAINS === "1" || process.env.HONEY_REQUIRE_RUST === "1"
+	return process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1" || process.env.CLIENTS_REQUIRE_RUST === "1"
 }
 
 /**
@@ -108,7 +108,7 @@ export function withRust(toolchain = pinnedRust()): boolean {
 	const rust = hasRust(toolchain)
 	if (!rust && rustRequired())
 		throw new Error(
-			`Rust ${toolchain} is required here (HONEY_REQUIRE_RUST or HONEY_REQUIRE_TOOLCHAINS) and is not installed: rustup toolchain install ${toolchain} --profile minimal --component rustfmt --component clippy`,
+			`Rust ${toolchain} is required here (CLIENTS_REQUIRE_RUST or CLIENTS_REQUIRE_TOOLCHAINS) and is not installed: rustup toolchain install ${toolchain} --profile minimal --component rustfmt --component clippy`,
 		)
 	return rust
 }

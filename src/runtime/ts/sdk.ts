@@ -23,7 +23,7 @@ export type ServiceEntry = {
 	realtime?: boolean
 	/** an event stream; `"json"` when its events carry JSON `data` the client parses */
 	sse?: boolean | "json"
-	/** the param that spans segments (`x-honey-wildcard`) */
+	/** the param that spans segments (`x-backend-wildcard`) */
 	wildcard?: string
 	ws?: boolean
 	/** how a stream, WebSocket or realtime operation is called; a REST one has none */

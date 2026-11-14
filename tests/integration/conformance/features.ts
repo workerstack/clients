@@ -395,7 +395,7 @@ const shared = (id: string, asserted: string, scenarios: Scenario[]): Feature =>
 export const FEATURES: readonly Feature[] = [
 	shared("verbs", "each verb + path/query/header params: the request wire matches; the typed result decodes", verbs),
 	shared("json-status", "JSON request + response: the right status variant comes back", jsonStatus),
-	shared("typed-errors", "a honey error surfaces as the target's typed error, its key kept", typedErrors),
+	shared("typed-errors", "a backend error surfaces as the target's typed error, its key kept", typedErrors),
 	shared("binary-response", "bytes come back as bytes; Accept names the declared media type", [
 		{
 			calls: [call("files.get", "GET", "/v1/files/:name", { params: { name: "blob.bin" } })],

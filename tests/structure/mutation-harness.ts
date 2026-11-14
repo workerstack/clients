@@ -1,12 +1,12 @@
 /**
  * Gen's mutation check, the same mechanism as core's and none of its code (H2): a guard is
  * load-bearing only if the emit adversarial suite goes red without it. For each guard of the registry
- * (mutation-harness.guards.ts), rerun the suite with that guard disabled (HONEY_MUTANT=<id>, applied by the
+ * (mutation-harness.guards.ts), rerun the suite with that guard disabled (CLIENTS_MUTANT=<id>, applied by the
  * suite through vi.doMock) and require a failing run: a toolchain guard its own language's security file
  * (SUITES, the only one its mock reaches), a guard naming its own suite that file alone (an MCP guard's), any other
  * guard all of `tests/security`. With every guard in place the whole directory must pass. A guard whose toolchain is
- * absent is reported skipped, never killed; where the toolchain is required (HONEY_REQUIRE_GO, HONEY_REQUIRE_RUST,
- * HONEY_REQUIRE_PYTHON, HONEY_REQUIRE_TOOLCHAINS) its absence fails the run instead.
+ * absent is reported skipped, never killed; where the toolchain is required (CLIENTS_REQUIRE_GO, CLIENTS_REQUIRE_RUST,
+ * CLIENTS_REQUIRE_PYTHON, CLIENTS_REQUIRE_TOOLCHAINS) its absence fails the run instead.
  *
  *     bun tests/structure/mutation-harness.ts
  */
@@ -28,7 +28,7 @@ const NAMES: Readonly<Record<Toolchain, string>> = { csharp: ".NET", go: "Go", p
 
 /** The emit adversarial suite's exit status, with `mutant` disabled when given: its toolchain's file alone, or all of it. */
 export function runSuite(mutant: string | undefined): number {
-	const env = { ...process.env, HONEY_MUTANT: mutant ?? "" }
+	const env = { ...process.env, CLIENTS_MUTANT: mutant ?? "" }
 	const guard = guardNamed(mutant)
 	const suite = guard?.suite ?? (guard?.toolchain === undefined ? SUITE : SUITES[guard.toolchain])
 	const run = spawnSync(process.execPath, [VITEST, "run", suite], { cwd: GEN, encoding: "utf8", env })

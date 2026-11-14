@@ -15,7 +15,7 @@ import { guardNamed } from "../structure/mutation-harness.guards.ts"
 
 const REPO = resolve(import.meta.dirname, "../..")
 
-const mutant = guardNamed(process.env.HONEY_MUTANT)
+const mutant = guardNamed(process.env.CLIENTS_MUTANT)
 if (mutant !== undefined) {
 	vi.doMock(resolve(REPO, mutant.module), async (importOriginal) => {
 		const original = await importOriginal<Record<string, unknown>>()
@@ -135,7 +135,7 @@ describe("gen adversarial: an MCP tool's path argument (H18.11)", SLOW, () => {
 			[
 				...leaving.map(() => refused("name must stay within one path segment")),
 				...safe.map(() => ({
-					_meta: { "honey/status": 200 },
+					_meta: { "backend/status": 200 },
 					content: [{ text: "{}", type: "text" }],
 					structuredContent: {},
 				})),

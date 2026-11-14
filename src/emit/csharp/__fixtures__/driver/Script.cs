@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>
 /// The envelope's optional script (protocol.ts <c>Script</c>, decoded strictly by Protocol.cs): client config a
@@ -151,7 +151,7 @@ internal static class Scripts
 }
 
 /// <summary>
-/// The caller chain under <c>httpClient</c>: a link adding <c>User-Agent: honey-driver</c>, <c>X-Builder: b</c> and
+/// The caller chain under <c>httpClient</c>: a link adding <c>User-Agent: clients-driver</c>, <c>X-Builder: b</c> and
 /// basic auth (<c>driver:pw</c>), each only where the request has none (caller defaults, so the SDK's own
 /// credential is never doubled), over a <c>SocketsHttpHandler</c> whose redirects are on until the SDK's install
 /// turns them off.
@@ -160,7 +160,7 @@ internal sealed class DriverLink : DelegatingHandler
 {
     private static readonly (string Name, string Value)[] Defaults =
     [
-        ("User-Agent", "honey-driver"),
+        ("User-Agent", "clients-driver"),
         ("X-Builder", "b"),
         ("Authorization", "Basic ZHJpdmVyOnB3"),
     ];

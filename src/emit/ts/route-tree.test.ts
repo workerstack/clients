@@ -56,13 +56,13 @@ const project = new Project({
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		noEmit: true,
-		paths: { "@workerstack/backend/http/tree": ["/honey/tree.ts"] },
+		paths: { "@workerstack/backend/http/tree": ["/backend/tree.ts"] },
 		strict: true,
 		target: ts.ScriptTarget.ES2022,
 	},
 	useInMemoryFileSystem: true,
 })
-project.createSourceFile("/honey/tree.ts", CORE_TREE)
+project.createSourceFile("/backend/tree.ts", CORE_TREE)
 
 /** Every diagnostic of the module emitted for `tree` and of a `consumer.ts` of type assertions beside it. */
 function typecheck(tree: RouteTree, consumer: string): string[] {

@@ -6,7 +6,7 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 const rule = plugin.rules["no-v8-ignore"]
 const MESSAGE = "coverage ignore hints are forbidden; delete the code or give it a case"
 
-describe("honey/no-v8-ignore", () => {
+describe("clients/no-v8-ignore", () => {
 	it("rejects every coverage-ignore hint the v8 provider honors", () => {
 		const fixture = {
 			"src/a.ts": "/* v8 ignore next */\nexport const a = 1\n",
@@ -31,7 +31,7 @@ describe("honey/no-v8-ignore", () => {
 		expect(reportsOf(rule, fixture)).toEqual([])
 	})
 
-	it("fails oxlint through the honey plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
+	it("fails oxlint through the clients plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
 		const fixture = {
 			"src/a.ts": "/* v8 ignore next */\nexport const a = 1\n",
 			"src/b.ts": "export const b = 1\n",

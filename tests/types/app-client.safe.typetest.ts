@@ -11,19 +11,19 @@ import type { ErrorEnvelope } from "../../src/runtime/ts/app-types.ts"
 import type { DecodeError } from "../../src/runtime/ts/error.ts"
 import type { Result } from "../../src/runtime/ts/response.ts"
 import { defineErrors } from "@workerstack/backend/http"
-import { honey } from "@workerstack/backend/http"
+import { httpApp } from "@workerstack/backend/http"
 
 const row = z.object({ id: z.string(), name: z.string() })
 
-/** A route answering a row, its 404 honey's envelope. */
-const app = honey<{}>()
+/** A route answering a row, its 404 backend's envelope. */
+const app = httpApp<{}>()
 	.get("/users/:id")
 	.output({ "application/json": { ok: row } })
 	.errors(defineErrors({ not_found: "not_found" }), "not_found")
 	.handler((ctx) => ctx.res.json("ok", { id: ctx.params.id, name: "test" }))
 
 /** A route declaring a custom-schema error from the app's factory. */
-const erring = honey<{}>()
+const erring = httpApp<{}>()
 	.errorFactory(
 		defineErrors({
 			item_not_found: {

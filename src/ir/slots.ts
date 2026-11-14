@@ -1,6 +1,6 @@
 /**
  * One operation's slots in the IR: its parameters by where they travel, its request bodies in
- * preference order, its responses by status, and the honey extensions it carries (realtime, SSE,
+ * preference order, its responses by status, and the backend extensions it carries (realtime, SSE,
  * websocket, invalidation…), and for a Standard Webhooks event, its type and data. Component `$ref`s on
  * parameters, bodies, responses and an event's envelope are followed.
  */
@@ -85,7 +85,7 @@ function paramOf(p: Json): IRParam {
 		schema: schema === undefined ? STRING : schemaToIR(schema),
 	}
 	if (typeof p.description === "string") param.description = p.description
-	if (p["x-honey-wildcard"] === true) param.wildcard = true
+	if (p["x-backend-wildcard"] === true) param.wildcard = true
 	if (schema?.default !== undefined) param.default = schema.default
 	return param
 }
@@ -205,7 +205,7 @@ export function responsesOf(op: Json, components: Components): { responses: Reco
 				return each === undefined ? { contentType } : { contentType, schema: schemaToIR(each) }
 			})
 		}
-		if (response?.["x-honey-error"] === true) out.error = true
+		if (response?.["x-backend-error"] === true) out.error = true
 		const headers = responseHeaders(response, components)
 		if (headers !== undefined) out.headers = headers
 		responses[status] = out
@@ -213,7 +213,7 @@ export function responsesOf(op: Json, components: Components): { responses: Reco
 	return { responses, sse }
 }
 
-/** The honey extensions: each only when it is literally `true`; invalidation targets as strings. */
+/** The backend extensions: each only when it is literally `true`; invalidation targets as strings. */
 export function extensionsOf(op: Json, sse: boolean): IROperationExtensions {
 	const out: IROperationExtensions = {}
 	if (op["x-websocket"] === true) out.websocket = true
@@ -222,15 +222,15 @@ export function extensionsOf(op: Json, sse: boolean): IROperationExtensions {
 	if (op["x-deprecated"] === true || op.deprecated === true) out.deprecated = true
 	if (op["x-idempotency-key"] === true) out.idempotencyKey = true
 	if (op["x-mcp"] === true) out.mcp = true
-	if (typeof op["x-honey-route"] === "string") out.route = op["x-honey-route"]
+	if (typeof op["x-backend-route"] === "string") out.route = op["x-backend-route"]
 	const invalidate = op["x-invalidate"]
 	if (Array.isArray(invalidate)) out.invalidates = invalidate.filter((target) => typeof target === "string")
-	const errors = declaredErrors(op["x-honey-errors"])
+	const errors = declaredErrors(op["x-backend-errors"])
 	if (errors !== undefined) out.errors = errors
 	return out
 }
 
-/** `x-honey-errors` as the IR reads it: each key with a numeric or null status, its schema when it has one. */
+/** `x-backend-errors` as the IR reads it: each key with a numeric or null status, its schema when it has one. */
 function declaredErrors(raw: unknown): IROperationExtensions["errors"] {
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined
 	const out: NonNullable<IROperationExtensions["errors"]> = {}
@@ -244,14 +244,14 @@ function declaredErrors(raw: unknown): IROperationExtensions["errors"] {
 }
 
 /**
- * The Standard Webhooks event the webhook `name` declares through `x-honey-webhook`, from its JSON
+ * The Standard Webhooks event the webhook `name` declares through `x-backend-webhook`, from its JSON
  * body's `{ type, timestamp, data }` envelope; none when unmarked. gen reads documents it did not
  * write: a marked webhook it could not verify into a typed event is refused, never emitted half.
  */
 export function eventOf(name: string, op: Json, components: Components): IRWebhookEvent | undefined {
-	const marker = op["x-honey-webhook"]
+	const marker = op["x-backend-webhook"]
 	if (marker === undefined) return undefined
-	const refuse = (reason: string) => new Error(`x-honey-webhook on webhook ${JSON.stringify(name)}: ${reason}`)
+	const refuse = (reason: string) => new Error(`x-backend-webhook on webhook ${JSON.stringify(name)}: ${reason}`)
 	if (marker !== "standard-webhooks") throw refuse(`${JSON.stringify(marker)} is not standard-webhooks`)
 	const content = deref(op.requestBody, components)?.content as Json | undefined
 	const envelope = deref((content?.["application/json"] as Json | undefined)?.schema, components)

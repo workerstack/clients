@@ -42,7 +42,7 @@ function bytesResult(bytes: Uint8Array, type: string, tool: string): ToolResult 
 		content: [
 			kind === "image" || kind === "audio"
 				? { data, mimeType, type: kind }
-				: { resource: { blob: data, mimeType, uri: `honey://${tool}/result` }, type: "resource" },
+				: { resource: { blob: data, mimeType, uri: `mcp://${tool}/result` }, type: "resource" },
 		],
 	}
 }
@@ -65,7 +65,7 @@ export function successOf(
 	return { ...json(value), structuredContent: value as Record<string, unknown> }
 }
 
-/** The result of an `answer` outside 2xx: its status, with honey's error envelope its key and message, else its body. */
+/** The result of an `answer` outside 2xx: its status, with backend's error envelope its key and message, else its body. */
 export function failureOf({ error, status }: { error: unknown; status: number }, scrub: Scrub): ToolResult {
 	if (error instanceof Error)
 		return json(scrub({ status, message: error.message, body: (error as { body?: unknown }).body }), true)

@@ -1,6 +1,6 @@
 /**
  * The emitted TS client, executed: the files an emitter writes land under
- * `$HOME/.cache/honey-tmp/gen-ts/<content hash>/` (never /tmp, 00-rules) and are imported from
+ * `$HOME/.cache/backend-tmp/gen-ts/<content hash>/` (never /tmp, 00-rules) and are imported from
  * there, so a behavior test drives exactly the text an SDK ships, `runtimeSource` included: a
  * mutant of the runtime reaches every behavior test. Driven by an injected recording `fetch`.
  */
@@ -13,7 +13,7 @@ import type { RouteTree } from "../route-tree.ts"
 import { generateSdk, type SdkOptions } from "../sdk.ts"
 
 /** Where emitted files land: under the toolchain cache, never /tmp. */
-const root = () => join(process.env.HOME ?? homedir(), ".cache/honey-tmp/gen-ts")
+const root = () => join(process.env.HOME ?? homedir(), ".cache/backend-tmp/gen-ts")
 
 /** Write `files` once per content; the path of `entry` among them. */
 function writtenEntry(files: Readonly<Record<string, string>>, entry: string): string {

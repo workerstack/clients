@@ -1,7 +1,7 @@
 /**
  * A project whose `@workerstack/backend` stands as a checkout (bit 19 h2): the package carries tsconfig.json and
  * backend's export shape over a `src` link to the runtime tree of the backend this package resolves (its `src/` in a
- * checkout, its built `dist/` once installed), each subpath's `honey-source` that tree's file and its `default` an
+ * checkout, its built `dist/` once installed), each subpath's `backend-source` that tree's file and its `default` an
  * unbuilt dist/ (bit 20: no `bun` condition, which backend dropped and which pointed Bun at the source), so `--app`
  * resolves backend from the app as a checkout would. An install copies the tree instead, its `default` the tree's
  * file too. Test-only: backend is found by its package name, never imported.
@@ -46,18 +46,18 @@ export function appProject(
 		cpSync(join(root, tree), join(core, "src"), { filter: (path) => !path.endsWith(".test.ts"), recursive: true })
 	else symlinkSync(join(root, tree), join(core, "src"), "dir")
 	const { imports } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-		imports: Record<string, { "honey-source"?: string; default: string }>
+		imports: Record<string, { "backend-source"?: string; default: string }>
 	}
-	/* the tree's file for an import target: its honey-source in a checkout, its default (dist) once installed */
-	const inTree = (target: { "honey-source"?: string; default: string }) =>
-		(target["honey-source"] ?? target.default).replace(/^\.\/(src|dist)\//, "./src/")
+	/* the tree's file for an import target: its backend-source in a checkout, its default (dist) once installed */
+	const inTree = (target: { "backend-source"?: string; default: string }) =>
+		(target["backend-source"] ?? target.default).replace(/^\.\/(src|dist)\//, "./src/")
 	const own = Object.fromEntries(
 		Object.entries(imports).map(([name, target]) => {
 			const source = inTree(target)
 			return [
 				name,
 				{
-					"honey-source": source,
+					"backend-source": source,
 					default: installed ? source : source.replace(/^\.\/src\/(.*)\.[jt]s$/, "./dist/$1.js"),
 				},
 			]
@@ -66,7 +66,7 @@ export function appProject(
 	const exports = Object.fromEntries(
 		Object.entries(ENTRIES).map(([subpath, file]) => {
 			const source = `./src/${file}.${ext}`
-			return [subpath, { "honey-source": source, default: installed ? source : `./dist/${file}.js` }]
+			return [subpath, { "backend-source": source, default: installed ? source : `./dist/${file}.js` }]
 		}),
 	)
 	/* a plain subpath and one with no source condition, as a real exports map has */

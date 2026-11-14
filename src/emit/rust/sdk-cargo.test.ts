@@ -57,7 +57,7 @@ describe("the crate's [package] metadata", () => {
 				homepage: "https://acme.example",
 				keywords: ["acme", "api"],
 				license: "MIT",
-				name: "honey-sdk",
+				name: "http-sdk",
 				repository: "https://github.com/acme/sdk-rust",
 				"rust-version": "1.85",
 				version: "0.1.0",

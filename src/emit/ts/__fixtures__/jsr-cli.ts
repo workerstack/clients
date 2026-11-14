@@ -1,6 +1,6 @@
 /**
  * The CLI JSR's publish check runs in (plan 39 8.3.1): the release `jsr-pins.json` pins by sha256, extracted into
- * `$HOME/.cache/honey-tmp/tools/<dir>` by `jsrCliInstall`'s command after its checksum passes; CI runs that command
+ * `$HOME/.cache/backend-tmp/tools/<dir>` by `jsrCliInstall`'s command after its checksum passes; CI runs that command
  * verbatim. The pin file is the one place its name is spelled. A missing pin fails where toolchains are required
  * and skips anywhere else; nothing is fetched by a run.
  */
@@ -15,7 +15,8 @@ type Pin = { readonly bin: string; readonly dir: string; readonly sha256: string
 const pin = (): Pin => JSON.parse(readFileSync(resolve(import.meta.dirname, "jsr-pins.json"), "utf8")) as Pin
 
 /** The pinned CLI's binary. */
-export const jsrCli = (): string => join(process.env.HOME ?? homedir(), ".cache/honey-tmp/tools", pin().dir, pin().bin)
+export const jsrCli = (): string =>
+	join(process.env.HOME ?? homedir(), ".cache/backend-tmp/tools", pin().dir, pin().bin)
 
 /**
  * Whether a leg runs its JSR half: false only where the CLI may be absent. A missing pin fails where toolchains are
@@ -23,7 +24,7 @@ export const jsrCli = (): string => join(process.env.HOME ?? homedir(), ".cache/
  */
 export function withJsrCli(): boolean {
 	const present = existsSync(jsrCli())
-	if (!present && process.env.HONEY_REQUIRE_TOOLCHAINS === "1")
+	if (!present && process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1")
 		throw new Error(`the pinned JSR CLI is required here and is not installed: ${jsrCliInstall()}`)
 	return present
 }

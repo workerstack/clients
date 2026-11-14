@@ -156,7 +156,7 @@ try {
   while (e.hasNext()) {
     note(e.next().data().n());
   }
-} catch (HoneyException error) {
+} catch (HttpException error) {
   note(error.getClass().getSimpleName());
 }
 ${NEXT}
@@ -171,7 +171,7 @@ const HOOKED = `ExampleClient hooked = ExampleClient.builder().baseUrl(BASE)
 try {
   hooked.ticks().stream(TicksStreamParams.builder().build());
   note("opened");
-} catch (HoneyException error) {
+} catch (HttpException error) {
   note(error.getClass().getSimpleName() + ": " + error.getMessage());
 }
 ${NEXT}`

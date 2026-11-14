@@ -1,5 +1,5 @@
 /**
- * What the TanStack Query adapter's emitter writes (bit 22): the vendored source with its honey imports
+ * What the TanStack Query adapter's emitter writes (bit 22): the vendored source with its runtime imports
  * pointed at the emitted runtime, and the two nested key trees the file's mapped types narrow by. The
  * adapter's behavior is `tanstack-query.behavior.test.ts`.
  */
@@ -44,7 +44,7 @@ const document = {
 describe("tanstackQuerySource: the vendored adapter, pointed at the emitted runtime", () => {
 	const source = tanstackQuerySource("api.runtime.gen")
 
-	it("rewrites honey's runtime imports to the emitted runtime module", () => {
+	it("rewrites clients' runtime imports to the emitted runtime module", () => {
 		expect(source).toContain('from "./api.runtime.gen.js"')
 		expect(source).not.toContain('from "../ts/sdk.ts"')
 	})

@@ -119,7 +119,7 @@ def coroutine(f: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
 def caller(fields: dict[str, Any], client: str) -> None:
     """A caller httpx2 client: its own user agent and header, basic auth, and redirects on (the
     SDK sends each hop itself, so a hop shows what the client adds)."""
-    headers = {"User-Agent": "honey-driver", "X-Builder": "b"}
+    headers = {"User-Agent": "clients-driver", "X-Builder": "b"}
     auth = ("driver", "pw")
     if client == "sync":
         fields["http_client"] = httpx2.Client(

@@ -75,7 +75,7 @@ const plain = (entry: Partial<JavaError>) => ({
 
 /** The HookException a hook's thrown `IllegalStateException(text)` became (§1 rules). */
 const hookError = (text: string) =>
-	plain({ chain: ["HookException", "HoneyException"], inner: "IllegalStateException", text, type: "HookException" })
+	plain({ chain: ["HookException", "HttpException"], inner: "IllegalStateException", text, type: "HookException" })
 
 /** OnLog entries, as the trace records them. */
 const start = { event: "request_start", level: "debug", operation: OPERATION }

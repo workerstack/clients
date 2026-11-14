@@ -146,15 +146,15 @@ export function bindTools(specs: readonly ToolSpec[], client: SdkClient, binding
 					})
 				const answer = (await send({ signal })) as Answer
 				const { status } = answer.response
-				if (answer.ok) return { ...successOf(spec, answer, scrub), _meta: { "honey/status": status } }
+				if (answer.ok) return { ...successOf(spec, answer, scrub), _meta: { "backend/status": status } }
 				/* an error status's JSON object body speaks for it, any other answer its error */
 				const { body } = answer.error as { body?: unknown }
 				const error = body && typeof body === "object" && !Array.isArray(body) ? body : answer.error
-				return { ...failureOf({ error, status }, scrub), _meta: { "honey/status": status } }
+				return { ...failureOf({ error, status }, scrub), _meta: { "backend/status": status } }
 			} catch (error) {
 				const status = (error as { status?: unknown } | null)?.status
 				return typeof status === "number"
-					? { ...failureOf({ error, status }, scrub), _meta: { "honey/status": status } }
+					? { ...failureOf({ error, status }, scrub), _meta: { "backend/status": status } }
 					: unanswered(error, scrub)
 			}
 		},

@@ -155,7 +155,7 @@ goDescribe("the Go test driver: SSE errors and string data", () => {
 			status: status?.error?.status,
 			streams: [decode?.stream, status?.stream],
 		}).toEqual({
-			decode: expect.stringMatching(/^honey: decode sse event:/),
+			decode: expect.stringMatching(/^httpsdk: decode sse event:/),
 			status: 404,
 			streams: [{ retry: [0], yields: 2 }, { yields: 1 }],
 		})
@@ -163,7 +163,7 @@ goDescribe("the Go test driver: SSE errors and string data", () => {
 		const bare = await served(replies.slice(0, 1), (server) => sdk.runCalls({ calls: [ticks()] }, server))
 		expect({ status: bare.status, stderr: bare.stderr }).toEqual({
 			status: 1,
-			stderr: expect.stringMatching(/honey: decode sse event/),
+			stderr: expect.stringMatching(/httpsdk: decode sse event/),
 		})
 	}, 600_000)
 	it("observes a string stream's data as sent, a path failing before the stream as no events, and asks isErrors", async () => {
@@ -356,7 +356,7 @@ goDescribe("the Go test driver: a stream method failing before any stream", () =
 		expect([forbidden?.error?.status, forbidden?.stream, ok?.error?.text]).toEqual([
 			403,
 			undefined,
-			expect.stringMatching(/^honey: http do:/),
+			expect.stringMatching(/^httpsdk: http do:/),
 		])
 	}, 600_000)
 })

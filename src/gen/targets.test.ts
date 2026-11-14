@@ -40,7 +40,7 @@ describe("targetOptionSchemas (plan 39 8.1)", () => {
 			const options = cliOptions(target)
 			expect([target, Object.keys(options).length > 0]).toEqual([target, true])
 			expect(validated(target, options)).toEqual({ value: options })
-			expect(targetOptionSchemas[target]["~standard"]).toMatchObject({ vendor: "honey-clients", version: 1 })
+			expect(targetOptionSchemas[target]["~standard"]).toMatchObject({ vendor: "clients", version: 1 })
 		}
 		expect(validated("go", {})).toEqual({ value: {} })
 	})

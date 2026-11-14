@@ -31,9 +31,9 @@ export const TOOLS = {
 	rust: "1.99.0",
 } as const
 
-/* The record honey keeps in every package it generates: the package's name and version on each registry. */
-const IDENTITY = ".honey-generated.json"
-/* `field` of the package honey recorded for `registry`, or a failed step when it recorded none. */
+/* The record clients keeps in every package it generates: the package's name and version on each registry. */
+const IDENTITY = ".clients-generated.json"
+/* `field` of the package clients recorded for `registry`, or a failed step when it recorded none. */
 const identity = (registry: string, field: "name" | "version") =>
 	`jq -er '.packages[] | select(.registry == "${registry}") | .${field}' ${IDENTITY}`
 

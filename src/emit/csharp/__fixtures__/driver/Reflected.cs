@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization.Metadata;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>
 /// An SDK stream's <c>IAsyncEnumerable&lt;T&gt;</c> read by reflection, whatever <c>T</c> is (a value type such as

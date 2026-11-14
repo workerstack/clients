@@ -20,7 +20,7 @@ const DOTNET = withDotnet()
 
 const DOCUMENT = { info: { title: "Shop", version: "1" }, openapi: "3.1.0", paths: {} }
 
-const csproj = (options: CSharpSdkOptions = {}) => generateCSharpSdk(DOCUMENT, options).files["HoneySdk.csproj"] ?? ""
+const csproj = (options: CSharpSdkOptions = {}) => generateCSharpSdk(DOCUMENT, options).files["HttpSdk.csproj"] ?? ""
 
 /** The metadata elements `text` holds, in the manifest's order. */
 const elements = (text: string) =>
@@ -119,7 +119,7 @@ describe.skipIf(!DOTNET)("dotnet pack on the pinned SDK, offline", () => {
 		const packed = runDotnet(
 			[
 				"pack",
-				"src/HoneySdk.csproj",
+				"src/HttpSdk.csproj",
 				"-c",
 				"Release",
 				"--no-build",
@@ -161,7 +161,7 @@ describe.skipIf(!DOTNET)("dotnet pack on the pinned SDK, offline", () => {
 			repository: METADATA.repository,
 			shipped: ["README.md", "icon.png", [["LICENSE", "README.md", "icon.png"]]],
 			status: 0,
-			symbols: ["HoneySdk.0.1.0.snupkg"],
+			symbols: ["HttpSdk.0.1.0.snupkg"],
 			tags: "shop api c# $(NoWarn)",
 		})
 	})

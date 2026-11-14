@@ -1,7 +1,7 @@
 /**
  * The Python SDK's errors (contract 29 §5.7, G6/G7, Fc2–Fc4): an error status raises its `APIStatusError` subclass
  * (`HTTP <status>: <message>`, the message sanitized and cut at 512 characters), every other failure its own
- * `HoneyError`; each API's functional `ErrorKey` StrEnum (§3.4) and `<Key>Data`, read through `e.key` and
+ * `HttpError`; each API's functional `ErrorKey` StrEnum (§3.4) and `<Key>Data`, read through `e.key` and
  * `e.decode_body`; `ErrorEnvelope`, a TypedDict view of the body (contract 34 Fd8 step 2). Driven through the
  * `errors` driver on `AsyncSDK` and `SDK` with one expectation (G17); consumers `caught` and `errors` and one mypy
  * program. Safe mode is errors.safe.test.ts.
@@ -39,7 +39,7 @@ const KEYS: readonly (readonly [member: string, wire: string])[] = [
 	["USER_NOT_FOUND", "user_not_found"],
 ]
 
-/** §3.4's ErrorKey for KEYS, exactly as `types.py` ends (honey-a8: its own trailing block; `<Key>Data` is not in it). */
+/** §3.4's ErrorKey for KEYS, exactly as `types.py` ends (clients-a8: its own trailing block; `<Key>Data` is not in it). */
 const ERROR_KEY = `# The error keys the API declares: APIStatusError.key is one of these, else the server's string.
 # item.locked: its body decodes into ItemLockedData (APIStatusError.decode_body).
 # order.locked: its body decodes into Lock (APIStatusError.decode_body).
@@ -55,7 +55,7 @@ const CLASSES = ["E404", "Item", "Lock", "User", "E404FieldsValueItem", "ItemLoc
 
 describe("the ErrorKey StrEnum each API declares (G6/G7, Fc3, §3.4)", () => {
 	const files = generatePythonSdk(errors()).files
-	const types = files["src/honey_sdk/types.py"] ?? ""
+	const types = files["src/http_sdk/types.py"] ?? ""
 
 	it("ends types.py with the functional ErrorKey over every declared key, colliding names numbered, after every class", () => {
 		/* Fc3: the class form trips ruff's S105 on INVALID_PASSWORD, and emitted code takes no noqa */
@@ -63,7 +63,7 @@ describe("the ErrorKey StrEnum each API declares (G6/G7, Fc3, §3.4)", () => {
 	})
 
 	it("declares ItemLockedData among the hoisted declarations in code-unit order, not after ErrorKey", () => {
-		/* honey-a8 on §2 vs §3.4: one ordering rule for every declaration; a key's body type is a hoisted one */
+		/* clients-a8 on §2 vs §3.4: one ordering rule for every declaration; a key's body type is a hoisted one */
 		const classes = [...types.matchAll(/^class (\w+)\(TypedDict\):$/gm)].map((m) => m[1])
 		const data = types.includes(
 			"\n\n\nclass ItemLockedData(TypedDict):\n    until: NotRequired[str]\n\n\nclass UsersCreateBody(",
@@ -72,8 +72,8 @@ describe("the ErrorKey StrEnum each API declares (G6/G7, Fc3, §3.4)", () => {
 	})
 
 	it("imports StrEnum before typing, hands ErrorKey to the transport, exports it, and names no envelope or ref Data", () => {
-		const client = files["src/honey_sdk/client.py"] ?? ""
-		const init = files["src/honey_sdk/__init__.py"] ?? ""
+		const client = files["src/http_sdk/client.py"] ?? ""
+		const init = files["src/http_sdk/__init__.py"] ?? ""
 		expect({
 			defaults: client.split("\n").find((line) => line.startsWith("_DEFAULTS = ")),
 			exported: ["ErrorKey", "ItemLockedData"].map((name) => init.includes(`"${name}",`)),
@@ -89,10 +89,10 @@ describe("the ErrorKey StrEnum each API declares (G6/G7, Fc3, §3.4)", () => {
 
 	it("emits no ErrorKey, no StrEnum import and no fourth Defaults argument for an API without keys (http)", () => {
 		const http = generatePythonSdk(pythonHttp()).files
-		const client = http["src/honey_sdk/client.py"] ?? ""
+		const client = http["src/http_sdk/client.py"] ?? ""
 		expect({
 			defaults: client.split("\n").find((line) => line.startsWith("_DEFAULTS = ")),
-			keyed: [http["src/honey_sdk/types.py"] ?? "", client, http["src/honey_sdk/__init__.py"] ?? ""].map((text) =>
+			keyed: [http["src/http_sdk/types.py"] ?? "", client, http["src/http_sdk/__init__.py"] ?? ""].map((text) =>
 				/\bErrorKey\b|\bStrEnum\b/.test(text),
 			),
 		}).toEqual({ defaults: '_DEFAULTS = Defaults(None, "Authorization", "Bearer ")', keyed: [false, false, false] })
@@ -130,7 +130,7 @@ const errorsOf = (run: Run) => (run.trace?.calls ?? []).map((call) => call.error
 const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(String), via: "return", ...entry })
 /** The chain of an `APIStatusError` subclass `type` (or of `APIStatusError` itself). */
 const statusChain = (type: string) =>
-	type === "APIStatusError" ? ["APIStatusError", "HoneyError"] : [type, "APIStatusError", "HoneyError"]
+	type === "APIStatusError" ? ["APIStatusError", "HttpError"] : [type, "APIStatusError", "HttpError"]
 /** An error status with no key whose message is `message`, as the trace records it. */
 const unkeyed = (status: number, type: string, message = "m") =>
 	plain({
@@ -232,7 +232,7 @@ describe.skipIf(!PY)("a hostile error body in the error's message and text", SLO
 	)
 })
 
-describe.skipIf(!PY)("each way a call fails, one HoneyError class each: a status only with an answer", SLOW, () => {
+describe.skipIf(!PY)("each way a call fails, one HttpError class each: a status only with an answer", SLOW, () => {
 	it.each(CLIENTS)(
 		"%s: ends an error status as its subclass, an undecodable 2xx as DecodeError, a bad path param as PathParamError, a refused connection as APIConnectionError",
 		async (client) => {
@@ -259,9 +259,9 @@ describe.skipIf(!PY)("each way a call fails, one HoneyError class each: a status
 				],
 				shapes: [
 					[statusChain("NotFoundError"), 404, null],
-					[["DecodeError", "HoneyError"], undefined, null],
-					[["PathParamError", "HoneyError"], undefined, null],
-					[["APIConnectionError", "HoneyError"], undefined, "ConnectError"],
+					[["DecodeError", "HttpError"], undefined, null],
+					[["PathParamError", "HttpError"], undefined, null],
+					[["APIConnectionError", "HttpError"], undefined, "ConnectError"],
 				],
 				texts: ["HTTP 200: the body is not JSON", "path parameter 'id' is missing, empty, '.' or '..'", true],
 			})
@@ -278,11 +278,11 @@ describe.skipIf(!PY)("each way a call fails, one HoneyError class each: a status
 				errors: [
 					plain({
 						cause: "ReadTimeout",
-						chain: ["APITimeoutError", "APIConnectionError", "HoneyError"],
+						chain: ["APITimeoutError", "APIConnectionError", "HttpError"],
 						text: "the call ran past its timeout",
 						type: "APITimeoutError",
 					}),
-					plain({ chain: ["CanceledError", "HoneyError"], text: "the call was canceled", type: "CanceledError" }),
+					plain({ chain: ["CanceledError", "HttpError"], text: "the call was canceled", type: "CanceledError" }),
 				],
 				hops: 1,
 				observed: [{ kind: "timeout" }, null],
@@ -414,7 +414,7 @@ describe.skipIf(!PY)("APIStatusError, ErrorKey and ErrorEnvelope from a consumer
 
 /** A program mypy checks against `errors`: ErrorKey's type, decode_body's, and what is not emitted. */
 const TYPES = [
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"",
 	"",
 	"def read(e: sdk.APIStatusError) -> None:",

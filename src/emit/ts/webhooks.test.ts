@@ -11,7 +11,7 @@ import { generateSdk } from "./sdk.ts"
 /** A Standard Webhooks event `type` as core documents it: the marker and the `{ type, timestamp, data }` envelope. */
 const event = (type: string, data: Record<string, unknown>) => ({
 	post: {
-		"x-honey-webhook": "standard-webhooks",
+		"x-backend-webhook": "standard-webhooks",
 		requestBody: {
 			content: {
 				"application/json": {

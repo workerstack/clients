@@ -265,7 +265,7 @@ impl ScriptConfig {
         }
         if self.http_client {
             let builder = reqwest::Client::builder()
-                .user_agent("honey-driver")
+                .user_agent("clients-driver")
                 .redirect(reqwest::redirect::Policy::limited(10));
             config.http_builder = Some(builder);
         }

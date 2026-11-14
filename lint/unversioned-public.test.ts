@@ -1,12 +1,12 @@
 /**
- * honey/unversioned-public (plan 39 6.8): no name a package's `exports` reach carries a version suffix, and no export
+ * clients/unversioned-public (plan 39 6.8): no name a package's `exports` reach carries a version suffix, and no export
  * renames a value to one. Through real oxlint, because the rule reads the rest of the package from disk.
  */
 import { describe, expect, it } from "vitest"
 import { oxlintReports } from "./rule-harness.ts"
 import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 
-const MANIFEST = JSON.stringify({ exports: { ".": { "honey-source": "./src/index.ts" } } })
+const MANIFEST = JSON.stringify({ exports: { ".": { "clients-source": "./src/index.ts" } } })
 
 const versioned = (name: string, bare: string) =>
 	`\`${name}\` is public through "." and its name carries a version: drop the version: call it \`${bare}\`; a format's version is data, not a name`
@@ -15,7 +15,7 @@ function reports(files: Record<string, string>) {
 	return oxlintReports("unversioned-public", { "package.json": MANIFEST, ...files })
 }
 
-describe("honey/unversioned-public", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/unversioned-public", { timeout: SPAWN_TIMEOUT }, () => {
 	it("reports a public declaration and the type it reaches, each where it is declared", () => {
 		expect(
 			reports({

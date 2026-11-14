@@ -6,7 +6,7 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 const rule = plugin.rules["content-type-exact-essence"]
 const MESSAGE = "compare a media type by its parsed essence, never by prefix (H18.2)"
 
-describe("honey/content-type-exact-essence", () => {
+describe("clients/content-type-exact-essence", () => {
 	it("rejects a prefix test against a media-type literal", () => {
 		const fixture = {
 			"src/a.ts": 'export const f = (ct: string) => ct.startsWith("application/json")\n',
@@ -46,7 +46,7 @@ describe("honey/content-type-exact-essence", () => {
 		expect(reportsOf(rule, fixture)).toEqual([])
 	})
 
-	it("fails oxlint through the honey plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
+	it("fails oxlint through the clients plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
 		const fixture = {
 			"src/a.ts": 'export const f = (ct: string) => ct.startsWith("application/json")\n',
 			"src/b.ts": 'export const f = (ct: string) => ct === "application/json"\n',

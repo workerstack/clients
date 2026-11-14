@@ -257,7 +257,7 @@ describe("valueCycleSchemas: what needs a pointer", () => {
 
 type Schema = Record<string, unknown>
 
-/** honey's error envelope for `status` and `keys`, its field list behind a ref. */
+/** backend's error envelope for `status` and `keys`, its field list behind a ref. */
 describe("sdkModel: path parameters", () => {
 	// v0: c80635e96d
 	it("lists a path's parameters in the order the path names them", () => {
@@ -299,7 +299,7 @@ function withFields(object: IRSchema, properties: Record<string, unknown>): IRSc
 	return { ...object, fields: [...object.fields.filter((f) => !Object.hasOwn(properties, f.name)), ...replaced] }
 }
 
-describe("irErrorEnvelope: honey's error body, read through refs", () => {
+describe("irErrorEnvelope: backend's error body, read through refs", () => {
 	// v0: 658fb508a5
 	// v0: 2f4c85dc90
 	// v0: a6591bd427
@@ -314,7 +314,7 @@ describe("irErrorEnvelope: honey's error body, read through refs", () => {
 	// v0: 15559804d0
 	// v0: 341a572e8b
 	// v0: 4d0e00cc24
-	it("reads honey's error envelope through refs, and nothing else as one", () => {
+	it("reads backend's error envelope through refs, and nothing else as one", () => {
 		const fieldList = schemaToIR({
 			properties: { error_key: { type: "string" }, message: { type: "string" }, path: { type: "string" } },
 		})

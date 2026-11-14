@@ -2,7 +2,7 @@
  * The F2 cross-check against the real compilers: a seeded batch of literals (and comments) goes
  * into one program per language, which prints each string's UTF-8 bytes; they must equal the bytes
  * of the text as written. This lifts the fuzz's spec-derived readers to compiler-verified. Runs
- * where the toolchains are; `HONEY_REQUIRE_TOOLCHAINS=1` (CI's test and harness jobs) makes a missing one fail.
+ * where the toolchains are; `CLIENTS_REQUIRE_TOOLCHAINS=1` (CI's test and harness jobs) makes a missing one fail.
  */
 import { type SpawnSyncReturns, spawnSync } from "node:child_process"
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
@@ -191,7 +191,7 @@ const SKIPPED = (name: string) => !PRESENT.has(name) && !(LANGUAGES[name] as Lan
 
 /** The hex of each string `language`'s compiler made of the literals of `texts`. */
 function compiled(language: Language, texts: readonly string[]): string[] {
-	const dir = mkdtempSync(join(language.home(), "honey-f2-"))
+	const dir = mkdtempSync(join(language.home(), "clients-f2-"))
 	try {
 		const path = join(dir, language.file)
 		writeFileSync(path, language.source(texts))
@@ -253,7 +253,7 @@ function javaSource(texts: readonly string[]): string {
 
 /** The hex of each string the pinned javac and java made of the literals of `texts`, one per line of output. */
 function compiledJava(texts: readonly string[]): string[] {
-	const dir = mkdtempSync(join(javaCacheDir("tmp"), "honey-f2-"))
+	const dir = mkdtempSync(join(javaCacheDir("tmp"), "clients-f2-"))
 	try {
 		writeFileSync(join(dir, "Program.java"), javaSource(texts))
 		const built = runJavac(21, ["-encoding", "UTF-8", "-Xlint:all", "-Werror", "-d", dir, "Program.java"], { cwd: dir })

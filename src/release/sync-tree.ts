@@ -50,7 +50,7 @@ export async function replaceTreeWithSource(args: {
 }
 
 async function runRsync(src: string, dst: string, excludes: string[]): Promise<void> {
-	/* honey's manifest is the source repo's record of what it generated, not part of the package */
+	/* clients' manifest is the source repo's record of what it generated, not part of the package */
 	const args = ["-a", "--delete", "--exclude=.git", `--exclude=${MANIFEST}`]
 	for (const glob of excludes) {
 		args.push(`--exclude=${glob}`)
