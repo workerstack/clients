@@ -31,7 +31,7 @@ app.serve({ port: 3000 })
 ```
 
 ```ts
-import { honey } from "@workerstack/backend"
+import { honey } from "@workerstack/backend/http"
 
 export const app = honey()
 app.get("/health").handler((ctx) => ctx.res.text("ok", "up"))

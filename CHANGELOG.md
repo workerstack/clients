@@ -12,6 +12,7 @@ All notable changes to [`@workerstack/clients`](https://www.npmjs.com/package/@w
 
 ### Changed
 
+- **Generated code imports the backend by surface.** `@workerstack/backend` 1.0.0-rc.26 has no root entry, so the generated `types.gen.d.ts`, route trees and the IR loader import `@workerstack/backend/http` and `/http/openapi`. Upgrade both packages together and rerun `honey-clients generate`; [the backend's migration guide](https://github.com/workerstack/backend/blob/main/docs/migrating-from-honey.md) maps every moved import.
 - **The package has its own repository.** `@workerstack/clients` now ships from [github.com/workerstack/clients](https://github.com/workerstack/clients), with its full history. The move itself changed nothing in the package: 1.0.0-rc.24 has rc.23's `honey-clients` command, exports and generated code. It depends on `@workerstack/backend` only for its tests, and an app keeps both as before.
 
 ### Fixed

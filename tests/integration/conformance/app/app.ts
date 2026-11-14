@@ -9,15 +9,15 @@
  * middleware records each non-internal request in arrival order; `mark` and `wire?since=` read it.
  */
 import * as z from "zod"
-import { defineErrors } from "@workerstack/backend"
-import { createErrorTranslator } from "@workerstack/backend/i18n"
-import type { MiddlewareFn, WSAdapter } from "@workerstack/backend"
+import { defineErrors } from "@workerstack/backend/http"
+import { createErrorTranslator } from "@workerstack/backend/http/i18n"
+import type { MiddlewareFn, WSAdapter } from "@workerstack/backend/http"
 
 /** The `next` a middleware is handed, read off the exported middleware type. */
 type NextFn = Parameters<MiddlewareFn>[1]
-import { requestId } from "@workerstack/backend/request-id"
-import { serveOpenApi } from "@workerstack/backend/openapi"
-import { honey } from "@workerstack/backend"
+import { requestId } from "@workerstack/backend/http/request-id"
+import { serveOpenApi } from "@workerstack/backend/http/openapi"
+import { honey } from "@workerstack/backend/http"
 import { sha256 } from "./digest.ts"
 import { createReferenceServer } from "./reference-server.ts"
 import { realtimeRoutes } from "./app-realtime.ts"

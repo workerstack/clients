@@ -32,7 +32,7 @@ const BIN = resolve(import.meta.dirname, "../bin/honey-clients.js")
 const REPO = resolve(import.meta.dirname, "..")
 const PINNED_BUN = withPinnedBun()
 const MARK = markOf()
-const HONEY = 'import { honey } from "@workerstack/backend"\n'
+const HONEY = 'import { honey } from "@workerstack/backend/http"\n'
 
 const projects: (() => void)[] = []
 afterEach(() => {

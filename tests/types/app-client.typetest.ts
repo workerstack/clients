@@ -10,10 +10,10 @@ import type { createClient } from "../../src/runtime/ts/app.ts"
 import type { ErrorsFor, OutputDefFor } from "../../src/runtime/ts/app-types.ts"
 import type { Result } from "../../src/runtime/ts/response.ts"
 import type { SSEEvent } from "../../src/runtime/ts/sse.ts"
-import { defineErrors } from "@workerstack/backend"
-import { streamed } from "@workerstack/backend/input"
-import { honey } from "@workerstack/backend"
-import type { InferRoutes } from "@workerstack/backend"
+import { defineErrors } from "@workerstack/backend/http"
+import { streamed } from "@workerstack/backend/http/input"
+import { honey } from "@workerstack/backend/http"
+import type { InferRoutes } from "@workerstack/backend/http"
 
 const user = z.object({ email: z.string(), id: z.string(), name: z.string() })
 const row = z.object({ id: z.string(), name: z.string() })

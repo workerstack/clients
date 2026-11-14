@@ -10,7 +10,7 @@ import { resolve } from "node:path"
 import type { TsMorph } from "../../../extract/walk.ts"
 
 /** Every consumer starts with: the honey names, the always-emitted types, and the assertion helpers. */
-const PRELUDE = `import type { HoneyContext, HoneyError } from "@workerstack/backend"
+const PRELUDE = `import type { HoneyContext, HoneyError } from "@workerstack/backend/http"
 import type { BaseCtx, RouteCtx, RouteErrors, RouteErrorShapes, RouteErrorsByStatus, RouteInput, RouteMeta, RouteOutput, Routes } from "./types.gen"
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type IsAny<T> = 0 extends 1 & T ? true : false

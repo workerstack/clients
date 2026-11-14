@@ -4,7 +4,7 @@
  * which is what the TS harness's onAuthExpired cases retry against.
  */
 import * as z from "zod"
-import { createMiddleware } from "@workerstack/backend"
+import { createMiddleware } from "@workerstack/backend/http"
 import type { ConformanceApp, errors } from "./app.ts"
 import { sha256 } from "./digest.ts"
 

@@ -4,8 +4,8 @@
  * answered by a real app (`ctx.res.json(key, …)`), and the status the app sends is the code gen pairs it with. A
  * status that carries no body (204, 205, 304) refuses the JSON answer, naming its code, and that code is the one read.
  */
-import { honey, type StatusKey } from "@workerstack/backend"
-import { testClient } from "@workerstack/backend/testing"
+import { honey, type StatusKey } from "@workerstack/backend/http"
+import { testClient } from "@workerstack/backend/http/testing"
 import { describe, expect, it } from "vitest"
 import { STATUS_KEYS } from "../../src/emit/shared/status-keys.ts"
 

@@ -261,7 +261,7 @@ describe("gen adversarial: an adversarial app compiles under strict", () => {
 			{ method: "GET", pattern: "/then" },
 		])
 		const { files } = generateSdk(app.document, { name: "AdvSDK", stem: "adv" })
-		const consumer = `import type { RouteSelectorOf } from "@workerstack/backend"
+		const consumer = `import type { RouteSelectorOf } from "@workerstack/backend/http"
 import type { RouteSelector } from "./types.gen"
 import { AdvSDK } from "./adv.index.gen.ts"
 expectType<Equal<RouteSelectorOf, RouteSelector>>()

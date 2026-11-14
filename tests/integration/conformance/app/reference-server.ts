@@ -14,9 +14,9 @@
  * replays the whole log (not a whole number) or nothing (past the head).
  */
 import * as z from "zod"
-import { honey } from "@workerstack/backend"
-import type { SSEStream } from "@workerstack/backend"
-import type { WSContext } from "@workerstack/backend"
+import { honey } from "@workerstack/backend/http"
+import type { SSEStream } from "@workerstack/backend/http"
+import type { WSContext } from "@workerstack/backend/http"
 import { ws } from "@workerstack/backend/ws"
 
 export type ReferenceEvent = { readonly data: unknown; readonly id: number }

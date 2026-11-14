@@ -18,7 +18,7 @@
         "@total-typescript/ts-reset": "0.6.1",
         "@types/node": "26.1.1",
         "@vitest/coverage-v8": "4.1.10",
-        "@workerstack/backend": "1.0.0-rc.24",
+        "@workerstack/backend": "file:vendor/workerstack-backend-1.0.0-rc.26.tgz",
         "@workerstack/system": "0.3.0",
         "ajv": "8.20.0",
         "ajv-formats": "3.0.1",
@@ -523,7 +523,7 @@
 
     "@vitest/utils": ["@vitest/utils@4.1.10", "", { "dependencies": { "@vitest/pretty-format": "4.1.10", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA=="],
 
-    "@workerstack/backend": ["@workerstack/backend@1.0.0-rc.24", "", { "dependencies": { "jiti": "2.7.0" }, "peerDependencies": { "@workerstack/clients": ">=1.0.0-0", "ws": ">=8.21.0" }, "optionalPeers": ["@workerstack/clients", "ws"], "bin": { "honey": "bin/honey.js" } }, "sha512-cvktjhHVLHrCuZWQIlWcqpAcWQtCw7QUgMWb3gkXSklcOq0jKEdvx6fap8lwJB+FJPdGY22IrtLX4B2GZYDh8Q=="],
+    "@workerstack/backend": ["@workerstack/backend@vendor/workerstack-backend-1.0.0-rc.26.tgz", { "dependencies": { "jiti": "2.7.0" }, "peerDependencies": { "@workerstack/clients": ">=1.0.0-0" }, "optionalPeers": ["@workerstack/clients"], "bin": { "honey": "bin/honey.js" } }, "sha512-KSKxKAZp8s8hZJ0hSqFt3W0B+DITsa19lXna6RqyaoL6JZ3vx0pU2ARg3Ro3pFW1RYm7rVqwu/N0yVv9cP8zzA=="],
 
     "@workerstack/system": ["@workerstack/system@0.3.0", "", { "bin": { "system": "src/bin.ts" } }, "sha512-uE3CDD8ZVLcZsGcOrUl49GoH64BZcd/nTD+Cz0nrADTvQKE3VNEiZlMSfo4ESGAnXh69HNKrIoLuf9hInznPAQ=="],
 
