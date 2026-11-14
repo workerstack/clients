@@ -63,7 +63,7 @@ const plain = (entry: Partial<JavaError>) => ({
 /** The SDK's refusal of the restricted header `name`: a ConfigException naming it, never the JDK's. */
 const refused = (name: string) =>
 	plain({
-		chain: ["ConfigException", "HoneyException"],
+		chain: ["ConfigException", "HttpException"],
 		text: `the ${name} header is restricted and cannot be sent`,
 		type: "ConfigException",
 	})
@@ -93,7 +93,7 @@ describe.skipIf(!JAVA)("a request hook's header: one value per name, whatever it
 		const { hops, run } = await drive([], [ECHO], {}, setHeader("X-Bad", "a\r\nb"))
 		expect({ error: run.trace?.calls[0]?.error, hops: hops.length, observed: run.observed }, run.stderr).toEqual({
 			error: plain({
-				chain: ["ConfigException", "HoneyException"],
+				chain: ["ConfigException", "HttpException"],
 				text: "the X-Bad header's value cannot be sent",
 				type: "ConfigException",
 			}),
@@ -111,7 +111,7 @@ describe.skipIf(!JAVA)("a request hook's header: one value per name, whatever it
 			expect(JSON.stringify(run.trace?.calls[0]?.error)).not.toContain(JSON.stringify(value).slice(1, -1))
 			expect({ error: run.trace?.calls[0]?.error, hops: hops.length, observed: run.observed }, run.stderr).toEqual({
 				error: plain({
-					chain: ["ConfigException", "HoneyException"],
+					chain: ["ConfigException", "HttpException"],
 					text: "the X-Bad header cannot be sent",
 					type: "ConfigException",
 				}),
@@ -128,7 +128,7 @@ describe.skipIf(!JAVA)("a header name the JDK refuses: the SDK's ConfigException
 		const { hops, run } = await drive([], [{ ...ECHO, headers: { "bad name": "x" } }], {}, {})
 		expect({ error: run.trace?.calls[0]?.error, hops: hops.length, observed: run.observed }, run.stderr).toEqual({
 			error: plain({
-				chain: ["ConfigException", "HoneyException"],
+				chain: ["ConfigException", "HttpException"],
 				text: "the bad name header cannot be sent",
 				type: "ConfigException",
 			}),

@@ -10,7 +10,7 @@ import { dirname, join } from "node:path"
 
 /** A fresh directory under the toolchain cache. */
 export const scratchDir = (name: string): string => {
-	const root = join(process.env.HOME ?? "", ".cache/honey-tmp/gen-mcp")
+	const root = join(process.env.HOME ?? "", ".cache/backend-tmp/gen-mcp")
 	mkdirSync(root, { recursive: true })
 	return mkdtempSync(join(root, `${name}-`))
 }
@@ -175,4 +175,8 @@ export const request = (id: number, method: string, params?: object) => ({
 
 /** The initialize request for `protocolVersion`. */
 export const initialize = (protocolVersion: string) =>
-	request(0, "initialize", { capabilities: {}, clientInfo: { name: "honey-test", version: "1.0.0" }, protocolVersion })
+	request(0, "initialize", {
+		capabilities: {},
+		clientInfo: { name: "clients-test", version: "1.0.0" },
+		protocolVersion,
+	})

@@ -1,6 +1,6 @@
 /**
  * Emitted Python, gated (contract 28 §6.2, Fb8): a registry package (`FIXTURES`, Fb14) lands under
- * `$HOME/.cache/honey-tmp/python/sdk/<content hash>/` and is byte-compiled and imported under the pinned
+ * `$HOME/.cache/backend-tmp/python/sdk/<content hash>/` and is byte-compiled and imported under the pinned
  * interpreter (or PY_FLOOR), in a venv holding its manifest's dependencies at the pinned (or floor) constraints,
  * or at the newest set they resolve to online (the harness alone, Fe4), once per content hash. Its `.complete`
  * marker holds the gate's outcome, and a gate that finds it reads it, touches it for CI's prune and spawns

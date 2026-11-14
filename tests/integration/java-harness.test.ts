@@ -100,7 +100,7 @@ const UNAUTHORIZED: Observed = {
 /** An `ApiException` subclass the method threw, as the Java trace records it (`ApiException`'s `HTTP <status>: …`). */
 const statusError = (type: string, status: number, key: string, message: string): JavaError => ({
 	canceled: false,
-	chain: [type, "ApiException", "SdkException", "HoneyException"],
+	chain: [type, "ApiException", "SdkException", "HttpException"],
 	display: expect.stringMatching(new RegExp(`${type}: HTTP ${status}: ${message}$`)) as unknown as string,
 	inner: null,
 	key,
@@ -123,9 +123,9 @@ const CANCELED = expect.objectContaining({
 /** Each hop's value of the header `name` (lower case), `undefined` where it is absent. */
 const headerOf = (hops: readonly WireHop[], name: string) => hops.map((h) => h.headers[name])
 
-/** A multipart content type's boundary when it is `honey-<uuid>`, else null. */
+/** A multipart content type's boundary when it is `clients-<uuid>`, else null. */
 const boundaryOf = (type: string | undefined) =>
-	/^multipart\/form-data; boundary=(honey-[0-9a-f-]{36})$/.exec(type ?? "")?.[1] ?? null
+	/^multipart\/form-data; boundary=(clients-[0-9a-f-]{36})$/.exec(type ?? "")?.[1] ?? null
 
 /** A consumer program on the served client at the app's URL running `body`, each `note(…)` one output line. */
 const consumer = (url: string, body: string) => `package probe;
@@ -240,7 +240,7 @@ javaDescribe("onAuthExpired", () => {
 		])
 		const boundaries = hops.map((h) => boundaryOf(h.headers["content-type"]))
 		expect([boundaries[0], boundaries[1], hops[1]?.body.sha256]).toEqual([
-			expect.stringMatching(/^honey-/),
+			expect.stringMatching(/^clients-/),
 			boundaries[0],
 			hops[0]?.body.sha256,
 		])

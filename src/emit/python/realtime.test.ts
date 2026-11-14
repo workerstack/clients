@@ -102,7 +102,7 @@ const consumed = (name: string, replies: readonly Reply[], body: string) =>
 
 /** Each method's await typed by its event schema, a declared resume param folded into the stream fields. */
 const SURFACE = `from typing import Any
-import honey_sdk as sdk
+import http_sdk as sdk
 async def main(a: sdk.AsyncSDK) -> None:
     rc: sdk.ResumableConnection[sdk.Payload] = await a.feed.live(channel="c")
     first: sdk.Payload | None = await rc.recv()
@@ -465,7 +465,7 @@ describe("the emitted realtime surface: the stream fields reserved, the event's 
 	it("claims a declared max_reconnect_attempts or reconnect_delay_ms as …2, and pins a typed event's kind", () => {
 		/* Rust and Go claim `…2`; HEAD emitted the name twice, a duplicate argument (a SyntaxError). Fd5: the
 		 * typed event's JSON kind rides its Operation, an untyped one's none */
-		const client = generatePythonSdk(FIXTURES.realtime.document()).files["src/honey_sdk/client.py"] ?? ""
+		const client = generatePythonSdk(FIXTURES.realtime.document()).files["src/http_sdk/client.py"] ?? ""
 		const flat = client.replace(/\s+/g, "").replaceAll(",)", ")")
 		const claimed = { max_reconnect_attempts: "max_reconnect_attempts2", reconnect_delay_ms: "reconnect_delay_ms2" }
 		const typed = 'Operation[Payload]=Operation("GET","/feed",answer="none",shape="object",stream="realtime")'

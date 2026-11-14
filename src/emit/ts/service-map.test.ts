@@ -46,7 +46,7 @@ describe("serviceMapOf: what an entry carries, each only when set", () => {
 					"/files/{path}": {
 						get: {
 							operationId: "files.get",
-							parameters: [{ in: "path", name: "path", required: true, schema: STRING, "x-honey-wildcard": true }],
+							parameters: [{ in: "path", name: "path", required: true, schema: STRING, "x-backend-wildcard": true }],
 							responses: { 200: json() },
 						},
 					},

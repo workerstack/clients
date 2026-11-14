@@ -28,11 +28,11 @@ type Parsing = { -readonly [K in keyof Generate]: Generate[K] } & {
 
 /** The usage text, the options listed by target. */
 export function usage(): string {
-	return `usage: honey-clients generate (--spec <openapi.json> | --app <module>[#export]) --target <name>... --out <dir>
+	return `usage: clients generate (--spec <openapi.json> | --app <module>[#export]) --target <name>... --out <dir>
        [--watch] [options]
 
   --spec <file>     the OpenAPI document (JSON) to generate from
-  --app <module>    a honey app module instead: its export (#name, else app, else default) is the app, and its
+  --app <module>    a backend app module instead: its export (#name, else app, else default) is the app, and its
                     openApi export, if any, the document's options (core's generateOpenApi); the module
                     exports the app and serves nothing: one that calls serve() as it loads is outside --app
   --target <name>   ${TARGETS.join(", ")}; repeat for more than one
@@ -53,7 +53,7 @@ ${Object.entries(TARGET_OPTIONS)
 	.map(([target, options]) => `  ${target}: ${options.map((key) => `--${target}-${kebab(key)}`).join(" ")}`)
 	.join("\n")}
 
-Each <out>/<target> keeps .honey-generated.json: the package it makes on each registry (registry, name, version),
+Each <out>/<target> keeps .clients-generated.json: the package it makes on each registry (registry, name, version),
 and every file it wrote with its sha256. A regeneration deletes a file the last run wrote and this one does not,
 unless it was edited since: that one is kept and named on stderr.
 Nothing outside <out>/<target> is written or deleted, and no symlink is followed.

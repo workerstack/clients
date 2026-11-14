@@ -42,7 +42,7 @@ export const DOCUMENT = {
 					},
 				},
 				responses: { 200: { description: "ok" } },
-				"x-honey-webhook": "standard-webhooks",
+				"x-backend-webhook": "standard-webhooks",
 			},
 		},
 	},

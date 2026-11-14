@@ -1,7 +1,7 @@
 /**
  * The Java SDK's errors (bit 16, C4): an error status throws its per-status `ApiException` subclass, its message
  * `HTTP <status>: <detail>` with no reason phrase (R3), the detail stripped of control and format characters and cut
- * at 512 code points; every other failure its own `HoneyException`. Each API's `ErrorKey`, a class of string
+ * at 512 code points; every other failure its own `HttpException`. Each API's `ErrorKey`, a class of string
  * constants, and its `<Key>Data` for an inline key schema; the envelope in the trace, and `decodeBody(Class)` through
  * one compiled consumer program, since the trace holds no decoded value. Driven through the Java driver on `errors`
  * (`drivenJavaSdk`), observed as `JavaError`. Safe mode is errors.safe.test.ts. Ported from C#'s errors.test.ts.
@@ -80,7 +80,7 @@ const NAMES = {
 			get: {
 				operationId: "x.get",
 				responses: { 204: { description: "done" } },
-				"x-honey-errors": Object.fromEntries(
+				"x-backend-errors": Object.fromEntries(
 					["NotFound", "equals", "error_key", "not-found", "not_found"].map((key) => [key, { status: 409 }]),
 				),
 			},
@@ -144,7 +144,7 @@ const plain = (entry: Partial<JavaError>) => ({
 	via: "return",
 	...entry,
 })
-const statusChain = (type: string) => [type, "ApiException", "SdkException", "HoneyException"]
+const statusChain = (type: string) => [type, "ApiException", "SdkException", "HttpException"]
 /** An error status with no key whose detail is `message`, as the trace records it. */
 const unkeyed = (status: number, type: string, message = "m") =>
 	plain({
@@ -243,7 +243,7 @@ describe.skipIf(!JAVA)("a hostile error body in the detail and the message", SLO
 })
 
 describe.skipIf(!JAVA)(
-	"each way a call fails, one HoneyException class each: a status only with an answer",
+	"each way a call fails, one HttpException class each: a status only with an answer",
 	SLOW,
 	() => {
 		// ported: csharp errors.test.ts:238
@@ -270,9 +270,9 @@ describe.skipIf(!JAVA)(
 				path: 'path param id: ".." is not a path segment',
 				shapes: [
 					[statusChain("NotFoundException"), 404, null],
-					[["DecodeException", "SdkException", "HoneyException"], undefined, "UnexpectedEndOfInputException"],
-					[["PathParamException", "HoneyException"], undefined, null],
-					[["ApiConnectionException", "HoneyException"], undefined, "ConnectException"],
+					[["DecodeException", "SdkException", "HttpException"], undefined, "UnexpectedEndOfInputException"],
+					[["PathParamException", "HttpException"], undefined, null],
+					[["ApiConnectionException", "HttpException"], undefined, "ConnectException"],
 				],
 			})
 		})
@@ -295,7 +295,7 @@ describe.skipIf(!JAVA)(
 			})
 			expect(timeout).toEqual(
 				plain({
-					chain: ["ApiTimeoutException", "HoneyException"],
+					chain: ["ApiTimeoutException", "HttpException"],
 					inner: expect.stringMatching(/^(TimeoutException|CompletionException|CancellationException)$/),
 					text: "GET /items/{id} timed out after 300 ms",
 					type: "ApiTimeoutException",

@@ -77,7 +77,7 @@ function errOf(result: Result) {
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
 	Response.json(body, { headers, status })
 
-/** honey's error envelope for `status`, `key` and `fields`. */
+/** backend's error envelope for `status`, `key` and `fields`. */
 function envelope(status: number, key: string, fields: Record<string, unknown> = {}) {
 	return { error_key: key, fields, message: "Rejected", request_id: "req-1", status, status_key: key, success: false }
 }

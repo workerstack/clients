@@ -7,7 +7,7 @@ const rule = plugin.rules["no-module-state"]
 const MESSAGE =
 	"module-scope state needs `// per-process-constant: <reason>` with an allowlisted reason (raw-body, text-codec, rate-limit-store, i18n-dict, build-id)"
 
-describe("honey/no-module-state", () => {
+describe("clients/no-module-state", () => {
 	it("rejects module-scope let, var and constructed state", () => {
 		const fixture = {
 			"src/a.ts": "let count = 0\nexport function bump() {\n\treturn ++count\n}\n",
@@ -48,7 +48,7 @@ describe("honey/no-module-state", () => {
 	})
 })
 
-describe("honey/no-module-state: scope", () => {
+describe("clients/no-module-state: scope", () => {
 	it("allows constants, function-scope state, tests and code outside src", () => {
 		const fixture = {
 			"src/a.ts":
@@ -59,7 +59,7 @@ describe("honey/no-module-state: scope", () => {
 		expect(reportsOf(rule, fixture)).toEqual([])
 	})
 
-	it("fails oxlint through the honey plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
+	it("fails oxlint through the clients plugin entry", { timeout: SPAWN_TIMEOUT }, () => {
 		const fixture = {
 			"src/a.ts": "let n = 0\nexport const get = () => n\n",
 			"src/b.ts": "const enc = new TextEncoder() // per-process-constant: text-codec\nexport const e = enc\n",

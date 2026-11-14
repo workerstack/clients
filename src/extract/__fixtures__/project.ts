@@ -1,7 +1,7 @@
 /**
  * A throwaway TypeScript project for the extract suites: a temp directory holding the app files a
  * case writes, a tsconfig, and `node_modules/@workerstack/backend` linked to the backend this package resolves,
- * so a fixture app imports it as a user app does: its source in a checkout (the `honey-source` condition), its
+ * so a fixture app imports it as a user app does: its source in a checkout (the `backend-source` condition), its
  * declarations once installed. gen itself imports nothing from backend (H2).
  */
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
@@ -15,19 +15,19 @@ import { type ExtractedProp, type ExtractOptions, extractTypes } from "../extrac
 const backendRoot = (): string =>
 	realpathSync(dirname(createRequire(import.meta.url).resolve("@workerstack/backend/package.json")))
 
-/** The file backend's `/http` export names for a checker: its `honey-source` in a checkout, its `types` once installed. */
+/** The file backend's `/http` export names for a checker: its `backend-source` in a checkout, its `types` once installed. */
 export function backendEntry(): string {
 	const root = backendRoot()
 	const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
 		exports: { "./http": Record<string, string> }
 	}
 	const entry = manifest.exports["./http"]
-	return join(root, entry["honey-source"] ?? (entry.types as string))
+	return join(root, entry["backend-source"] ?? (entry.types as string))
 }
 
 export const COMPILER_OPTIONS = {
 	allowImportingTsExtensions: true,
-	customConditions: ["honey-source"],
+	customConditions: ["backend-source"],
 	lib: ["ES2024", "DOM"],
 	module: "ESNext",
 	moduleResolution: "Bundler",
@@ -48,7 +48,7 @@ export type FixtureProject = {
  * backend linked into its node_modules.
  */
 export function fixtureProject(compilerOptions: Record<string, unknown> = {}, linked = true): FixtureProject {
-	const root = mkdtempSync(join(tmpdir(), "honey-extract-"))
+	const root = mkdtempSync(join(tmpdir(), "clients-extract-"))
 	const write = (rel: string, content: string): string => {
 		const path = join(root, rel)
 		mkdirSync(dirname(path), { recursive: true })

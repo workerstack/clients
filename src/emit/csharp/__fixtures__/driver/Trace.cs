@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>
 /// What a scripted run prints beside the observed (protocol.ts <c>Trace&lt;CsError&gt;</c>): each call's time, its
@@ -153,12 +153,12 @@ internal static class Traces
     public static JsonObject ErrorOf(Sdk sdk, Exception error, string via, bool envelope)
     {
         var type = error.GetType();
-        var honey = sdk.Type("HoneyException");
+        var httpException = sdk.Type("HttpException");
         var chain = new JsonArray();
         for (var at = type; at is not null; at = at.BaseType)
         {
             chain.Add(at.Name);
-            if (at == honey || !honey.IsInstanceOfType(error))
+            if (at == httpException || !httpException.IsInstanceOfType(error))
             {
                 break;
             }

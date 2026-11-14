@@ -160,7 +160,7 @@ describe("syncPackage dry-run messages", () => {
 
 describe("syncPackage spec gate on a drifting prod", () => {
 	const root = usePackageRoot(GATE_ENTRY, {
-		".honey-generated.json": JSON.stringify({ files: { "client.go": "a".repeat(64) } }),
+		".clients-generated.json": JSON.stringify({ files: { "client.go": "a".repeat(64) } }),
 		"README.md": "# sdk-go\n",
 		"client.go": "package acme\n",
 	})
@@ -204,7 +204,7 @@ describe("syncPackage spec gate on a drifting prod", () => {
 
 describe("syncPackage spec gate on a matching prod", () => {
 	const root = usePackageRoot(GATE_ENTRY, {
-		".honey-generated.json": JSON.stringify({ files: { "client.go": "a".repeat(64) } }),
+		".clients-generated.json": JSON.stringify({ files: { "client.go": "a".repeat(64) } }),
 		"README.md": "# sdk-go\n",
 		"client.go": "package acme\n",
 	})
@@ -223,7 +223,7 @@ describe("syncPackage spec gate on a matching prod", () => {
 		expect(result.status).toBe("synced")
 	})
 
-	it("keeps honey's manifest out of the mirror", { timeout: SPAWN_TIMEOUT }, async () => {
+	it("keeps clients' manifest out of the mirror", { timeout: SPAWN_TIMEOUT }, async () => {
 		mirrorDiff(["README.md"])
 		/* the staged tree, seen when sync stages it (the worktree is removed afterwards) */
 		const staged: string[] = []
@@ -240,7 +240,7 @@ describe("syncPackage spec gate on a matching prod", () => {
 		})
 
 		expect(staged).toContain("client.go")
-		expect(staged).not.toContain(".honey-generated.json")
+		expect(staged).not.toContain(".clients-generated.json")
 	})
 })
 

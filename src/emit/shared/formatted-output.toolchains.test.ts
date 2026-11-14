@@ -2,12 +2,12 @@
  * What the shipped pipeline hands back is already formatted (bit 22). The gate drives `generated()` — the one
  * function both the bin and a module-API caller go through — and runs each formatter's own `--check` over the
  * files it returns. It never formats anything itself: `emit/python/__fixtures__/ruff-gate.ts` does that, which
- * proves ruff's output is ruff-clean and says nothing about whether honey ever calls ruff. That gap shipped
+ * proves ruff's output is ruff-clean and says nothing about whether clients ever calls ruff. That gap shipped
  * `--target python` output with a 623-character import line through rc.9.
  *
- * Runs where the toolchains are; `HONEY_REQUIRE_TOOLCHAINS=1` (CI's test and harness jobs) makes a missing
+ * Runs where the toolchains are; `CLIENTS_REQUIRE_TOOLCHAINS=1` (CI's test and harness jobs) makes a missing
  * toolchain fail this leg rather than skip it. The product's own strictness is a different variable,
- * `HONEY_REQUIRE_FORMATTERS`, so CI setting the first one never turns an incidental generation fatal.
+ * `CLIENTS_REQUIRE_FORMATTERS`, so CI setting the first one never turns an incidental generation fatal.
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -40,10 +40,10 @@ async function generatedInto(
 	target: "python" | "rust",
 	extension: string,
 ): Promise<{ dir: string; written: string[] }> {
-	/* the pinned binaries, named through the env honey's discovery reads: PATH must not decide a test */
+	/* the pinned binaries, named through the env clients' discovery reads: PATH must not decide a test */
 	const env = { ...process.env, RUFF: ruffPath(), RUSTFMT: rustfmtPath() }
 	const files = await generated({ targets: [target] }, document, { env, report: () => undefined })
-	const dir = mkdtempSync(join(tmpdir(), `honey-formatted-${target}-`))
+	const dir = mkdtempSync(join(tmpdir(), `clients-formatted-${target}-`))
 	const written: string[] = []
 	for (const [name, text] of Object.entries(files[target]?.files ?? {})) {
 		if (!name.endsWith(extension)) continue
@@ -95,14 +95,14 @@ describe("a formatter that is not there", () => {
 		})
 		expect(Object.keys(files.python?.files ?? {}).length).toBeGreaterThan(0)
 		expect(reported).toEqual([
-			"honey-clients: ruff was not found, so the python output is not formatted (install ruff, or set RUFF)\n",
+			"clients: ruff was not found, so the python output is not formatted (install ruff, or set RUFF)\n",
 		])
 	})
 
 	it("refuses an override that points at nothing, naming the variable", { timeout: SPAWN_TIMEOUT }, async () => {
 		/* a stale RUFF would otherwise spawn-fail inside the pass, which formatFiles raises as a parse error,
 		   and falling back to another ruff would ignore what the run explicitly asked for */
-		const missing = join(tmpdir(), "honey-no-such-ruff")
+		const missing = join(tmpdir(), "clients-no-such-ruff")
 		await expect(
 			generated({ targets: ["python"] }, document, {
 				env: { PATH: "", RUFF: missing },
@@ -120,14 +120,14 @@ describe("a formatter that is not there", () => {
 		/* before bit 22 this threw: "gofmt is required for the go and cli targets" */
 		expect(Object.keys(files.go?.files ?? {}).length).toBeGreaterThan(0)
 		expect(reported).toEqual([
-			"honey-clients: gofmt was not found, so the go output is not formatted (install Go, or set GOFMT)\n",
+			"clients: gofmt was not found, so the go output is not formatted (install Go, or set GOFMT)\n",
 		])
 	})
 
-	it("fails instead under HONEY_REQUIRE_FORMATTERS", { timeout: SPAWN_TIMEOUT }, async () => {
+	it("fails instead under CLIENTS_REQUIRE_FORMATTERS", { timeout: SPAWN_TIMEOUT }, async () => {
 		await expect(
 			generated({ targets: ["python"] }, document, {
-				env: { HONEY_REQUIRE_FORMATTERS: "1", PATH: "" },
+				env: { CLIENTS_REQUIRE_FORMATTERS: "1", PATH: "" },
 				report: () => undefined,
 			}),
 		).rejects.toThrow("ruff was not found")

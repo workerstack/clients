@@ -1,13 +1,13 @@
 {
 	"openapi": "3.1.0",
 	"info": {
-		"title": "Honey Compose",
+		"title": "Backend Compose",
 		"version": "0.0.1"
 	},
 	"paths": {
 		"/account": {
 			"get": {
-				"x-honey-route": "GET /account",
+				"x-backend-route": "GET /account",
 				"responses": {
 					"401": {
 						"content": {
@@ -18,7 +18,7 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -29,10 +29,10 @@
 							}
 						},
 						"description": "forbidden",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -47,7 +47,7 @@
 		},
 		"/account/settings": {
 			"post": {
-				"x-honey-route": "POST /account/settings",
+				"x-backend-route": "POST /account/settings",
 				"requestBody": {
 					"content": {
 						"application/json": {
@@ -68,7 +68,7 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -79,10 +79,10 @@
 							}
 						},
 						"description": "forbidden",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -97,7 +97,7 @@
 		},
 		"/docs": {
 			"get": {
-				"x-honey-route": "GET /docs",
+				"x-backend-route": "GET /docs",
 				"responses": {
 					"401": {
 						"content": {
@@ -108,10 +108,10 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -123,7 +123,7 @@
 		},
 		"/feed": {
 			"get": {
-				"x-honey-route": "GET /feed",
+				"x-backend-route": "GET /feed",
 				"parameters": [
 					{
 						"in": "query",
@@ -145,10 +145,10 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -160,7 +160,7 @@
 		},
 		"/health": {
 			"get": {
-				"x-honey-route": "GET /health",
+				"x-backend-route": "GET /health",
 				"responses": {
 					"401": {
 						"content": {
@@ -171,10 +171,10 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -186,7 +186,7 @@
 		},
 		"/resources": {
 			"post": {
-				"x-honey-route": "POST /resources",
+				"x-backend-route": "POST /resources",
 				"requestBody": {
 					"content": {
 						"application/json": {
@@ -207,7 +207,7 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -218,7 +218,7 @@
 							}
 						},
 						"description": "forbidden",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"429": {
 						"content": {
@@ -229,10 +229,10 @@
 							}
 						},
 						"description": "rate_limited",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -250,7 +250,7 @@
 		},
 		"/resources/{resourceId}": {
 			"get": {
-				"x-honey-route": "GET /resources/:resourceId",
+				"x-backend-route": "GET /resources/:resourceId",
 				"parameters": [
 					{
 						"in": "path",
@@ -271,7 +271,7 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -282,7 +282,7 @@
 							}
 						},
 						"description": "forbidden",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"404": {
 						"content": {
@@ -293,10 +293,10 @@
 							}
 						},
 						"description": "not_found",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},
@@ -312,7 +312,7 @@
 				}
 			},
 			"delete": {
-				"x-honey-route": "DELETE /resources/:resourceId",
+				"x-backend-route": "DELETE /resources/:resourceId",
 				"parameters": [
 					{
 						"in": "path",
@@ -336,7 +336,7 @@
 							}
 						},
 						"description": "expired_token, invalid_token",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"403": {
 						"content": {
@@ -347,7 +347,7 @@
 							}
 						},
 						"description": "forbidden",
-						"x-honey-error": true
+						"x-backend-error": true
 					},
 					"404": {
 						"content": {
@@ -358,10 +358,10 @@
 							}
 						},
 						"description": "not_found",
-						"x-honey-error": true
+						"x-backend-error": true
 					}
 				},
-				"x-honey-errors": {
+				"x-backend-errors": {
 					"expired_token": {
 						"status": 401
 					},

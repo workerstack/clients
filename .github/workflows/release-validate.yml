@@ -12,11 +12,11 @@ on:
         required: true
       cli:
         description: >-
-          The command that runs honey-clients, split on spaces. The consumer's installed bin by default; a repo whose
+          The command that runs clients, split on spaces. The consumer's installed bin by default; a repo whose
           root package is @workerstack/clients itself passes its own bin
         type: string
         required: false
-        default: bun x --no-install honey-clients
+        default: bun x --no-install clients
 
 jobs:
   validate:

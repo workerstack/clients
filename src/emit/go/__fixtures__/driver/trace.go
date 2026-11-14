@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	sdk "honey.test/driver/sdk"
+	sdk "backend.test/driver/sdk"
 )
 
 // trace is what a scripted run prints beside the observed (emit/shared/__fixtures__/protocol.ts Trace).

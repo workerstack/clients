@@ -1,7 +1,7 @@
 name: e2e-snapshot
 
 # The generated CLI's release path end to end (scripts/e2e-snapshot.ts): a fixture spec through
-# honey-clients generate, a goreleaser snapshot signed keyless by this job's OIDC identity, installgen check and
+# clients generate, a goreleaser snapshot signed keyless by this job's OIDC identity, installgen check and
 # install.sh from this package's packed tarball against it, the installed binary's --version, and a tampered
 # checksums.txt refused. The signature leg needs GitHub OIDC, so it runs here and is skipped by a local run.
 on:

@@ -2,7 +2,7 @@
  * Past JSON in C# (contract 47 §5.11; Fc6, Fc7): a binary answer is its `byte[]`, asked for under its declared
  * media type, which a per-call `Accept` overrides and a config one never does; a text answer is a `string` as sent.
  * A binary body is a `BinaryBody`: a `byte[]` goes out sized and is sent again on a 401, a `Stream` goes out chunked
- * and never again. A multipart file is a `FilePart` held in memory and sent again too, under a `honey-<uuid>`
+ * and never again. A multipart file is a `FilePart` held in memory and sent again too, under a `clients-<uuid>`
  * boundary, and an empty map is no part. Declared response headers fill a caller's `<Op>Headers` (`headersInto`),
  * and a missing or unparsable required one is a `DecodeException` (on `client.Safe` an answer, so its Result's Err).
  * Driven in both styles on `http`, C#'s one async client and its `client.Safe` (no drift check); answer types and
@@ -63,7 +63,7 @@ const plain = (entry: Partial<CsError>) => ({
 	...entry,
 })
 const decodeError = (text: string) =>
-	plain({ chain: ["DecodeException", "SdkException", "HoneyException"], text, type: "DecodeException" })
+	plain({ chain: ["DecodeException", "SdkException", "HttpException"], text, type: "DecodeException" })
 
 /** The `http` SDK with the driver aimed at it (it must build). */
 function on(): DrivenCSharpSdk {
@@ -291,7 +291,7 @@ describe.skipIf(!DOTNET)("the answer types a method returns (Fc6)", SLOW, () => 
 
 /** csc's errors for `lines` (statements of a consumer's Main) against `http`, each as `<the statement> → <CS code>: <message>`. */
 function findings(lines: readonly string[]): string[] {
-	const source = program("HoneySdk", "HoneySdkClient", lines.join("\n"))
+	const source = program("HttpSdk", "HttpSdkClient", lines.join("\n"))
 	const rows = source.split("\n")
 	return checked("http", source).map((line) => {
 		const found = /^\((\d+),\d+\): error (CS\d+: .*)$/.exec(line)
@@ -337,13 +337,13 @@ describe.skipIf(!DOTNET)("headersInto, FilePart and BinaryBody as csc reads them
 	// ported: python binary.test.ts:485
 	it("refuses a byte[] where a multipart file part goes, and takes a FilePart", () => {
 		expect(findings(MULTIPART_TYPES)).toEqual([
-			`${UPLOAD_BYTES} → CS0029: Cannot implicitly convert type 'byte[]' to 'HoneySdk.FilePart'`,
+			`${UPLOAD_BYTES} → CS0029: Cannot implicitly convert type 'byte[]' to 'HttpSdk.FilePart'`,
 		])
 	})
 
 	it("takes a byte[] or a Stream as a BinaryBody, and refuses a string (Fc6)", () => {
 		expect(findings(BINARY_BODY)).toEqual([
-			`${PUT_STRING} → CS1503: Argument 2: cannot convert from 'string' to 'HoneySdk.BinaryBody'`,
+			`${PUT_STRING} → CS1503: Argument 2: cannot convert from 'string' to 'HttpSdk.BinaryBody'`,
 		])
 	})
 })
@@ -388,10 +388,10 @@ const multipart = () =>
 		return { hops, run }
 	}))
 
-/** A multipart content type's boundary when it is `honey-<uuid>`, else null. */
-const boundaryOf = (type: string) => /^multipart\/form-data; boundary=(honey-[0-9a-f-]{36})$/.exec(type)?.[1] ?? null
+/** A multipart content type's boundary when it is `clients-<uuid>`, else null. */
+const boundaryOf = (type: string) => /^multipart\/form-data; boundary=(clients-[0-9a-f-]{36})$/.exec(type)?.[1] ?? null
 
-describe.skipIf(!DOTNET)("multipart: FilePart parts held in memory, a honey-<uuid> boundary", SLOW, () => {
+describe.skipIf(!DOTNET)("multipart: FilePart parts held in memory, a clients-<uuid> boundary", SLOW, () => {
 	// ported: python binary.test.ts:399; P6 (the hand encoder against formData())
 	it("sends file and text parts under multipart/form-data, the same body again after a 401", async () => {
 		const { hops, run } = await multipart()

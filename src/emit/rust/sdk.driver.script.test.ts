@@ -289,12 +289,12 @@ describe.skipIf(!RUST)("the Rust test driver's script: a caller's http_builder",
 		})
 		expect({ cross: seen(cross), same: seen(same) }).toEqual({
 			cross: {
-				hops: ["primary /echo honey-driver Bearer t", "alt /landing honey-driver -"],
+				hops: ["primary /echo clients-driver Bearer t", "alt /landing clients-driver -"],
 				observed: [OK_DATA],
 				transport: undefined,
 			},
 			same: {
-				hops: ["primary /echo honey-driver -", "primary /landing honey-driver -"],
+				hops: ["primary /echo clients-driver -", "primary /landing clients-driver -"],
 				observed: [OK_DATA],
 				transport: undefined,
 			},

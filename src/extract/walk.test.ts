@@ -10,7 +10,7 @@ const SLOW = 60_000
 
 describe("findTsConfig: the project's own tsconfig", () => {
 	it("is the nearest one walking up, never one past the package root, and none when there is none", () => {
-		const root = mkdtempSync(join(tmpdir(), "honey-tsconfig-"))
+		const root = mkdtempSync(join(tmpdir(), "clients-tsconfig-"))
 		try {
 			const put = (rel: string) => {
 				mkdirSync(join(root, rel, ".."), { recursive: true })
@@ -45,13 +45,13 @@ describe("loadEntry: the app under its export", () => {
 		"finds the app through an export list, an unexported declaration of the name, and a default export",
 		() => {
 			const sources = {
-				"entry/default.ts": "export default honey<{ D: 1 }>()",
-				"entry/list.ts": "const inner = honey<{ L: 1 }>()\nexport { inner as app }",
-				"entry/local.ts": "const app = honey<{ U: 1 }>()\nexport const other = 1",
+				"entry/default.ts": "export default httpApp<{ D: 1 }>()",
+				"entry/list.ts": "const inner = httpApp<{ L: 1 }>()\nexport { inner as app }",
+				"entry/local.ts": "const app = httpApp<{ U: 1 }>()\nexport const other = 1",
 			}
 			const names: Record<string, string> = { "entry/default.ts": "default" }
 			const envs = Object.entries(sources).map(([rel, body]) => {
-				const entryPath = project.write(rel, lines('import { honey } from "@workerstack/backend/http"', body))
+				const entryPath = project.write(rel, lines('import { httpApp } from "@workerstack/backend/http"', body))
 				const entry = loadEntry(tsMorph, { entryPath, exportName: names[rel] ?? "app" })
 				const env = entry.appType.getProperty("$env")
 				return env === undefined ? null : entry.checker.typeToString(entry.checker.getTypeOfSymbol(env))
@@ -64,7 +64,7 @@ describe("loadEntry: the app under its export", () => {
 	it(
 		"reads an entry that no tsconfig governs",
 		() => {
-			const root = mkdtempSync(join(tmpdir(), "honey-no-tsconfig-"))
+			const root = mkdtempSync(join(tmpdir(), "clients-no-tsconfig-"))
 			try {
 				writeFileSync(join(root, "package.json"), JSON.stringify({ name: "bare" }))
 				const entryPath = join(root, "app.ts")
@@ -93,26 +93,26 @@ describe("registrations: the routes the program's own files register", () => {
 			project.write(
 				"walk/node_modules/dep/index.ts",
 				lines(
-					'import { honey } from "@workerstack/backend/http"',
-					'export const dep = honey<{}>().get("/dep").handler((c) => c.res.text("ok", "ok"))',
+					'import { httpApp } from "@workerstack/backend/http"',
+					'export const dep = httpApp<{}>().get("/dep").handler((c) => c.res.text("ok", "ok"))',
 				),
 			)
 			project.write("walk/node_modules/dep/package.json", JSON.stringify({ main: "index.ts", name: "dep" }))
 			project.write(
 				"walk/more.ts",
 				lines(
-					'import type { Honey } from "@workerstack/backend/http"',
-					'export const more = (app: Honey<{}>) => app.on(["GET", "PUT"], "/more").handler((c) => c.res.text("ok", "ok"))',
+					'import type { HttpApp } from "@workerstack/backend/http"',
+					'export const more = (app: HttpApp<{}>) => app.on(["GET", "PUT"], "/more").handler((c) => c.res.text("ok", "ok"))',
 				),
 			)
 			const entryPath = project.write(
 				"walk/app.ts",
 				lines(
-					'import { honey } from "@workerstack/backend/http"',
+					'import { httpApp } from "@workerstack/backend/http"',
 					'import { ws } from "@workerstack/backend/ws"',
 					'import "dep"',
 					'import { more } from "./more.ts"',
-					"export const app = honey<{}>()",
+					"export const app = httpApp<{}>()",
 					'app.get("/a").handler((c) => c.res.text("ok", "ok"))',
 					'ws(app, "/socket").handler({ onMessage: () => {} })',
 					"const fake = { handler: (f: unknown) => f }",

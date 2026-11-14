@@ -415,7 +415,7 @@ const client = new ConformanceSDK({ baseURL: "http://localhost" })
 
 /** tsc's diagnostics on `driver.ts` beside the emitted `files`, strict; a run with none that still failed throws. */
 function driverErrors(files: Readonly<Record<string, string>>, driver: string): string[] {
-	const root = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/gen-ts-types")
+	const root = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/gen-ts-types")
 	mkdirSync(root, { recursive: true })
 	const dir = mkdtempSync(join(root, "safe-"))
 	const tsc = join(dirname(createRequire(import.meta.url).resolve("typescript/package.json")), "bin/tsc")

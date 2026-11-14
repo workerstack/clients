@@ -1,7 +1,7 @@
 /**
- * The API's declared error keys in Go (G6/G7): every operation's `x-honey-errors` key as an
+ * The API's declared error keys in Go (G6/G7): every operation's `x-backend-errors` key as an
  * `Err<Key>` constant of the runtime's `ErrorKey`, which `errors.Is` matches against a
- * `*ClientError` carrying it, and `<Key>Data` for a key whose own schema is inline and not honey's
+ * `*ClientError` carrying it, and `<Key>Data` for a key whose own schema is inline and not backend's
  * envelope, the type `ClientError.DecodeBody` decodes its body into. Spec text reaches the source
  * only through the shared escape layer.
  */

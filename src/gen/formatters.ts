@@ -16,7 +16,7 @@ import type { Target } from "./targets.ts"
  * The binary a caller named through an environment variable, checked here at the edge. An override that
  * points at nothing is a mistake in how the run was configured, so it is a named error: falling back to some
  * other binary would ignore an explicit instruction, and spawning it would surface inside the post-pass,
- * which raises a failure there as though honey had emitted source the formatter could not parse.
+ * which raises a failure there as though clients had emitted source the formatter could not parse.
  */
 function named(variable: string, path: string | undefined): string | undefined {
 	if (path === undefined || path === "") return undefined
@@ -51,7 +51,7 @@ export function findGofmt(env: NodeJS.ProcessEnv = process.env): string | undefi
 /**
  * The pinned ruff, or none: `RUFF` names it, else PATH. A named path that is not there counts as none, so a
  * stale override is a skip with its own line rather than a spawn failure deep in the post-pass, which
- * `formatFiles` would raise as though honey had emitted unparseable Python.
+ * `formatFiles` would raise as though clients had emitted unparseable Python.
  */
 export function findRuff(env: NodeJS.ProcessEnv = process.env): string | undefined {
 	return named("RUFF", env.RUFF) ?? onPath("ruff", env)
@@ -84,10 +84,10 @@ export type FormatPass = {
 	readonly extension: string
 	readonly install: string
 	/**
-	 * Say nothing when this one is absent. Only `ts`: oxfmt is honey's own choice of TS formatter and a
+	 * Say nothing when this one is absent. Only `ts`: oxfmt is clients' own choice of TS formatter and a
 	 * declared optional peer, so a consumer is not expected to have it and "TS goes out as emitted" is the
 	 * documented rule (Q12, `blueprint/00-rules.md`). ruff, rustfmt and gofmt are the language's own standard
-	 * tools, which a developer of that language has — honey simply never called them, and silence there is
+	 * tools, which a developer of that language has — clients simply never called them, and silence there is
 	 * what let unformatted Python ship.
 	 */
 	readonly quiet?: true
@@ -112,7 +112,7 @@ export const FORMATTERS: Partial<Record<Target, FormatPass>> = {
 
 /**
  * The formatter for `target`, or none when its binary is not there. Each factory is named here rather than
- * held in the table's rows: `honey/spawn-timeout` proves which exports reach a spawn by walking named calls
+ * held in the table's rows: `clients/spawn-timeout` proves which exports reach a spawn by walking named calls
  * (the repo lint plugin's `spawners.js`), and a closure in a table is opaque to that walk — which would leave a
  * test calling `generated()` free of the bound it needs, since the spawn is real either way.
  */
@@ -146,8 +146,8 @@ export async function formatterFor(
  * A formatter that is not there: the files go out as emitted and the skip is named, so unformatted output is
  * never silent. A consumer generating a Python SDK should not need ruff to get valid Python.
  *
- * `HONEY_REQUIRE_FORMATTERS=1` makes it fail instead, for a pipeline that would rather stop than ship
- * unformatted code. Deliberately NOT `HONEY_REQUIRE_TOOLCHAINS`, which this repository's CI sets on six jobs
+ * `CLIENTS_REQUIRE_FORMATTERS=1` makes it fail instead, for a pipeline that would rather stop than ship
+ * unformatted code. Deliberately NOT `CLIENTS_REQUIRE_TOOLCHAINS`, which this repository's CI sets on six jobs
  * to mean "these TESTS need their toolchain, do not skip" — reading it here turned every incidental
  * generation in CI without oxfmt into a hard failure, which is how rc.10's release run died.
  */
@@ -159,6 +159,6 @@ export function missingFormatter(
 ): void {
 	const said = `${pass.tool} was not found, so the ${target} output is not formatted (${pass.install})`
 	/* an explicit demand is honoured for every target, quiet or not: the caller asked to be stopped */
-	if (env.HONEY_REQUIRE_FORMATTERS === "1") throw new Error(said)
-	if (pass.quiet !== true) report(`honey-clients: ${said}\n`)
+	if (env.CLIENTS_REQUIRE_FORMATTERS === "1") throw new Error(said)
+	if (pass.quiet !== true) report(`clients: ${said}\n`)
 }

@@ -2,15 +2,15 @@
  * The emitted `types.gen.d.ts` checked as a service sees it: a `consumer.ts` beside it states each
  * type as an `expectType<…>()` assertion, typechecked in-process with ts-morph's TypeScript.
  * `@workerstack/backend` resolves as a service's import does, through node_modules: backend's source in a
- * checkout (the `honey-source` condition), its declarations once installed (gen imports nothing from backend, H2),
+ * checkout (the `backend-source` condition), its declarations once installed (gen imports nothing from backend, H2),
  * so a name backend lacks is a real red (O6). ts-morph is injected, as `extractTypes` takes it (only extract/
  * imports it). One project per suite: backend's files parse once, each check swaps the emitted file and the consumer.
  */
 import { resolve } from "node:path"
 import type { TsMorph } from "../../../extract/walk.ts"
 
-/** Every consumer starts with: the honey names, the always-emitted types, and the assertion helpers. */
-const PRELUDE = `import type { HoneyContext, HoneyError } from "@workerstack/backend/http"
+/** Every consumer starts with: the backend names, the always-emitted types, and the assertion helpers. */
+const PRELUDE = `import type { HttpContext, HttpError } from "@workerstack/backend/http"
 import type { BaseCtx, RouteCtx, RouteErrors, RouteErrorShapes, RouteErrorsByStatus, RouteInput, RouteMeta, RouteOutput, Routes } from "./types.gen"
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type IsAny<T> = 0 extends 1 & T ? true : false
@@ -30,7 +30,7 @@ export function typechecker(tsMorph: TsMorph) {
 	const project = new tsMorph.Project({
 		compilerOptions: {
 			allowImportingTsExtensions: true,
-			customConditions: ["honey-source"],
+			customConditions: ["backend-source"],
 			lib: ["lib.es2023.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
 			module: ts.ModuleKind.ESNext,
 			moduleResolution: ts.ModuleResolutionKind.Bundler,

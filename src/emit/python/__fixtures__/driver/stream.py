@@ -5,7 +5,7 @@ traced via "return". Once open, the call observes what the stream delivered, SSE
 and realtime frames, and an error the stream raised is traced via "stream"; SSE events ending in no
 answer (a drop, a timeout) after the first observe it as ``failed`` (f2). Unscripted, an error the
 grid has no outcome for (one a stream raised among them) fails the run, and an exception outside the
-SDK's ``HoneyError`` propagates, as on a unary call. ``bounded`` fails a stream call that has not
+SDK's ``HttpError`` propagates, as on a unary call. ``bounded`` fails a stream call that has not
 ended after ``STALL_AFTER`` seconds instead of hanging the run. Under ``safe`` (bit 21 i2) an SSE call answers a
 ``Result``, read as observe.py reads one: its ``Ok`` the stream, read as above; its ``Err`` the opening's error. A
 connection (WebSocket, realtime) is the same method on the mirror, opened and read as above.
@@ -61,8 +61,8 @@ async def bounded(work: Coroutine[Any, Any, Outcome]) -> Outcome:
 
 
 def outside(error: Exception, lens: Lens) -> bool:
-    """Whether ``error`` propagates: unscripted, one outside the SDK's ``HoneyError``."""
-    return not lens.scripted and not isinstance(error, lens.module.HoneyError)
+    """Whether ``error`` propagates: unscripted, one outside the SDK's ``HttpError``."""
+    return not lens.scripted and not isinstance(error, lens.module.HttpError)
 
 
 def unopened(error: Exception, lens: Lens) -> Outcome:

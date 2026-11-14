@@ -1,7 +1,7 @@
 {
 	"openapi": "3.1.0",
 	"info": {
-		"title": "Honey MCP",
+		"title": "Backend MCP",
 		"version": "1.0.0"
 	},
 	"servers": [
@@ -19,7 +19,7 @@
 					}
 				],
 				"x-mcp": true,
-				"x-honey-route": "POST /v1/projects/:project_id/extract",
+				"x-backend-route": "POST /v1/projects/:project_id/extract",
 				"requestBody": {
 					"content": {
 						"multipart/form-data": {
@@ -68,7 +68,7 @@
 					}
 				],
 				"x-mcp": true,
-				"x-honey-route": "POST /v1/projects/:project_id/extract-stream",
+				"x-backend-route": "POST /v1/projects/:project_id/extract-stream",
 				"requestBody": {
 					"content": {
 						"multipart/form-data": {
@@ -117,7 +117,7 @@
 					}
 				],
 				"x-mcp": true,
-				"x-honey-route": "POST /v1/projects/:project_id/suggest-schema",
+				"x-backend-route": "POST /v1/projects/:project_id/suggest-schema",
 				"requestBody": {
 					"content": {
 						"multipart/form-data": {
@@ -166,7 +166,7 @@
 					}
 				],
 				"x-mcp": true,
-				"x-honey-route": "POST /v1/projects/:project_id/tables/:table_id/extract",
+				"x-backend-route": "POST /v1/projects/:project_id/tables/:table_id/extract",
 				"requestBody": {
 					"content": {
 						"multipart/form-data": {
@@ -223,7 +223,7 @@
 					}
 				],
 				"x-mcp": true,
-				"x-honey-route": "POST /v1/projects/:project_id/tables/:table_id/extract-stream",
+				"x-backend-route": "POST /v1/projects/:project_id/tables/:table_id/extract-stream",
 				"requestBody": {
 					"content": {
 						"multipart/form-data": {

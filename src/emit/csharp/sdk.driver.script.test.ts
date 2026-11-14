@@ -93,7 +93,7 @@ const plain = (entry: Partial<CsError>) => ({
 })
 /** A HookException a hook's (or the refresher's) `InvalidOperationException(text)` became. */
 const hookError = (text: string) =>
-	plain({ chain: ["HookException", "HoneyException"], inner: "InvalidOperationException", text, type: "HookException" })
+	plain({ chain: ["HookException", "HttpException"], inner: "InvalidOperationException", text, type: "HookException" })
 /** The caller's token, as thrown: .NET throws either cancel type, so only `canceled` is pinned. */
 const CANCELED = expect.objectContaining({ canceled: true, via: "return" })
 
@@ -177,7 +177,7 @@ describe.skipIf(!DOTNET)("the C# test driver's script: client config", SLOW, () 
 		const { run } = await drive(on(), replies, [ECHO], { script })
 		expect({ error: run.trace?.calls[0]?.error, observed: run.observed, status: run.status }, run.stderr).toEqual({
 			error: plain({
-				chain: ["DecodeException", "SdkException", "HoneyException"],
+				chain: ["DecodeException", "SdkException", "HttpException"],
 				text: "the answer exceeds 10 bytes",
 				type: "DecodeException",
 			}),
@@ -251,7 +251,7 @@ describe.skipIf(!DOTNET)("the C# test driver's script: a caller handler chain (C
 		const { hops, run } = await drive(on(), [hop("primary", "/landing"), OK], [ECHO], { script })
 		const seen = hops.map((h) => `${h.origin} ${h.url} ${h.headers["user-agent"]} ${h.headers["x-builder"]}`)
 		expect({ hops: seen, observed: run.observed, transport: run.trace?.transport }, run.stderr).toEqual({
-			hops: ["primary /echo honey-driver b", "primary /landing honey-driver b"],
+			hops: ["primary /echo clients-driver b", "primary /landing clients-driver b"],
 			observed: [OK_DATA],
 			transport: undefined,
 		})
@@ -272,7 +272,7 @@ describe.skipIf(!DOTNET)("the C# test driver's script: a caller handler chain (C
 			},
 			crossed.run.stderr + refused.run.stderr,
 		).toEqual({
-			landed: ["honey-driver", undefined, undefined],
+			landed: ["clients-driver", undefined, undefined],
 			observed: [[OK_DATA], [{ errorKey: null, kind: "error", status: 307 }]],
 			origins: [["primary /echo", "alt /landing"], ["primary /echo"]],
 		})
@@ -351,7 +351,7 @@ describe.skipIf(!DOTNET)(
 			const { run } = await drive(on(), replies, [ITEM], { script: {} })
 			const text = "the X-Item-Version header is missing"
 			expect({ error: run.trace?.calls[0]?.error, observed: run.observed }, run.stderr).toEqual({
-				error: plain({ chain: ["DecodeException", "SdkException", "HoneyException"], text, type: "DecodeException" }),
+				error: plain({ chain: ["DecodeException", "SdkException", "HttpException"], text, type: "DecodeException" }),
 				observed: [null],
 			})
 		})
@@ -383,7 +383,7 @@ describe.skipIf(!DOTNET)("the C# test driver: the bytes outcome", SLOW, () => {
 const MISSING: Reply = { json: { error_key: "member.missing", message: "gone" }, status: 404 }
 /** MISSING as the trace records it, read through ApiStatusException's members. */
 const MISSING_ERROR = plain({
-	chain: ["NotFoundException", "ApiStatusException", "SdkException", "HoneyException"],
+	chain: ["NotFoundException", "ApiStatusException", "SdkException", "HttpException"],
 	key: "member.missing",
 	keyMember: null,
 	message: "gone",
@@ -435,7 +435,7 @@ describe.skipIf(!DOTNET)("the C# test driver's script: a call's C# error", SLOW,
 		).toEqual({
 			envelope: { ...sent, extraKeys: ["success", "trace"] },
 			hops: 2,
-			path: plain({ chain: ["PathParamException", "HoneyException"], text, type: "PathParamException" }),
+			path: plain({ chain: ["PathParamException", "HttpException"], text, type: "PathParamException" }),
 			unasked: true,
 		})
 	})

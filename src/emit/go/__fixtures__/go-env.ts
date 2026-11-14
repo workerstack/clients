@@ -2,7 +2,7 @@
  * The one way gen runs Go (G10): every `go` and `gofmt` a test, the conformance runner or the
  * harness spawns goes through here, so it runs the toolchain `.go-version` pins — the same binary
  * locally and in CI (`GOTOOLCHAIN`, Go's checksum-verified download) — with its caches under
- * `$HOME/.cache/honey-tmp/go/` (never /tmp, 00-rules). A structure test forbids a Go spawn elsewhere.
+ * `$HOME/.cache/backend-tmp/go/` (never /tmp, 00-rules). A structure test forbids a Go spawn elsewhere.
  */
 import { type SpawnSyncReturns, spawnSync } from "node:child_process"
 import { mkdirSync, readFileSync } from "node:fs"
@@ -23,7 +23,7 @@ export const GO_FLOOR = "1.24.0"
 
 /** Where gen's Go caches live: one area under the toolchain cache, made on first use. */
 export function goCacheDir(...parts: string[]): string {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/go", ...parts)
+	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/go", ...parts)
 	mkdirSync(dir, { recursive: true })
 	return dir
 }
@@ -70,7 +70,7 @@ export function hasGo(): boolean {
 
 /** Whether a missing Go must fail rather than skip: CI and the pre-push battery set one of these. */
 export function goRequired(): boolean {
-	return process.env.HONEY_REQUIRE_TOOLCHAINS === "1" || process.env.HONEY_REQUIRE_GO === "1"
+	return process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1" || process.env.CLIENTS_REQUIRE_GO === "1"
 }
 
 /**
@@ -80,6 +80,6 @@ export function goRequired(): boolean {
 export function withGo(): boolean {
 	const go = hasGo()
 	if (!go && goRequired())
-		throw new Error("Go is required here (HONEY_REQUIRE_GO or HONEY_REQUIRE_TOOLCHAINS), and none is on PATH")
+		throw new Error("Go is required here (CLIENTS_REQUIRE_GO or CLIENTS_REQUIRE_TOOLCHAINS), and none is on PATH")
 	return go
 }

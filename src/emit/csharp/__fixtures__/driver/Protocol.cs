@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>
 /// The stdin envelope (driven.ts): the SDK to load, the grid cell, the emitter's call plans by operation, the

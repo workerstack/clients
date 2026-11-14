@@ -1,5 +1,5 @@
 /**
- * HTTP status code → honey's status key (`201` → `created`), as backend's response vocabulary names
+ * HTTP status code → backend's status key (`201` → `created`), as backend's response vocabulary names
  * them (gen never imports backend, H2). tests/integration/codegen-tables.test.ts answers each key through a real app, so the two cannot drift.
  */
 

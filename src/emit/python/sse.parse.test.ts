@@ -5,7 +5,7 @@
  * waiting for another byte; the same events however the stream is chunked, a UTF-8 sequence split across writes
  * included; the 1 MiB line and 8 MiB event caps, counted in bytes, and their errors, each raised once; and the id
  * and retry fields, comments, multi-line data and the BOM. Consumer programs on `sse` feed the shipped parser
- * (`_honey.sse.SseParser`) directly: the events a capped chunk completed first, and data lines that accumulate in
+ * (`_http.sse.SseParser`) directly: the events a capped chunk completed first, and data lines that accumulate in
  * linear time.
  */
 import { describe, expect, it } from "vitest"
@@ -333,12 +333,12 @@ describe.skipIf(!PY)(
 )
 
 /**
- * The shipped `_honey.sse` fed in process. `run` feeds each case's chunks, then one empty chunk, collecting each
+ * The shipped `_http.sse` fed in process. `run` feeds each case's chunks, then one empty chunk, collecting each
  * event's data (over 16 characters, as its length) until the first error, kept as `<type>: <text>`.
  */
 const PARSER = `import importlib
 
-parsing = importlib.import_module(f"{sdk.__name__}._honey.sse")
+parsing = importlib.import_module(f"{sdk.__name__}._http.sse")
 MiB = 1 << 20
 
 
@@ -368,7 +368,7 @@ const LINES = `import gc
 import importlib
 import time
 
-parsing = importlib.import_module(f"{sdk.__name__}._honey.sse")
+parsing = importlib.import_module(f"{sdk.__name__}._http.sse")
 
 
 def fed(lines: int) -> tuple[float, list[int]]:

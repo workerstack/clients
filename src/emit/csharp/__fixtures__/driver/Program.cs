@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>
 /// The C# SDK's test driver (bit 15, contract 45 §6.5, Fb10; contract 47 §4.3): one fixed program, no generated

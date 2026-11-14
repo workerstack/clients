@@ -156,7 +156,7 @@ describe.skipIf(!PY)("an SSE open through a plain call's pipeline: the on_respon
 			},
 			run.stderr,
 		).toEqual({
-			error: plain({ cause: "ValueError", chain: ["HookError", "HoneyError"], text: "hook: bad", type: "HookError" }),
+			error: plain({ cause: "ValueError", chain: ["HookError", "HttpError"], text: "hook: bad", type: "HookError" }),
 			gone: true,
 			observed: [null],
 			order: "0 request 0 | 0 response 0 200",

@@ -4,18 +4,18 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using HoneySdk;
+using HttpSdk;
 
 public static class Example
 {
-    public static HoneySdkClient NewClient() => new(new ClientConfig
+    public static HttpSdkClient NewClient() => new(new ClientConfig
     {
         BaseUrl = "https://api.example.com",
         BearerToken = Environment.GetEnvironmentVariable("KITCHEN_TOKEN"),
         Timeout = TimeSpan.FromSeconds(10),
     });
 
-    public static async Task<string?> CheckHealth(HoneySdkClient client)
+    public static async Task<string?> CheckHealth(HttpSdkClient client)
     {
         try
         {
@@ -28,7 +28,7 @@ public static class Example
         }
     }
 
-    public static async Task<string> Listing(HoneySdkClient client, string id)
+    public static async Task<string> Listing(HttpSdkClient client, string id)
     {
         var result = await client.Safe.GetApiAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
         return result.Match(
@@ -41,7 +41,7 @@ public static class Example
             });
     }
 
-    public static async Task<List<string>> FirstEvents(HoneySdkClient client, int limit)
+    public static async Task<List<string>> FirstEvents(HttpSdkClient client, int limit)
     {
         var seen = new List<string>();
         await using var stream = await client.GetApiEventsAsync(); // disposing it frees the connection

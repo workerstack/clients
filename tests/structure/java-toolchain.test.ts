@@ -1,8 +1,8 @@
 /**
  * Toolchain parity (G10, G11, R7) for Java: gen runs java, javac, javap, Gradle and google-java-format only through
  * `src/emit/java/__fixtures__/java-env.ts`, on the releases `java-pins.json` pins by sha256. `javaInstall`'s command
- * fetches each pin, checks it and extracts it into `$HOME/.cache/honey-tmp/java/toolchain/<release>`; the Jackson set
- * and its POMs go into `$HOME/.cache/honey-tmp/java/repo` in Maven layout. Never PATH's java or gradle, never a
+ * fetches each pin, checks it and extracts it into `$HOME/.cache/backend-tmp/java/toolchain/<release>`; the Jackson set
+ * and its POMs go into `$HOME/.cache/backend-tmp/java/repo` in Maven layout. Never PATH's java or gradle, never a
  * caller's `JAVA_HOME`, never a setup action. A run never installs: a missing pin skips, or fails where Java is
  * required, naming the install. The default run runs on JDK 21; 17 and 25 run in CI's matrix. CI reads the same pins
  * file with `jq`, in every job that runs gen's Java, beside the `-java-` cache.
@@ -60,7 +60,7 @@ const others = () =>
 		.map((path) => ({ path, text: readFileSync(join(GEN, path), "utf8") }))
 
 /** The cache root, as the install and every run spell it. */
-const cache = () => join(process.env.HOME ?? homedir(), ".cache/honey-tmp/java")
+const cache = () => join(process.env.HOME ?? homedir(), ".cache/backend-tmp/java")
 
 /** The pins as `java-pins.json` holds them: each release and artifact by its sha256, the Jackson set by Central's sha1 too. */
 const PINNED = {
@@ -192,7 +192,7 @@ const runs = (job: string) =>
 /** Whether a step saves or restores the java cache, keyed on content hashes. */
 const cachesJava = (step: string) =>
 	/^uses: actions\/cache(?:\/restore)?@[0-9a-f]{40} # v\d+\.\d+\.\d+\n/.test(step) &&
-	/honey-tmp\/java\b/.test(step) &&
+	/backend-tmp\/java\b/.test(step) &&
 	/\}\}-java-\$\{\{ hashFiles\(/.test(step.replace(/\s+/g, " "))
 
 /**
@@ -246,7 +246,7 @@ describe("the pins", () => {
 describe("CI installs the pins", () => {
 	/* the jobs that run gen's Java: the harness (`bun run test:harness`), the java project's shard and the rust
 	 * project's, whose toolchain files reach every language (vitest.config.ts, as for .NET) */
-	it("in every job that runs gen's Java, by the command a missing JDK names, beside the java cache, with HONEY_REQUIRE_TOOLCHAINS", () => {
+	it("in every job that runs gen's Java, by the command a missing JDK names, beside the java cache, with CLIENTS_REQUIRE_TOOLCHAINS", () => {
 		const testing = Object.entries(jobs(WORKFLOW)).filter(([, job]) =>
 			/^ +- run: bun run test:harness$|--project (?:java|rust)\b/m.test(job),
 		)
@@ -255,7 +255,7 @@ describe("CI installs the pins", () => {
 			([, job]) =>
 				!runs(job).some((lines) => lines.includes(INSTALL)) ||
 				!steps(job).some(cachesJava) ||
-				!/HONEY_REQUIRE_TOOLCHAINS: "1"/.test(job),
+				!/CLIENTS_REQUIRE_TOOLCHAINS: "1"/.test(job),
 		)
 		expect(missing.map(([name]) => name)).toEqual([])
 	})
@@ -312,11 +312,11 @@ describe("what a run never does", () => {
 	})
 
 	it("never installs a missing pin: it skips, or fails naming the install where Java is required", () => {
-		vi.stubEnv("HONEY_REQUIRE_TOOLCHAINS", "")
-		vi.stubEnv("HONEY_REQUIRE_JAVA", "")
-		vi.stubEnv("HOME", join(homedir(), "honey-no-java-here"))
+		vi.stubEnv("CLIENTS_REQUIRE_TOOLCHAINS", "")
+		vi.stubEnv("CLIENTS_REQUIRE_JAVA", "")
+		vi.stubEnv("HOME", join(homedir(), "clients-no-java-here"))
 		expect(withJava()).toBe(false)
-		vi.stubEnv("HONEY_REQUIRE_JAVA", "1")
+		vi.stubEnv("CLIENTS_REQUIRE_JAVA", "1")
 		expect(() => withJava()).toThrow(javaInstall())
 	})
 

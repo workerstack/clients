@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // `bun scripts/pack.ts <out dir> <package dir>...`: each package's tarball as npm publishes it, its path printed per
 // line. Each package is packed from a staged copy: prepack builds dist/ in the copy, so the checkout never gets one.
-// The build reads the checkout's `honey-source` condition, but the tarball ships no src/, so the manifest npm packs
-// drops every `honey-source` key: a process that sets the condition would otherwise resolve an install to a missing
+// The build reads the checkout's `clients-source` condition, but the tarball ships no src/, so the manifest npm packs
+// drops every `clients-source` key: a process that sets the condition would otherwise resolve an install to a missing
 // file. release.yml's pack job packs here (bit 19 i).
 import { spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -19,12 +19,12 @@ function published(dir: string): Manifest {
 	return read(dir)
 }
 
-/** `entry` (an `exports` or `imports` value) without its `honey-source` conditions, at any depth. */
+/** `entry` (an `exports` or `imports` value) without its `clients-source` conditions, at any depth. */
 function withoutSource(entry: unknown): unknown {
 	if (entry === null || typeof entry !== "object") return entry
 	if (Array.isArray(entry)) return entry.map(withoutSource)
 	return Object.fromEntries(
-		Object.entries(entry).flatMap(([key, value]) => (key === "honey-source" ? [] : [[key, withoutSource(value)]])),
+		Object.entries(entry).flatMap(([key, value]) => (key === "clients-source" ? [] : [[key, withoutSource(value)]])),
 	)
 }
 

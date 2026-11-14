@@ -2,7 +2,7 @@ import { Project, ts } from "ts-morph"
 import { describe, expect, it } from "vitest"
 import { generateSdk } from "./sdk.ts"
 
-/** honey's error envelope for `status`, its `error_key` one of `keys`, as a JSON response. */
+/** backend's error envelope for `status`, its `error_key` one of `keys`, as a JSON response. */
 function envelopeResponse(status: number, keys: string[]) {
 	const field = {
 		properties: { error_key: { type: "string" }, message: { type: "string" }, path: { type: "string" } },

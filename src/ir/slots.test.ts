@@ -43,7 +43,7 @@ describe("parameters, by where they travel", () => {
 			"get",
 			{
 				parameters: [
-					{ in: "path", name: "rest", required: true, schema: { type: "string" }, "x-honey-wildcard": true },
+					{ in: "path", name: "rest", required: true, schema: { type: "string" }, "x-backend-wildcard": true },
 				],
 			},
 		)
@@ -353,7 +353,7 @@ describe("operation extensions", () => {
 	// v0: 39ef3cbd8e
 	// v0: 93c4736b18
 	// v0: 7b8ac1f593
-	it("reads the honey extensions, only a literal true counting as on", () => {
+	it("reads the backend extensions, only a literal true counting as on", () => {
 		const on = {
 			"x-idempotency-key": true,
 			"x-invalidate": ["a", 1, "b", "c"],
@@ -380,10 +380,10 @@ describe("operation extensions", () => {
 		])
 	})
 
-	it("reads the route id an operation came from (x-honey-route), the key extracted ctx types join on", () => {
+	it("reads the route id an operation came from (x-backend-route), the key extracted ctx types join on", () => {
 		expect([
-			operation({ "x-honey-route": "GET /users/:id?" }).extensions,
-			operation({ "x-honey-route": 1 }).extensions,
+			operation({ "x-backend-route": "GET /users/:id?" }).extensions,
+			operation({ "x-backend-route": 1 }).extensions,
 		]).toEqual([{ route: "GET /users/:id?" }, {}])
 	})
 })
@@ -421,7 +421,7 @@ describe("responses: declared headers (A2)", () => {
 })
 
 describe("responses and extensions: what codegen reads of declared errors (O2) and media types", () => {
-	it("carries x-honey-errors per key and x-honey-error per response, and every media type with its schema", () => {
+	it("carries x-backend-errors per key and x-backend-error per response, and every media type with its schema", () => {
 		const op = operation({
 			responses: {
 				201: {
@@ -431,10 +431,10 @@ describe("responses and extensions: what codegen reads of declared errors (O2) a
 				409: {
 					content: { "application/json": { schema: { type: "object" } } },
 					description: "",
-					"x-honey-error": true,
+					"x-backend-error": true,
 				},
 			},
-			"x-honey-errors": { gone: { status: null }, taken: { schema: { type: "string" }, status: 409 } },
+			"x-backend-errors": { gone: { status: null }, taken: { schema: { type: "string" }, status: 409 } },
 		})
 		expect([
 			op.extensions.errors,
@@ -452,10 +452,10 @@ describe("responses and extensions: what codegen reads of declared errors (O2) a
 		])
 	})
 
-	it("drops a malformed x-honey-errors entry and leaves no field when nothing is declared", () => {
+	it("drops a malformed x-backend-errors entry and leaves no field when nothing is declared", () => {
 		const op = operation({
 			responses: { 200: { description: "" } },
-			"x-honey-errors": { bad: { status: "x" }, gone: null, list: [] },
+			"x-backend-errors": { bad: { status: "x" }, gone: null, list: [] },
 		})
 		expect([op.extensions.errors, op.responses["200"]?.contents, Object.hasOwn(op.extensions, "errors")]).toEqual([
 			undefined,

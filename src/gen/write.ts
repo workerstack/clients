@@ -26,7 +26,7 @@ import type { PackageIdentity } from "../emit/shared/metadata.ts"
  * The manifest a target's directory keeps: `files`, each file it wrote by its path with its sha256, and `packages`,
  * the package as each registry lists it (`registry`, `name`, `version`), when the writer names it.
  */
-export const MANIFEST = ".honey-generated.json"
+export const MANIFEST = ".clients-generated.json"
 
 /** What a write did: the files rewritten, the stale ones deleted, and the edited stale ones kept. */
 export type Written = {

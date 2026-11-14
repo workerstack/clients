@@ -21,7 +21,7 @@ export const FORCE_COMMIT_LIMIT = 2
 
 /** What `release bootstrap` prints when it is not told what to target. */
 export const USAGE = [
-	"Usage: honey-clients release bootstrap --config <path> (--all | --only <names>) [--force-bootstrap]",
+	"Usage: clients release bootstrap --config <path> (--all | --only <names>) [--force-bootstrap]",
 	"",
 	"Tip: get a token via: gh auth token",
 ]

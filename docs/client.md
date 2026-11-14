@@ -8,7 +8,7 @@ each language's client in a compiled example.
 ## Example
 
 ```sh
-honey-clients generate --spec openapi.json --target ts --out sdk
+clients generate --spec openapi.json --target ts --out sdk
 ```
 
 ## Errors and the safe mirror
@@ -132,7 +132,7 @@ of its own), or a `DecodeException` for a 2xx, or a declared header, that does n
 is the `EventStream<T>`), its error status at the opening the Err; a WebSocket or realtime method is the very method.
 
 ```csharp
-    public static async Task<string> Listing(HoneySdkClient client, string id)
+    public static async Task<string> Listing(HttpSdkClient client, string id)
     {
         var result = await client.Safe.GetApiAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
         return result.Match(

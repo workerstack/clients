@@ -1,8 +1,8 @@
 /**
  * A product `acme` in a real git repo for `release bump`: `openapi` is hand-kept, `sdk` is generated, the release
  * config at `<repo>/acme-release/release.config.ts`. The fixture codegen writes the sdk's `gen.txt` from the spec and
- * the version it is asked for (RELEASE_VERSIONS, else the released one), as honey bakes a version into rust and mcp
- * output, plus honey's manifest. It fails on a release run while `fail-codegen` exists. Prod is a loopback server
+ * the version it is asked for (RELEASE_VERSIONS, else the released one), as clients bakes a version into rust and mcp
+ * output, plus clients' manifest. It fails on a release run while `fail-codegen` exists. Prod is a loopback server
  * that serves the committed spec unless a test serves another. Bump runs in process, so coverage sees it.
  */
 import { execFileSync } from "node:child_process"
@@ -36,7 +36,7 @@ const state = existsSync(dir + "/.release-state.json")
 	: "0.1.0"
 const text = "version=" + (versions.sdk ?? state) + "\\nspec=" + sha(readFileSync("spec.json", "utf8")) + "\\n"
 writeFileSync(dir + "/gen.txt", text)
-writeFileSync(dir + "/.honey-generated.json", JSON.stringify({ files: { "gen.txt": sha(text) } }, null, "\\t") + "\\n")
+writeFileSync(dir + "/.clients-generated.json", JSON.stringify({ files: { "gen.txt": sha(text) } }, null, "\\t") + "\\n")
 `
 
 /* a spec whose `paths` map each path and method to its operationId */
@@ -116,7 +116,7 @@ async function seed(project: BumpProject, url: string): Promise<void> {
 		{
 			commitMessage: "c",
 			description: "sdk first cut",
-			honey: { options: {}, target: "go" },
+			clients: { options: {}, target: "go" },
 			name: "sdk",
 			repo: "acme/sdk",
 			topics: ["acme"],

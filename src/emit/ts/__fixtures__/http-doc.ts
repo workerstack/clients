@@ -1,7 +1,7 @@
 /**
  * What `generateTypes` reads from an app, written by hand: the OpenAPI document core would write
- * (each operation's `x-honey-route`, its parameters, body, responses, and the declared errors as
- * `x-honey-errors` plus `x-honey-error: true` on each error response), the route tree carrying each
+ * (each operation's `x-backend-route`, its parameters, body, responses, and the declared errors as
+ * `x-backend-errors` plus `x-backend-error: true` on each error response), the route tree carrying each
  * route's meta, and the `ExtractedTypes` ts-morph would read. Mirrors core's openapi/paths.ts and
  * openapi/responses.ts layout; gen imports nothing from core (H2).
  */
@@ -10,8 +10,8 @@ import type { RouteTree, TreeNode } from "../route-tree.ts"
 
 type Json = Record<string, unknown>
 
-/** One registration: `method` upper case (`ALL`, `WS` too), `pattern` a honey pattern (`/users/:id`, `/files/*path`). */
-export type HoneyRoute = {
+/** One registration: `method` upper case (`ALL`, `WS` too), `pattern` a backend pattern (`/users/:id`, `/files/*path`). */
+export type HttpRoute = {
 	readonly method: string
 	readonly pattern: string
 	/** each source's object schema, as `.input()` declares it */
@@ -24,7 +24,7 @@ export type HoneyRoute = {
 	readonly meta?: Record<string, unknown>
 }
 
-export type HoneyApp = { readonly document: Json; readonly tree: RouteTree }
+export type HttpApp = { readonly document: Json; readonly tree: RouteTree }
 
 const STATUS_CODES: Readonly<Record<string, number>> = { accepted: 202, created: 201, no_content: 204, ok: 200 }
 const ALL_METHODS = ["get", "post", "put", "patch", "delete"]
@@ -37,7 +37,7 @@ export const object = (properties: Json, required = Object.keys(properties)): Js
 	type: "object",
 })
 
-/** honey's default error envelope, narrowed to the standard `keys` at `code`. */
+/** backend's default error envelope, narrowed to the standard `keys` at `code`. */
 const envelope = (keys: string[], code: number): Json =>
 	object({
 		error_key: { enum: keys, type: "string" },
@@ -51,7 +51,7 @@ const envelope = (keys: string[], code: number): Json =>
 		success: { const: false },
 	})
 
-/** The OpenAPI path of a honey pattern: `:id` → `{id}`, `*path` → `{path}`, a bare `*` → `{wildcard}`. */
+/** The OpenAPI path of a backend pattern: `:id` → `{id}`, `*path` → `{path}`, a bare `*` → `{wildcard}`. */
 const openApiPath = (pattern: string): string =>
 	pattern.replace(/:([^/]+)/g, "{$1}").replace(/\*([^/]*)$/, (_, name: string) => `{${name || "wildcard"}}`)
 
@@ -59,14 +59,14 @@ function pathParameters(pattern: string): Json[] {
 	return [...pattern.matchAll(/:([^/]+)|\*([^/]*)$/g)].map(([, param, rest]) =>
 		param !== undefined
 			? { in: "path", name: param, required: true, schema: STRING }
-			: { in: "path", name: rest || "wildcard", required: true, schema: STRING, "x-honey-wildcard": true },
+			: { in: "path", name: rest || "wildcard", required: true, schema: STRING, "x-backend-wildcard": true },
 	)
 }
 
-function parametersOf(route: HoneyRoute): Json[] {
+function parametersOf(route: HttpRoute): Json[] {
 	const out = pathParameters(route.pattern)
 	for (const [source, location] of Object.entries(PARAM_SOURCES)) {
-		const schema = route.input?.[source as keyof NonNullable<HoneyRoute["input"]>]
+		const schema = route.input?.[source as keyof NonNullable<HttpRoute["input"]>]
 		if (schema === undefined) continue
 		const required = (schema.required ?? []) as string[]
 		for (const [name, property] of Object.entries(schema.properties as Json))
@@ -75,7 +75,7 @@ function parametersOf(route: HoneyRoute): Json[] {
 	return out
 }
 
-function responsesOf(route: HoneyRoute): Record<string, Json> {
+function responsesOf(route: HttpRoute): Record<string, Json> {
 	const out: Record<string, Json> = {}
 	for (const [media, statuses] of Object.entries(route.output ?? {}))
 		for (const [key, schema] of Object.entries(statuses)) {
@@ -94,16 +94,16 @@ function responsesOf(route: HoneyRoute): Record<string, Json> {
 		out[String(code)] = {
 			content: { "application/json": { schema } },
 			description: entries.map(([k]) => k).join(", "),
-			"x-honey-error": true,
+			"x-backend-error": true,
 		}
 	}
 	return Object.keys(out).length === 0 ? { 200: { description: "Success" } } : out
 }
 
-function operationOf(route: HoneyRoute, id: string): Json {
+function operationOf(route: HttpRoute, id: string): Json {
 	if (route.method === "WS")
-		return { responses: { 101: { description: "WebSocket upgrade" } }, "x-honey-route": id, "x-websocket": true }
-	const op: Json = { "x-honey-route": id }
+		return { responses: { 101: { description: "WebSocket upgrade" } }, "x-backend-route": id, "x-websocket": true }
+	const op: Json = { "x-backend-route": id }
 	if (typeof route.meta?.operationId === "string") op.operationId = route.meta.operationId
 	const parameters = parametersOf(route)
 	if (parameters.length > 0) op.parameters = parameters
@@ -113,7 +113,7 @@ function operationOf(route: HoneyRoute, id: string): Json {
 		op.requestBody = { content: { "application/x-www-form-urlencoded": { schema: form } }, required: true }
 	op.responses = responsesOf(route)
 	if (route.errors !== undefined && Object.keys(route.errors).length > 0)
-		op["x-honey-errors"] = Object.fromEntries(Object.entries(route.errors).sort(([a], [b]) => (a < b ? -1 : 1)))
+		op["x-backend-errors"] = Object.fromEntries(Object.entries(route.errors).sort(([a], [b]) => (a < b ? -1 : 1)))
 	return op
 }
 
@@ -138,7 +138,7 @@ function plant(root: TreeNode, method: string, pattern: string, id: string): voi
  * The app of `routes`: its document (an internal route left out, as core's document does) and its
  * route tree (every route, each with its meta). `components` become the document's schemas.
  */
-export function honeyDoc(routes: readonly HoneyRoute[], components: Record<string, Json> = {}): HoneyApp {
+export function httpDoc(routes: readonly HttpRoute[], components: Record<string, Json> = {}): HttpApp {
 	const paths: Record<string, Json> = {}
 	const root = node()
 	const entries: Record<string, { ek?: string[]; mt: Record<string, unknown> }> = {}

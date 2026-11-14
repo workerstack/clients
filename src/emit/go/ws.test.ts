@@ -362,7 +362,7 @@ goDescribe("a refused WebSocket handshake", () => {
 			upgrades: hops.map((hop) => [hop.url, hop.headers.upgrade]),
 		}).toEqual({
 			forbidden: ["return", ["*sdk.ForbiddenError", "*sdk.ClientError"], undefined],
-			ok: ["return", [], expect.stringMatching(/^honey: http do:/)],
+			ok: ["return", [], expect.stringMatching(/^httpsdk: http do:/)],
 			upgrades: [
 				["/rooms/r", "websocket"],
 				["/plain", "websocket"],

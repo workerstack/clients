@@ -36,21 +36,21 @@ final class Traces {
   }
 
   /**
-   * The simple names from {@code type} up to and including the SDK's HoneyException, or just {@code
+   * The simple names from {@code type} up to and including the SDK's HttpException, or just {@code
    * [type]} outside it.
    */
   private static ArrayNode chain(Sdk sdk, Class<?> type, String name) {
     List<String> names = new ArrayList<>();
-    boolean honey = false;
+    boolean inSdk = false;
     for (Class<?> at = type; at != null; at = at.getSuperclass()) {
       names.add(at.getSimpleName());
-      if (at.getSimpleName().equals("HoneyException") && sdk.pkg().equals(at.getPackageName())) {
-        honey = true;
+      if (at.getSimpleName().equals("HttpException") && sdk.pkg().equals(at.getPackageName())) {
+        inSdk = true;
         break;
       }
     }
     ArrayNode chain = Wire.array();
-    for (String part : honey ? names : List.of(name)) {
+    for (String part : inSdk ? names : List.of(name)) {
       chain.add(part);
     }
     return chain;

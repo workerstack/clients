@@ -1,7 +1,7 @@
 /**
  * Seeded generators for gen's fuzz suites: a copy of core's, since gen never reaches into core
- * (H2). A run uses a fixed seed, so a failure reproduces; `HONEY_FUZZ_SEED` explores other seeds,
- * `HONEY_FUZZ_RUNS` scales every suite's iteration count.
+ * (H2). A run uses a fixed seed, so a failure reproduces; `CLIENTS_FUZZ_SEED` explores other seeds,
+ * `CLIENTS_FUZZ_RUNS` scales every suite's iteration count.
  */
 
 export type Rng = {
@@ -12,12 +12,12 @@ export type Rng = {
 }
 
 function baseSeed(): number {
-	return Number(process.env.HONEY_FUZZ_SEED ?? 0x5eed)
+	return Number(process.env.CLIENTS_FUZZ_SEED ?? 0x5eed)
 }
 
-/** Iterations for a suite: `ci` under CI, `local` elsewhere, either scaled by `HONEY_FUZZ_RUNS`. */
+/** Iterations for a suite: `ci` under CI, `local` elsewhere, either scaled by `CLIENTS_FUZZ_RUNS`. */
 export function runs(local: number, ci: number): number {
-	const scale = Math.max(1, Number(process.env.HONEY_FUZZ_RUNS ?? 1))
+	const scale = Math.max(1, Number(process.env.CLIENTS_FUZZ_RUNS ?? 1))
 	return Math.round((process.env.CI === undefined ? local : ci) * scale)
 }
 

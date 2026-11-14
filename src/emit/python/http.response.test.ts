@@ -46,7 +46,7 @@ const LATE: Reply = { delayMs: 2000, json: { ok: true }, status: 200 }
 const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(String), via: "return", ...entry })
 /** The method's DecodeError for a 2xx whose body is no JSON. */
 const UNDECODED = plain({
-	chain: ["DecodeError", "HoneyError"],
+	chain: ["DecodeError", "HttpError"],
 	text: "HTTP 200: the body is not JSON",
 	type: "DecodeError",
 })
@@ -201,7 +201,7 @@ describe.skipIf(!PY)("a call ends when its time is up or it is canceled, never a
 				error: plain({
 					/* the httpx2 timeout the bound ended the read with */
 					cause: expect.any(String),
-					chain: ["APITimeoutError", "APIConnectionError", "HoneyError"],
+					chain: ["APITimeoutError", "APIConnectionError", "HttpError"],
 					text: "the call ran past its timeout",
 					type: "APITimeoutError",
 				}),
@@ -228,7 +228,7 @@ describe.skipIf(!PY)("a call ends when its time is up or it is canceled, never a
 			},
 			`${run.stderr} elapsed ${elapsed}`,
 		).toEqual({
-			error: plain({ chain: ["CanceledError", "HoneyError"], text: "the call was canceled", type: "CanceledError" }),
+			error: plain({ chain: ["CanceledError", "HttpError"], text: "the call was canceled", type: "CanceledError" }),
 			hops: ["/slow"],
 			observed: [null],
 			status: 0,
@@ -244,7 +244,7 @@ describe.skipIf(!PY)("a refused connection is a transport error, never CanceledE
 		expect({ error: run.trace?.calls[0]?.error, observed: run.observed, status: run.status }, run.stderr).toEqual({
 			error: plain({
 				cause: "ConnectError",
-				chain: ["APIConnectionError", "HoneyError"],
+				chain: ["APIConnectionError", "HttpError"],
 				text: expect.stringMatching(/^the request failed: ConnectError/),
 				type: "APIConnectionError",
 			}),

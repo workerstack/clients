@@ -49,10 +49,10 @@ async function drive(sdk: DrivenSdk, replies: readonly Reply[], calls: readonly 
 /** net/http's refusal of a header, as the SDK wraps it: the request's URL, then the header, never its value. */
 const refusal = (what: string) =>
 	expect.stringMatching(
-		new RegExp(`^honey: http do: Get "http://127\\.0\\.0\\.1:\\d+/echo": net/http: invalid header field ${what}$`),
+		new RegExp(`^httpsdk: http do: Get "http://127\\.0\\.0\\.1:\\d+/echo": net/http: invalid header field ${what}$`),
 	)
 
-/** A Go error of no honey type, as the trace records it. */
+/** A Go error of no backend type, as the trace records it. */
 const plain = (entry: Partial<GoError>) => ({
 	canceled: false,
 	deadline: false,
@@ -84,7 +84,7 @@ describe.skipIf(!GO)(
 				/* bit 21 i3: the status and headers arrived, so the 2xx past the cap is a *DecodeError, an answer */
 				error: plain({
 					chain: ["*sdk.DecodeError", "*errors.errorString"],
-					text: "honey: decode response: honey: response body exceeds MaxResponseBytes",
+					text: "httpsdk: decode response: httpsdk: response body exceeds MaxResponseBytes",
 					tooLarge: true,
 					type: "*sdk.DecodeError",
 				}),

@@ -4,13 +4,13 @@
  */
 import * as z from "zod"
 import type { ConformanceApp, errors } from "./app.ts"
-import type { HoneyRes } from "@workerstack/backend/http"
+import type { HttpRes } from "@workerstack/backend/http"
 
 /** How often an open `realtime.capped` stream looks for a send it has not framed yet. */
 const POLL_MS = 10
 
 /** A Response the route does not declare: a fault injected on purpose, past the handler's typed return. */
-const undeclared = (ctx: { readonly res: object }, response: Response) => (ctx.res as HoneyRes).raw(response) as never
+const undeclared = (ctx: { readonly res: object }, response: Response) => (ctx.res as HttpRes).raw(response) as never
 
 /**
  * The realtime feeds every transport dials (bit 19 e): `realtime.refused` refuses each with 403; `realtime.mixed`

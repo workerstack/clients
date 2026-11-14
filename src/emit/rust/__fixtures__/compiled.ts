@@ -1,6 +1,6 @@
 /**
  * Emitted Rust, compiled (contract 18 §7.2): a registry crate (`FIXTURES`, Fb5) lands under
- * `$HOME/.cache/honey-tmp/rust/sdk/<content hash>/` and builds with the pinned toolchain (rust-env) into the
+ * `$HOME/.cache/backend-tmp/rust/sdk/<content hash>/` and builds with the pinned toolchain (rust-env) into the
  * shared target dir, once per content hash. Its `.complete` marker holds the build's outcome, and a compile
  * that finds it reads it, touches it for CI's prune and spawns no cargo. Builds run `--locked --offline`
  * after one `cargo fetch` per lock and toolchain. A floor leg passes `toolchain: RUST_FLOOR` with `check`;
@@ -72,7 +72,7 @@ function writeAtomic(path: string, text: string | Buffer, mtime?: number): void 
 }
 
 /*
- * Every emitted crate is the package `honey-sdk 0.1.0` at its own workspace root, so cargo gives each the same
+ * Every emitted crate is the package `http-sdk 0.1.0` at its own workspace root, so cargo gives each the same
  * unit hash, fingerprint and rlib in the shared target dir and judges them fresh by mtime alone: a crate whose
  * sources were written before another crate's build finished would link that crate's rlib (and replay its
  * clippy findings). A source dated past every output makes each cargo command compile the crate in front of it;

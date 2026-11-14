@@ -76,7 +76,7 @@ const plain = (entry: Partial<CsError>) => ({
 })
 /** The HookException a hook's `InvalidOperationException(text)` became (§1 rules). */
 const hookError = (text: string) =>
-	plain({ chain: ["HookException", "HoneyException"], inner: "InvalidOperationException", text, type: "HookException" })
+	plain({ chain: ["HookException", "HttpException"], inner: "InvalidOperationException", text, type: "HookException" })
 
 /** OnLog entries, as the trace records them. */
 const start = { event: "request_start", level: "debug", operation: OPERATION }
@@ -452,7 +452,7 @@ describe.skipIf(!DOTNET)("a response hook's Status is read-only (Rust parity)", 
 				"};",
 				"using var c = Client(new ClientConfig { OnResponse = [hook] });",
 			]
-			const source = program("HoneySdk", "HoneySdkClient", lines.join("\n"))
+			const source = program("HttpSdk", "HttpSdkClient", lines.join("\n"))
 			const text = source.split("\n")
 			const findings = checked("http", source).map((line) => {
 				const found = /^\((\d+),\d+\): error (CS\d+: .*)$/.exec(line)

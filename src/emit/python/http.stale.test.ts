@@ -6,7 +6,7 @@
  * selector was invalidated by. Driven against `http` (documents-http.ts), whose `users.create`/`users.delete`
  * stale `GET /users` and `GET /users/{id}`, and `pages.touch` `/a`, `/b`, `/c`, every driver leg on `AsyncSDK` and
  * `SDK` with one expectation (G17). A consumer program on `fixtures` drives the one tracker both clients share
- * (`_honey.stale.StaleTracker`) directly: a pattern key, its clear, and a lookup's cost against the entry count.
+ * (`_http.stale.StaleTracker`) directly: a pattern key, its clear, and a lookup's cost against the entry count.
  */
 import { describe, expect, it } from "vitest"
 import type { Call } from "../../../tests/integration/conformance/matrix.ts"
@@ -202,7 +202,7 @@ const TRACKER = `import gc
 import importlib
 import time
 
-stale = importlib.import_module(f"{sdk.__name__}._honey.stale")
+stale = importlib.import_module(f"{sdk.__name__}._http.stale")
 open_window = sdk.InvalidationConfig(stale_time=600, stale_max_entries=100_000)
 
 section("pattern")

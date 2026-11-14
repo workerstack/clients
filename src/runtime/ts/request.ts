@@ -112,7 +112,7 @@ export function newClientRequestId(): string {
 		}
 		return out
 	}
-	throw new Error("honey: no crypto.randomUUID or crypto.getRandomValues in this runtime")
+	throw new Error("httpsdk: no crypto.randomUUID or crypto.getRandomValues in this runtime")
 }
 
 function isFileLike(v: unknown): boolean {

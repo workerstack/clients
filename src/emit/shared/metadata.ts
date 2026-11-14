@@ -152,7 +152,7 @@ export const shippedOf = (metadata: Metadata): Shipped => ({
 })
 
 /**
- * A registry a generated package publishes to, by the id honey's manifest records it under: `go` is the module proxy
+ * A registry a generated package publishes to, by the id clients' manifest records it under: `go` is the module proxy
  * (`go install <module>@<version>`), `mcp-registry` the MCP registry.
  */
 export type Registry = "crates.io" | "go" | "jsr" | "maven-central" | "mcp-registry" | "npm" | "nuget" | "pypi"

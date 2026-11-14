@@ -71,7 +71,7 @@ const json = (body: unknown, status: number) => () => Response.json(body, { stat
 const typed = (body: string | null, contentType: string | null, status: number) => () =>
 	new Response(body, { headers: contentType === null ? {} : { "content-type": contentType }, status })
 
-/** honey's error envelope for `status` and `key`. */
+/** backend's error envelope for `status` and `key`. */
 function envelope(status: number, key: string) {
 	return { error_key: key, fields: {}, message: "Not found", status, status_key: key, success: false }
 }

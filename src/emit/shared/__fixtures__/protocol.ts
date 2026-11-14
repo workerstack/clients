@@ -74,9 +74,9 @@ export type Script = {
 		readonly authHeaderPrefix?: string
 		/**
 		 * Go: Config.HTTPClient, a caller client counting its round trips and CheckRedirect calls. Rust:
-		 * `http_builder`, a caller builder with user agent `honey-driver` and `Policy::limited(10)` (reqwest has
+		 * `http_builder`, a caller builder with user agent `clients-driver` and `Policy::limited(10)` (reqwest has
 		 * no round-trip hook, so no `transport` count; the user agent is what a hop shows). C#: `ClientConfig.Handler`,
-		 * a caller link adding `User-Agent: honey-driver`, `X-Builder: b` and basic auth where the request has none,
+		 * a caller link adding `User-Agent: clients-driver`, `X-Builder: b` and basic auth where the request has none,
 		 * over a `SocketsHttpHandler` with redirects on (no `transport` count either)
 		 */
 		readonly httpClient?: true
@@ -164,7 +164,7 @@ export type RustError = {
 export type PythonError = {
 	/** `type(e).__name__`: "NotFoundError", "HookError", "CancelledError", … */
 	readonly type: string
-	/** the class names of `type(e).__mro__` up to and including HoneyError; `[type]` for an exception outside the SDK */
+	/** the class names of `type(e).__mro__` up to and including HttpError; `[type]` for an exception outside the SDK */
 	readonly chain: readonly string[]
 	/** `str(e)` */
 	readonly text: string
@@ -190,7 +190,7 @@ export type PythonError = {
 export type CsError = {
 	/** `e.GetType().Name`: "NotFoundException", "ApiTimeoutException", "TaskCanceledException", … */
 	readonly type: string
-	/** the type names from `e.GetType()` through its base types up to and including HoneyException; `[type]` outside the SDK */
+	/** the type names from `e.GetType()` through its base types up to and including HttpException; `[type]` outside the SDK */
 	readonly chain: readonly string[]
 	/** `e.Message` */
 	readonly text: string

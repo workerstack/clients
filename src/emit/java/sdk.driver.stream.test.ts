@@ -43,7 +43,7 @@ const sse = (steps: readonly (string | { waitMs: number })[], end: "close" | "dr
 const strings = (...texts: readonly string[]): Observed => ({ events: texts.map((data) => ({ data })), kind: "events" })
 /** A stream's cancel as traced: the reader's interrupt ended it (J2), via the stream. */
 const CANCELED = expect.objectContaining({ canceled: true, via: "stream" })
-const CONNECTION = ["ApiConnectionException", "HoneyException"]
+const CONNECTION = ["ApiConnectionException", "HttpException"]
 
 /** The `sse` registry SDK with the driver aimed at it, which must build. */
 function on(): DrivenJavaSdk {

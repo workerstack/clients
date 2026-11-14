@@ -1,12 +1,12 @@
 /**
- * honey/public-jsdoc: every declaration a package's `exports` reach, and every member a consumer can see on it, carries
+ * clients/public-jsdoc: every declaration a package's `exports` reach, and every member a consumer can see on it, carries
  * written JSDoc. Through real oxlint, because the rule reads the rest of the package from disk.
  */
 import { describe, expect, it } from "vitest"
 import { oxlintReports } from "./rule-harness.ts"
 import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
 
-const MANIFEST = JSON.stringify({ exports: { ".": { "honey-source": "./src/index.ts" } } })
+const MANIFEST = JSON.stringify({ exports: { ".": { "clients-source": "./src/index.ts" } } })
 
 const missing = (name: string, entry = ".") =>
 	`\`${name}\` is public through "${entry}" and has no JSDoc: add a /** */ block that says what a caller needs and the type does not`
@@ -26,7 +26,7 @@ function messages(code: string, extra: Record<string, string> = {}): string[] {
 	return oxlintReports("public-jsdoc", fixture).map((report) => report.message)
 }
 
-describe("honey/public-jsdoc: what needs a doc", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/public-jsdoc: what needs a doc", { timeout: SPAWN_TIMEOUT }, () => {
 	it.each([
 		["a function", "export function f(): void {}\n", ["f"]],
 		["a class", "export class C {}\n", ["C"]],
@@ -76,7 +76,7 @@ describe("honey/public-jsdoc: what needs a doc", { timeout: SPAWN_TIMEOUT }, () 
 	})
 })
 
-describe("honey/public-jsdoc: where a report lands", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/public-jsdoc: where a report lands", { timeout: SPAWN_TIMEOUT }, () => {
 	it("finds a re-exported declaration and an unexported reachable type where they are defined", () => {
 		const fixture = {
 			"package.json": MANIFEST,
@@ -91,7 +91,7 @@ describe("honey/public-jsdoc: where a report lands", { timeout: SPAWN_TIMEOUT },
 	})
 })
 
-describe("honey/public-jsdoc: what passes", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/public-jsdoc: what passes", { timeout: SPAWN_TIMEOUT }, () => {
 	it.each([
 		["a documented function", "/** Runs it. */\nexport function f(): void {}\n"],
 		["a documented constant", "/** How many fit. */\nexport const c = 1\n"],
@@ -143,7 +143,7 @@ describe("honey/public-jsdoc: what passes", { timeout: SPAWN_TIMEOUT }, () => {
 	})
 })
 
-describe("honey/public-jsdoc: docs that say nothing", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/public-jsdoc: docs that say nothing", { timeout: SPAWN_TIMEOUT }, () => {
 	it("rejects an empty doc", () => {
 		expect(messages("/** */\nexport const size = 1\n")).toEqual([empty("size")])
 	})
@@ -196,7 +196,7 @@ describe("honey/public-jsdoc: docs that say nothing", { timeout: SPAWN_TIMEOUT }
 	})
 })
 
-describe("honey/public-jsdoc: inferred shapes", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/public-jsdoc: inferred shapes", { timeout: SPAWN_TIMEOUT }, () => {
 	it.each([
 		["a function's return", "/** Runs. */\nexport function f() { return { a: 1 } }\n", "f"],
 		[
@@ -237,7 +237,7 @@ describe("honey/public-jsdoc: inferred shapes", { timeout: SPAWN_TIMEOUT }, () =
 	})
 })
 
-describe("honey/public-jsdoc: failing closed", { timeout: SPAWN_TIMEOUT }, () => {
+describe("clients/public-jsdoc: failing closed", { timeout: SPAWN_TIMEOUT }, () => {
 	it("reports a form the surface cannot follow, on the file that has it", () => {
 		const reports = oxlintReports("public-jsdoc", {
 			"package.json": MANIFEST,
@@ -247,7 +247,7 @@ describe("honey/public-jsdoc: failing closed", { timeout: SPAWN_TIMEOUT }, () =>
 			{
 				file: "src/index.ts",
 				message:
-					"honey/public-jsdoc cannot follow TSModuleDeclaration here, so what it exposes goes unchecked: write it as a plain export",
+					"clients/public-jsdoc cannot follow TSModuleDeclaration here, so what it exposes goes unchecked: write it as a plain export",
 			},
 		])
 	})

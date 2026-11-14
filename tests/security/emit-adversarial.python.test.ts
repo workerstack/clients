@@ -25,7 +25,7 @@ const FLOOR = withPython(PY_FLOOR)
 
 const REPO = resolve(import.meta.dirname, "../..")
 
-const mutant = guardNamed(process.env.HONEY_MUTANT)
+const mutant = guardNamed(process.env.CLIENTS_MUTANT)
 if (mutant !== undefined) {
 	vi.doMock(resolve(REPO, mutant.module), async (importOriginal) => {
 		const original = await importOriginal<Record<string, unknown>>()
@@ -173,7 +173,7 @@ const SENT = JSON.stringify(["Bearer s3cret", "sid=1", "k-1"])
 /* the redirect follow over an http→https hop, in process: the recording server has no TLS */
 const HTTPS_HOP = `import importlib
 
-redirect = importlib.import_module(f"{sdk.__name__}._honey.redirect")
+redirect = importlib.import_module(f"{sdk.__name__}._http.redirect")
 sent = {"Authorization": "Bearer s3cret", "Cookie": "sid=1", "X-Api-Key": "k-1", "Accept": "application/json"}
 hop = redirect.Hop("GET", "http://h.test/a", sent, None)
 for policy in ("same-origin", "follow"):

@@ -140,7 +140,7 @@ goDescribe("a JSON answer decodes into the operation's type; an undecodable one 
 				canceled: false,
 				deadline: false,
 				sdk: ["*sdk.DecodeError"],
-				text: expect.stringMatching(/^honey: decode response: /),
+				text: expect.stringMatching(/^httpsdk: decode response: /),
 				via,
 			},
 			result,
@@ -226,7 +226,7 @@ goDescribe("a call ends when its time is up or its ctx is canceled", () => {
 	}, 600_000)
 
 	// v0: 9a8782c1a9
-	it("ends a call whose ctx is canceled in flight with context.Canceled, not a deadline and no honey type", async () => {
+	it("ends a call whose ctx is canceled in flight with context.Canceled, not a deadline and no backend type", async () => {
 		const late: Reply = { delayMs: 2000, json: { ok: true }, status: 200 }
 		const script: Script = { calls: [{ cancel: { afterMs: 300 } }] }
 		const { hops, run } = await drive(respSdk(), [late], [SLOW], { script })

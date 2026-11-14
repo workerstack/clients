@@ -193,7 +193,7 @@ export async function runBump(release: Release, major: boolean, ctx: ReleaseCont
 		(planned): planned is Releasing => planned.decision.kind !== "none",
 	)
 	const generated = releasing.filter(
-		({ observed, pkg, previous }) => pkg.honey !== undefined && observed.output !== previous?.output,
+		({ observed, pkg, previous }) => pkg.clients !== undefined && observed.output !== previous?.output,
 	)
 	if (generated.length > 0) {
 		const gate = await checkDeployedSpec(release.spec, ctx.fetch)

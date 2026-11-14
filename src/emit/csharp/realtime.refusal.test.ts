@@ -82,7 +82,7 @@ IReadOnlyList<ITransportAdapter> adapters;
 await using (var setup = await c.Feed.LiveAsync("c")) (url, adapters) = (setup.Url, setup.Adapters);
 var sse = adapters[1];
 var options = new TransportOptions { MaxReconnectAttempts = 3, ReconnectDelay = TimeSpan.FromMilliseconds(1) };
-await using var rc = new ResumableConnection<JsonElement>(url, [adapters[0], ${second}], HoneySdkJsonContext.Default.JsonElement, options);
+await using var rc = new ResumableConnection<JsonElement>(url, [adapters[0], ${second}], HttpSdkJsonContext.Default.JsonElement, options);
 await rc.ConnectAsync();
 var e = rc.GetAsyncEnumerator();
 for (var i = 0; i < 2; i++)

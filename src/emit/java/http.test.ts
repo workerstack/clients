@@ -90,7 +90,7 @@ const plain = (entry: Partial<JavaError>) => ({
 /** The trace of a `user-id` value refused as a path segment (the C# text, kept for the Java SDK). */
 const refused = (value: string) =>
 	plain({
-		chain: ["PathParamException", "HoneyException"],
+		chain: ["PathParamException", "HttpException"],
 		text: `path param user-id: "${value}" is not a path segment`,
 		type: "PathParamException",
 	})

@@ -1,5 +1,5 @@
 /**
- * The Rust SDK's `Cargo.lock` template (contract 18 §5.2): a crate `honey-sdk 0.1.0` with the WebSocket
+ * The Rust SDK's `Cargo.lock` template (contract 18 §5.2): a crate `http-sdk 0.1.0` with the WebSocket
  * dependency set, as `sdk-cargo.ts` declares it, resolved by cargo under the pinned toolchain (rust-env) and
  * written to `src/runtime/rust/Cargo.lock`. Every emitted crate's lock is cut from it (`cargoLock`). The
  * resolve starts from the current template, so cargo only adds what a new dependency or feature needs and
@@ -15,7 +15,7 @@ import { cargoToml } from "../src/emit/rust/sdk-cargo.ts"
 
 const dir = rustCacheDir("tmp", "lock")
 mkdirSync(join(dir, "src"), { recursive: true })
-writeFileSync(join(dir, "Cargo.toml"), cargoToml({ name: "honey-sdk", version: "0.1.0" }, true))
+writeFileSync(join(dir, "Cargo.toml"), cargoToml({ name: "http-sdk", version: "0.1.0" }, true))
 writeFileSync(join(dir, "src/lib.rs"), "")
 const target = new URL("../src/runtime/rust/Cargo.lock", import.meta.url)
 writeFileSync(join(dir, "Cargo.lock"), readFileSync(target, "utf8"))

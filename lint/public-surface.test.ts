@@ -1,5 +1,5 @@
 /**
- * The graph behind honey/public-jsdoc: what a package's `exports` map reaches, by name or through a type position,
+ * The graph behind clients/public-jsdoc: what a package's `exports` map reaches, by name or through a type position,
  * read from a real package on disk because the graph crosses files.
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -11,9 +11,9 @@ import { findPackageRoot, publicSurface } from "./public-surface.js"
 const roots: string[] = []
 
 function packageOf(entries: Record<string, string>, files: Record<string, string>): string {
-	const root = realpathSync(mkdtempSync(join(tmpdir(), "honey-surface-")))
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "clients-surface-")))
 	roots.push(root)
-	const exports = Object.fromEntries(Object.entries(entries).map(([key, file]) => [key, { "honey-source": file }]))
+	const exports = Object.fromEntries(Object.entries(entries).map(([key, file]) => [key, { "clients-source": file }]))
 	writeFileSync(
 		join(root, "package.json"),
 		JSON.stringify({ exports: { ...exports, "./package.json": "./package.json" } }),
@@ -205,7 +205,7 @@ describe("publicSurface: failing closed", () => {
 })
 
 describe("findPackageRoot", () => {
-	it("finds the nearest package whose exports use the honey-source condition", () => {
+	it("finds the nearest package whose exports use the clients-source condition", () => {
 		const root = packageOf({ ".": "./src/index.ts" }, { "src/deep/file.ts": "export {}\n" })
 		expect(findPackageRoot(join(root, "src/deep/file.ts"))).toBe(root)
 	})

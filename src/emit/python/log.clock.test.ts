@@ -16,7 +16,7 @@ const SLOW = { timeout: 600_000 }
 const BODY = `    import importlib
     import types
 
-    log = importlib.import_module(sdk.__name__ + "._honey.log")
+    log = importlib.import_module(sdk.__name__ + "._http.log")
     ticks = [0.0]
 
     def tick() -> float:

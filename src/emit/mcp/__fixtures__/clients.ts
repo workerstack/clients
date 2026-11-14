@@ -18,7 +18,7 @@ import { serving } from "./http-server.ts"
 import type { HttpTarget, Step, Stepped } from "./steps.ts"
 
 /** Where the clients are installed. */
-export const clientsDir = (): string => join(process.env.HOME ?? "", ".cache/honey-tmp/mcp-clients")
+export const clientsDir = (): string => join(process.env.HOME ?? "", ".cache/backend-tmp/mcp-clients")
 
 /** The checked-in lock's sha256, as an install stamps it. */
 const lockSha = () =>
@@ -35,7 +35,7 @@ export const hasClients = (): boolean => {
 /** Whether a leg runs its clients half: a missing install fails where toolchains are required, and skips elsewhere. */
 export function withClients(): boolean {
 	const present = hasClients()
-	if (!present && process.env.HONEY_REQUIRE_TOOLCHAINS === "1")
+	if (!present && process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1")
 		throw new Error(`the pinned MCP clients are required here and are not installed: ${clientsInstall()}`)
 	return present
 }
@@ -81,7 +81,7 @@ const script = (client: ClientName) =>
 	`${CLIENTS[client].join("\n")}
 const [command, ...rest] = JSON.parse(process.argv[2])
 const call = JSON.parse(process.argv[3])
-const client = new Client({ name: "honey-check", version: "1.0.0" }, ${OPTIONS[client]})
+const client = new Client({ name: "clients-check", version: "1.0.0" }, ${OPTIONS[client]})
 await client.connect(new StdioClientTransport({ args: rest, command, env: process.env }))
 const out = { latest: LATEST_PROTOCOL_VERSION, negotiated: client.getNegotiatedProtocolVersion?.() ?? client.transport?.protocolVersion ?? "", tools: (await client.listTools()).tools }
 if (call) try { out.called = await client.callTool(call) } catch (error) { out.failed = String(error?.message ?? error) }
@@ -121,7 +121,7 @@ const sessionScript = (client: ClientName) =>
 	`${CLIENTS[client].join("\n")}
 const target = JSON.parse(process.argv[2])
 const steps = JSON.parse(process.argv[3])
-const client = new Client({ name: "honey-conformance", version: "1.0.0" }, ${OPTIONS[client]})
+const client = new Client({ name: "clients-conformance", version: "1.0.0" }, ${OPTIONS[client]})
 const transport = Array.isArray(target)
 	? new StdioClientTransport({ args: target.slice(1), command: target[0], env: process.env })
 	: new StreamableHTTPClientTransport(new URL(target.url), { requestInit: { headers: target.headers } })

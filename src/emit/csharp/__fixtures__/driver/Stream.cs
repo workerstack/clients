@@ -2,7 +2,7 @@ using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>A stream call: the SDK, its plan, the grid call, its script entry, how it is observed and its raw response.</summary>
 internal sealed record StreamCall(Sdk Sdk, Plan Plan, Call Call, CallScript? Entry, Lens Lens, object Raw);

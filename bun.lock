@@ -523,7 +523,7 @@
 
     "@vitest/utils": ["@vitest/utils@4.1.10", "", { "dependencies": { "@vitest/pretty-format": "4.1.10", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA=="],
 
-    "@workerstack/backend": ["@workerstack/backend@vendor/workerstack-backend-1.0.0-rc.26.tgz", { "dependencies": { "jiti": "2.7.0" }, "peerDependencies": { "@workerstack/clients": ">=1.0.0-0" }, "optionalPeers": ["@workerstack/clients"], "bin": { "honey": "bin/honey.js" } }, "sha512-KSKxKAZp8s8hZJ0hSqFt3W0B+DITsa19lXna6RqyaoL6JZ3vx0pU2ARg3Ro3pFW1RYm7rVqwu/N0yVv9cP8zzA=="],
+    "@workerstack/backend": ["@workerstack/backend@vendor/workerstack-backend-1.0.0-rc.26.tgz", { "dependencies": { "jiti": "2.7.0" }, "peerDependencies": { "@workerstack/clients": ">=1.0.0-rc.27" }, "optionalPeers": ["@workerstack/clients"], "bin": { "backend": "bin/backend.js" } }, "sha512-cYz1j0Dy88MfGLE6gEnplh7rdptoSe2DHd/jFNtkoWjrgn1NOhLYhw7jf/FJuYj+PS2FX1rPnqELwF/VTy5OkQ=="],
 
     "@workerstack/system": ["@workerstack/system@0.3.0", "", { "bin": { "system": "src/bin.ts" } }, "sha512-uE3CDD8ZVLcZsGcOrUl49GoH64BZcd/nTD+Cz0nrADTvQKE3VNEiZlMSfo4ESGAnXh69HNKrIoLuf9hInznPAQ=="],
 

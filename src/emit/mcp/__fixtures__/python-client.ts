@@ -96,7 +96,7 @@ def dumped(model):
     return model.model_dump(mode="json", by_alias=True, exclude_none=True)
 
 async def main():
-    metadata = OAuthClientMetadata(client_name="honey-oauth", redirect_uris=[world["redirectUri"]], grant_types=["authorization_code"], response_types=["code"], token_endpoint_auth_method="none")
+    metadata = OAuthClientMetadata(client_name="clients-oauth", redirect_uris=[world["redirectUri"]], grant_types=["authorization_code"], response_types=["code"], token_endpoint_auth_method="none")
     provider = OAuthClientProvider(world["endpoint"], metadata, Memory(), redirect, callback)
     out = {"authorizations": authorizations}
     try:

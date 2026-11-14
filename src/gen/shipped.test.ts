@@ -42,7 +42,7 @@ const read = (path: string): Uint8Array => {
 }
 
 /** The C# package's `.csproj` in `files`. */
-const csprojOf = (files: Generated) => String(files.csharp?.files["HoneySdk.csproj"])
+const csprojOf = (files: Generated) => String(files.csharp?.files["HttpSdk.csproj"])
 
 /** Every target's files for `run`, the files read through `reader`. */
 const run = (metadata: GenerateRun["metadata"], reader = read) =>

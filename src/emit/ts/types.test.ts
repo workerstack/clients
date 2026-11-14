@@ -12,7 +12,7 @@ import { serviceMapOf } from "./sdk.ts"
 
 const check = consumerChecker(morph)
 
-/** honey's error envelope for `status` and its error keys. */
+/** backend's error envelope for `status` and its error keys. */
 const envelope = (status: number, keys: string[]) =>
 	object({
 		error_key: { enum: keys, type: "string" },
@@ -135,11 +135,11 @@ expectType<[299 | 600] extends [B["status"]] ? false : true>()`
 	})
 })
 
-describe("a call's errors in honey's envelope", () => {
+describe("a call's errors in backend's envelope", () => {
 	// v0: 6193b45b8b
 	// v0: b72ff2324f
 	// v0: bb594968f7
-	it("types honey's error envelope at its declared status: all six keys, the status and the key as literals", () => {
+	it("types backend's error envelope at its declared status: all six keys, the status and the key as literals", () => {
 		const consumer = `type D = Declared<typeof safe.secure.get>
 type E = Extract<D, { status: 404 }>["body"]
 expectType<Equal<D["status"], 400 | 401 | 404>>()

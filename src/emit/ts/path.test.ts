@@ -97,7 +97,7 @@ const pathParam = (name: string, wildcard = false): Json => ({
 	name,
 	required: true,
 	schema: { type: "string" },
-	...(wildcard ? { "x-honey-wildcard": true } : {}),
+	...(wildcard ? { "x-backend-wildcard": true } : {}),
 })
 
 /** A GET operation `operationId` taking the path params `names`. */

@@ -73,7 +73,7 @@ async function drive(replies: readonly Reply[], calls: readonly Call[], script: 
 const step = (h: HookTrace) =>
 	[h.call, h.phase, h.index, h.isRetry ? "retry" : "", h.status ?? ""].filter((part) => part !== "").join(" ")
 
-/** A Go error of no honey type, as the trace records it. */
+/** A Go error of no backend type, as the trace records it. */
 const plain = (entry: Partial<GoError>) => ({
 	canceled: false,
 	deadline: false,
@@ -172,16 +172,16 @@ goDescribe("OnRequest and OnResponse hooks: a hook's error", () => {
 		])
 		expect({ after: outcome(after), before: outcome(before) }).toEqual({
 			after: {
-				error: hookError("honey: OnResponse hook: bad"),
+				error: hookError("httpsdk: OnResponse hook: bad"),
 				hops: 1,
-				log: [start, failed("honey: OnResponse hook: bad")],
+				log: [start, failed("httpsdk: OnResponse hook: bad")],
 				observed: [null],
 				order: ["0 request 0", "0 response 0 200"],
 			},
 			before: {
-				error: hookError("honey: OnRequest hook: boom"),
+				error: hookError("httpsdk: OnRequest hook: boom"),
 				hops: 0,
-				log: [start, failed("honey: OnRequest hook: boom")],
+				log: [start, failed("httpsdk: OnRequest hook: boom")],
 				observed: [null],
 				order: ["0 request 0"],
 			},

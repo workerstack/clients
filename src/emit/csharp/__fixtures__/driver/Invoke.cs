@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>
 /// The binding core (Fb10): one call sent by its plan, nothing generated. The method is found from the client (its

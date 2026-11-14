@@ -1,7 +1,7 @@
 /* copied from @workerstack/backend's tests/integration/conformance/reference-server.ts at b7c1db40, on backend's public exports: each package owns its test fixtures (roadmap 5 D7) */
 /**
  * The resumable reference server (H8): the conformance target the SDK reconnect tests run against.
- * Conformance infrastructure, never shipped core: an in-memory event log on honey's two public
+ * Conformance infrastructure, never shipped core: an in-memory event log on backend's two public
  * resume hooks alone, SSE `Last-Event-ID` and the WebSocket `reconnect_token` → `onReconnect`.
  *
  * - `POST /events` appends its JSON body; the answer is the stored event `{ id, data }`.
@@ -14,7 +14,7 @@
  * replays the whole log (not a whole number) or nothing (past the head).
  */
 import * as z from "zod"
-import { honey } from "@workerstack/backend/http"
+import { httpApp } from "@workerstack/backend/http"
 import type { SSEStream } from "@workerstack/backend/http"
 import type { WSContext } from "@workerstack/backend/http"
 import { ws } from "@workerstack/backend/ws"
@@ -75,7 +75,7 @@ export function createReferenceServer() {
 		follow(positionOf(cursor), deliver)
 	}
 
-	const app = honey<{}>()
+	const app = httpApp<{}>()
 	app
 		.post("/events")
 		.meta({ operationId: "events.append", mcp: true })

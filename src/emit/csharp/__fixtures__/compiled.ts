@@ -1,6 +1,6 @@
 /**
  * Emitted C#, gated (contract 45 §6.2, Fb9, Fb12): a registry SDK (`FIXTURES`) lands under
- * `$HOME/.cache/honey-tmp/dotnet/sdk/<content hash>/src`, and MSBuild builds it once per hash, offline, warnings as
+ * `$HOME/.cache/backend-tmp/dotnet/sdk/<content hash>/src`, and MSBuild builds it once per hash, offline, warnings as
  * errors, in a private partial dir renamed into place with its `.complete` marker: no worker sees half a dir or
  * builds into another's. Two slot files, taken by exclusive create and stale once their holder is gone, bound the
  * builds at once to two. A gate that finds the marker reads it, touches it for CI's prune and spawns nothing.

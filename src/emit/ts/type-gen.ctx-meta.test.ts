@@ -6,7 +6,7 @@
 import * as tsMorph from "ts-morph"
 import { describe, expect, it } from "vitest"
 import type { ExtractedTypes } from "../../extract/extract.ts"
-import { extracted, type HoneyApp, type HoneyRoute, honeyDoc, object } from "./__fixtures__/honey-doc.ts"
+import { extracted, type HttpApp, type HttpRoute, httpDoc, object } from "./__fixtures__/http-doc.ts"
 import { typechecker } from "./__fixtures__/typecheck.ts"
 import { generateTypes } from "./type-gen.ts"
 
@@ -16,20 +16,20 @@ const NUMBER = { type: "number" }
 const STRING = { type: "string" }
 
 /** generateTypes over `app`, what it reported, and each diagnostic of `consumer` beside its output. */
-function check(app: HoneyApp, consumer: string, types: ExtractedTypes | null = null) {
+function check(app: HttpApp, consumer: string, types: ExtractedTypes | null = null) {
 	const reports: string[] = []
 	const text = generateTypes({ ...app, extracted: types, report: (m) => reports.push(m) })
 	return { diagnostics: typecheck(text, consumer), reports, text }
 }
 
-const route = (method: string, pattern: string, rest: Partial<HoneyRoute> = {}): HoneyRoute => ({
+const route = (method: string, pattern: string, rest: Partial<HttpRoute> = {}): HttpRoute => ({
 	method,
 	pattern,
 	...rest,
 })
 
 /* the meta of each route as the tree carries it: chain, middleware and route meta resolved (O1) */
-const META_APP = honeyDoc([
+const META_APP = httpDoc([
 	route("GET", "/health", { meta: { summary: "Health check" } }),
 	route("GET", "/orgs", {
 		input: { search: object({ limit: NUMBER }) },
@@ -66,7 +66,7 @@ void intoGenerated`
 
 describe("the ctx's meta and a declared key (bit 22 a)", () => {
 	/* a consumer may type an OpenAPI key its own way; the handler holds that type, so the ctx must not intersect
-	   honey's over it */
+	   backend's over it */
 	it("leaves out an OpenAPI key the declared meta redefines", () => {
 		const declared = "{ readonly security?: readonly { readonly scheme: string }[] }"
 		const types = extracted({ env: "{}", meta: declared })
@@ -88,7 +88,7 @@ void notLiteral`
 
 	// v0: 3e07faac56
 	it("types chain meta per route, a route's own value overriding the chain's", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/test", { meta: { security: "jwt", tags: "Auth" } }),
 			route("POST", "/test", { meta: { security: "jwt", tags: "Override" } }),
 		])
@@ -100,7 +100,7 @@ expectType<Equal<RouteMeta<"/test", "post">, { security: "jwt"; tags: "Override"
 	// v0: 2717e15bd2
 	it("types invalidate beside deprecated, operationId and tags, and a meta-less route as {}", () => {
 		const meta = { deprecated: true, invalidate: ["GET /v1/users"], operationId: "user.create", tags: "users" }
-		const app = honeyDoc([route("GET", "/v1/users"), route("POST", "/v1/users", { meta })])
+		const app = httpDoc([route("GET", "/v1/users"), route("POST", "/v1/users", { meta })])
 		const consumer = `expectType<Equal<RouteMeta<"/v1/users", "post">, { deprecated: true; invalidate: ["GET /v1/users"]; operationId: "user.create"; tags: "users" }>>()
 expectType<Equal<RouteMeta<"/v1/users", "get">, {}>>()`
 		expect(check(app, consumer).diagnostics).toEqual([])
@@ -108,7 +108,7 @@ expectType<Equal<RouteMeta<"/v1/users", "get">, {}>>()`
 
 	// v0: eecb2cdc81
 	it("types invalidate as a literal string tuple", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/v1/users"),
 			route("GET", "/v1/users/:id"),
 			route("POST", "/v1/users", { meta: { invalidate: ["GET /v1/users", "GET /v1/users/:id"] } }),

@@ -4,7 +4,7 @@
  * file beside the SDK, plus the types that make its surfaces exact for this document.
  *
  * The vendoring mirrors `http.ts`'s `runtimeSource`, with one difference it cannot share: those modules
- * import only each other, so dropping every sibling import is enough. These import honey's runtime too
+ * import only each other, so dropping every sibling import is enough. These import clients' runtime too
  * (`../ts/sdk.ts`), and the emitted file needs those names from `./<stem>.runtime.gen`, so the specifier is
  * rewritten rather than dropped.
  */
@@ -19,7 +19,7 @@ const QUERY_MODULES: readonly string[] = ["invalidate", "query"]
 
 /* an import of a module beside this one: now the same file, so the names are already in scope */
 const SIBLING_IMPORT = /^import\s+(?:type\s+)?\{[^}]*\}\s+from\s+"\.\/[\w-]+\.ts"\n/gm
-/* an import of honey's own runtime, which the emitted file reads from `<stem>.runtime.gen` */
+/* an import of clients' own runtime, which the emitted file reads from `<stem>.runtime.gen` */
 const RUNTIME_IMPORT = /^import\s+(type\s+)?\{([^}]*)\}\s+from\s+"\.\.\/ts\/[\w-]+\.ts"\n/gm
 /* query-core, which stays exactly as written: type-only, so nothing has to resolve at run time */
 const QUERY_CORE_IMPORT = /^import\s+type\s+\{([^}]*)\}\s+from\s+"@tanstack\/query-core"\n/gm
@@ -39,7 +39,7 @@ function namesOf(clauses: readonly string[]): string[] {
  */
 export function tanstackQuerySource(runtime: string): string {
 	const core: string[] = []
-	const honey: string[] = []
+	const runtimeNames: string[] = []
 	const bodies = QUERY_MODULES.map((name) => {
 		const text = readFileSync(new URL(`../../runtime/ts-tanstack-query/${name}.ts`, import.meta.url), "utf8")
 		return text
@@ -48,7 +48,7 @@ export function tanstackQuerySource(runtime: string): string {
 				return ""
 			})
 			.replace(RUNTIME_IMPORT, (_, __, named: string) => {
-				honey.push(named)
+				runtimeNames.push(named)
 				return ""
 			})
 			.replace(SIBLING_IMPORT, "")
@@ -56,7 +56,7 @@ export function tanstackQuerySource(runtime: string): string {
 	})
 	const imports = [
 		`import type { ${namesOf(core).join(", ")} } from "@tanstack/query-core"`,
-		`import type { ${namesOf(honey).join(", ")} } from "./${runtime}.js"`,
+		`import type { ${namesOf(runtimeNames).join(", ")} } from "./${runtime}.js"`,
 	]
 	return `${imports.join("\n")}\n\n${bodies.join("\n\n")}\n`
 }

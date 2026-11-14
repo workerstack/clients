@@ -159,7 +159,7 @@ describe.skipIf(!PY)("freeing a stream's connection: async with, as the runtime 
 		const run = await served([sse(['data: {"n":1}\n\n'], "hold"), next.reply], (server) =>
 			consume("sse", "scoped", { base: server.url, body: SCOPED }),
 		)
-		const events = generatePythonSdk(sseDocument()).files["src/honey_sdk/_honey/events.py"] ?? ""
+		const events = generatePythonSdk(sseDocument()).files["src/http_sdk/_http/events.py"] ?? ""
 		expect(
 			{ ...seen(run), released: next.released(), says: events.replace(/\s*\n\s*/g, " ").includes(SCOPED_RELEASE) },
 			run.stderr,
@@ -193,7 +193,7 @@ describe.skipIf(!PY)("freeing a socket's connection: async with, as the runtime 
 			const program = consume("ws", "scoped_socket", { base: server.url, body: SCOPED_SOCKET })
 			return { first: await atSecondOpen(server), run: await program }
 		})
-		const doc = generatePythonSdk(wsDocument()).files["src/honey_sdk/_honey/ws.py"] ?? ""
+		const doc = generatePythonSdk(wsDocument()).files["src/http_sdk/_http/ws.py"] ?? ""
 		expect({ ...seen(run), first, says: doc.replace(/\s*\n\s*/g, " ").includes(SOCKET_RELEASE) }, run.stderr).toEqual({
 			first: [{ code: 1000, kind: "close", reason: "" }],
 			out: ["open", "again"],

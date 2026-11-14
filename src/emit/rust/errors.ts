@@ -1,9 +1,9 @@
 /**
  * The API's error keys in Rust (G6/G7): one `ErrorKey` enum over every key the API declares, in an operation's
- * `x-honey-errors` or as an error response's envelope keys, with `Other(String)` for any other; its wire
+ * `x-backend-errors` or as an error response's envelope keys, with `Other(String)` for any other; its wire
  * spelling (`as_str`, `Display`) and parse (`From<&str>`); `ApiError::key()`, which reads the runtime's raw key
  * into it, so the runtime never names a generated type (Fc4); and `<Key>Data` for a key whose own schema is
- * inline and not honey's envelope, the type `ApiError::decode_body` decodes its body into. Spec text reaches
+ * inline and not backend's envelope, the type `ApiError::decode_body` decodes its body into. Spec text reaches
  * the source only through the shared escape layer.
  */
 import type { IRResponse, IRSchema } from "../../ir/model.ts"
@@ -25,7 +25,7 @@ function envelopeKeys(model: SdkModel): string[] {
 }
 
 /**
- * Every declared key in code-unit order with its schema: `x-honey-errors`' (the first operation by id to
+ * Every declared key in code-unit order with its schema: `x-backend-errors`' (the first operation by id to
  * declare the key, so the document's path order never changes it), then an envelope's keys, which carry none.
  */
 function declaredKeys(model: SdkModel): [string, IRSchema | undefined][] {
@@ -101,7 +101,7 @@ const TAIL = [
 	"}",
 	"",
 	"impl crate::ApiError {",
-	"    /// honey's error key in the body: the declared one it names, else `Other`; `None` without one.",
+	"    /// backend's error key in the body: the declared one it names, else `Other`; `None` without one.",
 	"    pub fn key(&self) -> Option<ErrorKey> {",
 	"        self.raw_key().map(ErrorKey::from)",
 	"    }",

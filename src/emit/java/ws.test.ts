@@ -131,7 +131,7 @@ describe.skipIf(!JAVA)("the WebSocket dial: the call's headers, a request id, no
 			const { hops, run } = await drive([ws([])], [rooms({ headers: { [name]: "x" } })], { script: {} })
 			const error = run.trace?.calls[0]?.error
 			expect({ chain: error?.chain, hops: hops.length, inner: error?.inner, text: error?.text }, run.stderr).toEqual({
-				chain: ["ConfigException", "HoneyException"],
+				chain: ["ConfigException", "HttpException"],
 				hops: 0,
 				inner: null,
 				text: `the ${name} header is restricted and cannot be sent`,

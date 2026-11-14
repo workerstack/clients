@@ -287,7 +287,7 @@ describe("csTopLevel: refs, hoists and the empty record", () => {
 			text: ["public sealed record Empty", "{", "}"].join("\n"),
 			title: "a closed empty object is a record without members: {} on the wire",
 		},
-		/* honey-a8's ruling (contract 47, after 2a): additionalProperties beside fields is kept as extension data */
+		/* clients-a8's ruling (contract 47, after 2a): additionalProperties beside fields is kept as extension data */
 		{
 			name: "Labels",
 			schema: { additionalProperties: STRING, properties: { name: STRING }, type: "object" },

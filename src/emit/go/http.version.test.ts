@@ -1,7 +1,7 @@
 /**
  * The Go SDK speaks HTTP/1.1 (bit 19 d2, sweep item 10): against a server offering h2 and http/1.1 by ALPN, its
  * request arrives over http/1.1, as every SDK's does, so the conformance grid's cleartext server is the wire every
- * target ships. net/http's DefaultTransport would negotiate h2 (probe: ~/.cache/honey-tmp/b19/probes/http-version.txt);
+ * target ships. net/http's DefaultTransport would negotiate h2 (probe: ~/.cache/backend-tmp/b19/probes/http-version.txt);
  * the SDK sends through an HTTP/1.1-only copy of it, also for a caller's HTTPClient that names no Transport. A caller's
  * own Transport is the caller's.
  */

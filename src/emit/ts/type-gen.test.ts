@@ -1,12 +1,12 @@
 /**
  * `generateTypes`: an app's document, route tree and extracted types → `types.gen.d.ts`, checked
- * as a service consumes it (the `Routes` map, the extractors, `RouteSelector` and its `HoneyCodegen`
+ * as a service consumes it (the `Routes` map, the extractors, `RouteSelector` and its `HttpCodegen`
  * augmentation, route meta). Errors live in type-gen.errors.test.ts, ctx in type-gen.ctx.test.ts.
  */
 import * as tsMorph from "ts-morph"
 import { describe, expect, it } from "vitest"
 import type { ExtractedTypes } from "../../extract/extract.ts"
-import { extracted, type HoneyApp, type HoneyRoute, honeyDoc, object } from "./__fixtures__/honey-doc.ts"
+import { extracted, type HttpApp, type HttpRoute, httpDoc, object } from "./__fixtures__/http-doc.ts"
 import { typechecker } from "./__fixtures__/typecheck.ts"
 import { generateTypes } from "./type-gen.ts"
 
@@ -21,21 +21,21 @@ const arrayOf = (items: Json) => ({ items, type: "array" })
 const json = (statuses: Record<string, Json>) => ({ "application/json": statuses })
 
 /** generateTypes over `app`, what it reported, and each diagnostic of `consumer` beside its output. */
-function check(app: HoneyApp, consumer: string, types: ExtractedTypes | null = null) {
+function check(app: HttpApp, consumer: string, types: ExtractedTypes | null = null) {
 	const reports: string[] = []
 	const text = generateTypes({ ...app, extracted: types, report: (m) => reports.push(m) })
 	return { diagnostics: typecheck(text, consumer), reports, text }
 }
 
-const route = (method: string, pattern: string, rest: Partial<HoneyRoute> = {}): HoneyRoute => ({
+const route = (method: string, pattern: string, rest: Partial<HttpRoute> = {}): HttpRoute => ({
 	method,
 	pattern,
 	...rest,
 })
 
 /** The types of `routes` with nothing extracted. */
-const generate = (routes: HoneyRoute[]) =>
-	generateTypes({ ...honeyDoc(routes), extracted: null, report: () => undefined })
+const generate = (routes: HttpRoute[]) =>
+	generateTypes({ ...httpDoc(routes), extracted: null, report: () => undefined })
 
 /** A closed object schema, as Effect's JSON Schema writes a Struct. */
 const struct = (properties: Json) => ({ ...object(properties), additionalProperties: false })
@@ -43,7 +43,7 @@ const struct = (properties: Json) => ({ ...object(properties), additionalPropert
 const USER = object({ email: STRING, id: STRING, name: STRING })
 
 /* a real-world app: mixed inputs, optional and nullable fields, params, errors, outputs */
-const REAL_WORLD = honeyDoc([
+const REAL_WORLD = httpDoc([
 	route("GET", "/health"),
 	route("POST", "/v1/auth/register", {
 		errors: { email_taken: { status: 409 } },
@@ -82,8 +82,8 @@ const REAL_WORLD = honeyDoc([
 
 describe("the module skeleton", () => {
 	// v0: 6770071363
-	it("types every documented route under its pattern, with BaseCtx from the extracted env and HoneyError factories", () => {
-		const app = honeyDoc([
+	it("types every documented route under its pattern, with BaseCtx from the extracted env and HttpError factories", () => {
+		const app = httpDoc([
 			route("GET", "/items/:id", { errors: { not_found: { status: 404 } }, meta: { auth: true } }),
 			route("POST", "/items"),
 		])
@@ -91,26 +91,26 @@ describe("the module skeleton", () => {
 expectType<Equal<keyof Routes["/items/:id"], "get">>()
 expectType<Equal<keyof Routes["/items"], "post">>()
 expectType<Same<BaseCtx["env"], { DB: string }>>()
-expectType<Equal<ReturnType<RouteCtx<"/items/:id", "get">["errors"]["not_found"]>, HoneyError>>()`
+expectType<Equal<ReturnType<RouteCtx<"/items/:id", "get">["errors"]["not_found"]>, HttpError>>()`
 		const { diagnostics } = check(app, consumer, extracted({ env: "{ DB: string }" }))
 		expect(diagnostics).toEqual([])
 	})
 
 	// v0: 81bd6fd06a
 	it("types an app with no routes as an empty Routes map", () => {
-		expect(check(honeyDoc([]), "expectType<Equal<keyof Routes, never>>()").diagnostics).toEqual([])
+		expect(check(httpDoc([]), "expectType<Equal<keyof Routes, never>>()").diagnostics).toEqual([])
 	})
 
 	// v0: a31c4df124
 	it("emits all seven Route* extractors even with no routes", () => {
 		const consumer = `type Probe<P extends keyof Routes, M extends keyof Routes[P] & string> = [RouteCtx<P, M>, RouteInput<P, M>, RouteOutput<P, M>, RouteErrors<P, M>, RouteErrorShapes<P, M>, RouteErrorsByStatus<P, M>, RouteMeta<P, M>]
 expectType<Equal<Probe<never, never>["length"], 7>>()`
-		expect(check(honeyDoc([]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([]), consumer).diagnostics).toEqual([])
 	})
 
 	// v0: b3ed47c6ec
 	it("resolves each Route* extractor to that route's entry", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/health", {
 				errors: { down: { status: 503 } },
 				input: { search: object({ deep: { type: "boolean" } }) },
@@ -138,12 +138,12 @@ describe("the Routes map", () => {
 expectType<Equal<C["env"], BaseCtx["env"]>>()
 expectType<Equal<C["req"], Request>>()
 expectType<Equal<C["routePattern"], "/health">>()`
-		expect(check(honeyDoc([route("GET", "/health")]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("GET", "/health")]), consumer).diagnostics).toEqual([])
 	})
 
 	// v0: 5a5fd49d0e
 	it("keys GET and POST on one path under the same Routes entry", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/users"),
 			route("POST", "/users", { input: { json: object({ name: STRING }) } }),
 		])
@@ -154,12 +154,12 @@ expectType<Same<RouteInput<"/users", "post">["json"], { name: string }>>()`
 
 	it("types an all() route once, under the method all", () => {
 		const consumer = `expectType<Equal<keyof Routes["/echo"], "all">>()`
-		expect(check(honeyDoc([route("ALL", "/echo")]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("ALL", "/echo")]), consumer).diagnostics).toEqual([])
 	})
 
 	// v0: 494723e73f
 	it("types every route of a multi-route app with its concrete input and output", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/health"),
 			route("GET", "/users", {
 				input: { search: object({ page: NUMBER }) },
@@ -181,12 +181,12 @@ describe("path params", () => {
 		const consumer = `type P = RouteCtx<"/users/:userId/posts/:postId", "get">["params"]
 expectType<Same<P, { postId: string; userId: string }>>()
 expectType<Equal<P["userId"] | P["postId"], string>>()`
-		expect(check(honeyDoc([route("GET", "/users/:userId/posts/:postId")]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("GET", "/users/:userId/posts/:postId")]), consumer).diagnostics).toEqual([])
 	})
 
 	// v0: 4a3f99f9b3
 	it("types path params beside the route's body and output", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("PUT", "/users/:userId/posts/:postId", {
 				input: { json: object({ body: STRING, title: STRING }) },
 				output: json({ ok: object({ id: STRING, updated: { type: "boolean" } }) }),
@@ -204,13 +204,13 @@ describe("Routes entries", () => {
 	// v0: 1b35afa162
 	it("types a route with no input as input {}", () => {
 		const consumer = `expectType<Equal<RouteInput<"/health", "get">, {}>>()`
-		expect(check(honeyDoc([route("GET", "/health")]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("GET", "/health")]), consumer).diagnostics).toEqual([])
 	})
 
 	// v0: 555da9d12f
 	it("types a route with no output as output {}, core's placeholder 200 contributing nothing", () => {
 		const consumer = `expectType<Equal<RouteOutput<"/health", "get">, {}>>()`
-		expect(check(honeyDoc([route("GET", "/health")]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("GET", "/health")]), consumer).diagnostics).toEqual([])
 	})
 
 	// v0: 03a0e807c7
@@ -232,17 +232,17 @@ expectType<Same<RouteOutput<"/v1/projects", "get">["application/json"]["ok"], { 
 
 	it("leaves websocket operations out of Routes", () => {
 		const consumer = `expectType<Equal<keyof Routes, "/health">>()`
-		expect(check(honeyDoc([route("GET", "/health"), route("WS", "/chat")]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("GET", "/health"), route("WS", "/chat")]), consumer).diagnostics).toEqual([])
 	})
 
-	it("leaves out and reports, once, an operation without x-honey-route", () => {
-		const app = honeyDoc([route("GET", "/health"), route("GET", "/legacy")])
+	it("leaves out and reports, once, an operation without x-backend-route", () => {
+		const app = httpDoc([route("GET", "/health"), route("GET", "/legacy")])
 		const paths = app.document.paths as Record<string, Record<string, Json>>
-		delete paths["/legacy"]?.get?.["x-honey-route"]
+		delete paths["/legacy"]?.get?.["x-backend-route"]
 		const { diagnostics, reports } = check(app, `expectType<Equal<keyof Routes, "/health">>()`)
 		expect({ diagnostics, reports }).toEqual({
 			diagnostics: [],
-			reports: ["GET /legacy: no x-honey-route; left out of Routes"],
+			reports: ["GET /legacy: no x-backend-route; left out of Routes"],
 		})
 	})
 
@@ -260,14 +260,14 @@ expectType<Same<RouteOutput<"/v1/projects", "get">["application/json"]["ok"], { 
 describe("input and output types", () => {
 	// v0: b10d6edfc9
 	it("types a search schema as input.search", () => {
-		const app = honeyDoc([route("GET", "/search", { input: { search: object({ limit: NUMBER, q: STRING }) } })])
+		const app = httpDoc([route("GET", "/search", { input: { search: object({ limit: NUMBER, q: STRING }) } })])
 		const consumer = `expectType<Same<RouteInput<"/search", "get">, { search: { limit: number; q: string } }>>()`
 		expect(check(app, consumer).diagnostics).toEqual([])
 	})
 
 	// v0: 3c06c03f2d
 	it("keys a declared output by media type, then status key", () => {
-		const app = honeyDoc([route("GET", "/users", { output: json({ ok: object({ id: STRING, name: STRING }) }) })])
+		const app = httpDoc([route("GET", "/users", { output: json({ ok: object({ id: STRING, name: STRING }) }) })])
 		const consumer = `expectType<Same<RouteOutput<"/users", "get">, { "application/json": { ok: { id: string; name: string } } }>>()`
 		expect(check(app, consumer).diagnostics).toEqual([])
 	})
@@ -279,14 +279,14 @@ describe("input and output types", () => {
 expectType<Equal<keyof O, "created" | "ok">>()
 expectType<Same<O["created"], { id: string }>>()
 expectType<Same<O["ok"], { message: string }>>()`
-		expect(check(honeyDoc([route("POST", "/multi-status", { output })]), consumer).diagnostics).toEqual([])
+		expect(check(httpDoc([route("POST", "/multi-status", { output })]), consumer).diagnostics).toEqual([])
 	})
 })
 
 describe("vendor and recursive schemas", () => {
 	// v0: 7b85e5f7e5
 	it("types a search input and a JSON output concretely, never unknown", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/users", {
 				input: { search: object({ limit: NUMBER, q: STRING }) },
 				output: json({ ok: object({ id: STRING, name: STRING }) }),
@@ -300,7 +300,7 @@ expectType<Equal<unknown extends RouteInput<"/users", "get">["search"]["q"] ? tr
 
 	// v0: 2803d8f745
 	it("types an input and an output from different vendors' JSON Schema alike", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("POST", "/items", {
 				input: { json: { $schema: "https://json-schema.org/draft/2020-12/schema", ...object({ name: STRING }) } },
 				output: json({ ok: { ...object({ id: STRING }), additionalProperties: false } }),
@@ -313,7 +313,7 @@ expectType<Same<RouteOutput<"/items", "post">, { "application/json": { ok: { id:
 
 	// v0: 9a75eedce5
 	it("places an Effect schema's JSON Schema as the json input and the status-keyed output", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("POST", "/items", {
 				input: { json: struct({ name: STRING }) },
 				output: json({ ok: struct({ id: STRING }) }),
@@ -331,7 +331,7 @@ expectType<Same<RouteOutput<"/items", "post">["application/json"]["ok"], { id: s
 			logic: { enum: ["and", "or"], type: "string" },
 			subgroups: arrayOf(ref),
 		})
-		const app = honeyDoc([route("POST", "/items", { input: { json: object({ filter: ref }) } })], { FilterNode })
+		const app = httpDoc([route("POST", "/items", { input: { json: object({ filter: ref }) } })], { FilterNode })
 		const consumer = `type F = RouteInput<"/items", "post">["json"]["filter"]
 expectType<Equal<F["logic"], "and" | "or">>()
 expectType<Equal<F["subgroups"][number]["subgroups"][number]["logic"], "and" | "or">>()
@@ -340,10 +340,10 @@ expectType<Same<F["conditions"][number]["field"], string>>()`
 	})
 })
 
-describe("RouteSelector and the HoneyCodegen augmentation", () => {
+describe("RouteSelector and the HttpCodegen augmentation", () => {
 	// v0: 53841828e3
 	it("types RouteSelector as the union of every route's METHOD /pattern", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			route("GET", "/v1/users"),
 			route("GET", "/v1/users/:id"),
 			route("POST", "/v1/users"),
@@ -356,7 +356,7 @@ expectType<Equal<RouteSelector, "DELETE /v1/users/:id" | "GET /v1/users" | "GET 
 
 	// v0: 2a3909d553
 	it("lists RouteSelector members in code-unit order", () => {
-		const app = honeyDoc([route("POST", "/z"), route("GET", "/a"), route("DELETE", "/m"), route("GET", "/B")])
+		const app = httpDoc([route("POST", "/z"), route("GET", "/a"), route("DELETE", "/m"), route("GET", "/B")])
 		const { text } = check(app, "")
 		const members = text.match(/export type RouteSelector = (.+)/)?.[1]?.split(" | ")
 		expect(members).toEqual(['"DELETE /m"', '"GET /B"', '"GET /a"', '"POST /z"'])
@@ -364,21 +364,21 @@ expectType<Equal<RouteSelector, "DELETE /v1/users/:id" | "GET /v1/users" | "GET 
 
 	// v0: 8ab3dbcaa6
 	it("emits no RouteSelector for an app with no routes", () => {
-		const { diagnostics, text } = check(honeyDoc([]), "")
+		const { diagnostics, text } = check(httpDoc([]), "")
 		expect({ diagnostics, selector: /RouteSelector/.test(text) }).toEqual({ diagnostics: [], selector: false })
 	})
 
 	// v0: b99f9ef5db
-	it("leaves HoneyCodegen unaugmented with no routes: invalidate keeps plain strings", () => {
+	it("leaves HttpCodegen unaugmented with no routes: invalidate keeps plain strings", () => {
 		const consumer = `import type { RouteSelectorOf } from "@workerstack/backend/http"
 expectType<Equal<RouteSelectorOf, string>>()`
-		const { diagnostics, text } = check(honeyDoc([]), consumer)
-		expect({ diagnostics, augmented: text.includes("HoneyCodegen") }).toEqual({ augmented: false, diagnostics: [] })
+		const { diagnostics, text } = check(httpDoc([]), consumer)
+		expect({ diagnostics, augmented: text.includes("HttpCodegen") }).toEqual({ augmented: false, diagnostics: [] })
 	})
 
 	// v0: c143d3a344
 	it("leaves an internal route out of Routes and RouteSelector", () => {
-		const app = honeyDoc([route("GET", "/v1/users"), route("GET", "/v1/internal", { meta: { internal: true } })])
+		const app = httpDoc([route("GET", "/v1/users"), route("GET", "/v1/internal", { meta: { internal: true } })])
 		const consumer = `import type { RouteSelector } from "./types.gen"
 expectType<Equal<RouteSelector, "GET /v1/users">>()
 expectType<Equal<keyof Routes, "/v1/users">>()`
@@ -386,11 +386,11 @@ expectType<Equal<keyof Routes, "/v1/users">>()`
 	})
 
 	// v0: 2ab0bbb8f5
-	it('augments "@workerstack/backend" HoneyCodegen so invalidate takes exactly the route selectors', () => {
-		const app = honeyDoc([route("GET", "/v1/users"), route("POST", "/v1/users")])
-		const consumer = `import type { HoneyCodegen, RouteSelectorOf } from "@workerstack/backend/http"
+	it('augments "@workerstack/backend" HttpCodegen so invalidate takes exactly the route selectors', () => {
+		const app = httpDoc([route("GET", "/v1/users"), route("POST", "/v1/users")])
+		const consumer = `import type { HttpCodegen, RouteSelectorOf } from "@workerstack/backend/http"
 import type { RouteSelector } from "./types.gen"
-expectType<Equal<HoneyCodegen["routeSelector"], RouteSelector>>()
+expectType<Equal<HttpCodegen["routeSelector"], RouteSelector>>()
 expectType<Equal<RouteSelectorOf, "GET /v1/users" | "POST /v1/users">>()`
 		const { diagnostics, text } = check(app, consumer)
 		expect({ diagnostics, module: text.includes('declare module "@workerstack/backend/http"') }).toEqual({
@@ -401,7 +401,7 @@ expectType<Equal<RouteSelectorOf, "GET /v1/users" | "POST /v1/users">>()`
 })
 
 /* the meta of each route as the tree carries it: chain, middleware and route meta resolved (O1) */
-const META_APP = honeyDoc([
+const META_APP = httpDoc([
 	route("GET", "/health", { meta: { summary: "Health check" } }),
 	route("GET", "/orgs", {
 		input: { search: object({ limit: NUMBER }) },

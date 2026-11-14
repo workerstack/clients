@@ -236,7 +236,7 @@ function envelopeShape(envelope: IRSchema, field: FieldOf, resolve: (schema: IRS
 	return ["error_key", "message", "path"].every((name) => isString(field(item, name)))
 }
 
-/** honey's error envelope (`success: false`, an `error_key` enum, one `status`): its keys and status, else `null`. */
+/** backend's error envelope (`success: false`, an `error_key` enum, one `status`): its keys and status, else `null`. */
 export function irErrorEnvelope(
 	schema: IRSchema,
 	resolve: (schema: IRSchema) => IRSchema,

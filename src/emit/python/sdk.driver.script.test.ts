@@ -90,10 +90,10 @@ const hook = (entry: Record<string, unknown>) => ({
 
 /** A Python error as the trace records it: no cause and the method's own raise unless given, any repr. */
 const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(String), via: "return", ...entry })
-const CANCELED = plain({ chain: ["CanceledError", "HoneyError"], text: "the call was canceled", type: "CanceledError" })
+const CANCELED = plain({ chain: ["CanceledError", "HttpError"], text: "the call was canceled", type: "CanceledError" })
 /** A HookError a hook's (or the refresher's) `ValueError(text)` became. */
 const hookError = (text: string) =>
-	plain({ cause: "ValueError", chain: ["HookError", "HoneyError"], text, type: "HookError" })
+	plain({ cause: "ValueError", chain: ["HookError", "HttpError"], text, type: "HookError" })
 
 describe.skipIf(!PY)("the Python test driver's script: {observed, trace} on stdout", SLOW, () => {
 	it.each(CLIENTS)("%s: an empty script traces the time, a no-op hook per phase, no log", async (client) => {
@@ -176,7 +176,7 @@ describe.skipIf(!PY)("the Python test driver's script: client config", SLOW, () 
 		const { run } = await drive(on(client), replies, [ECHO], { script })
 		expect({ error: run.trace?.calls[0]?.error, observed: run.observed, status: run.status }, run.stderr).toEqual({
 			error: plain({
-				chain: ["DecodeError", "HoneyError"],
+				chain: ["DecodeError", "HttpError"],
 				text: "HTTP 200: the body exceeds 10 bytes",
 				type: "DecodeError",
 			}),
@@ -249,7 +249,7 @@ describe.skipIf(!PY)("the Python test driver's script: a caller's httpx2 client"
 		const { hops, run } = await drive(on(client), [hop("primary", "/landing"), OK], [ECHO], { script })
 		const seen = hops.map((h) => `${h.origin} ${h.url} ${h.headers["user-agent"]} ${h.headers["x-builder"]}`)
 		expect({ hops: seen, observed: run.observed, transport: run.trace?.transport }, run.stderr).toEqual({
-			hops: ["primary /echo honey-driver b", "primary /landing honey-driver b"],
+			hops: ["primary /echo clients-driver b", "primary /landing clients-driver b"],
 			observed: [OK_DATA],
 			transport: undefined,
 		})
@@ -263,7 +263,7 @@ describe.skipIf(!PY)("the Python test driver's script: a caller's httpx2 client"
 		const origins = hops.map((h) => `${h.origin} ${h.url}`)
 		const landed = [second["user-agent"], second["x-builder"], second.authorization]
 		expect({ landed, observed: run.observed, origins }, run.stderr).toEqual({
-			landed: ["honey-driver", undefined, undefined],
+			landed: ["clients-driver", undefined, undefined],
 			observed: [OK_DATA],
 			origins: ["primary /echo", "alt /landing"],
 		})
@@ -353,7 +353,7 @@ describe.skipIf(!PY)(
 			const { run } = await drive(on(client), replies, [ITEM], { script: {} })
 			const text = "the X-Item-Version header is missing"
 			expect({ error: run.trace?.calls[0]?.error, observed: run.observed }, run.stderr).toEqual({
-				error: plain({ chain: ["DecodeError", "HoneyError"], text, type: "DecodeError" }),
+				error: plain({ chain: ["DecodeError", "HttpError"], text, type: "DecodeError" }),
 				observed: [{ kind: "decode", status: 200 }],
 			})
 		})
@@ -385,7 +385,7 @@ describe.skipIf(!PY)("the Python test driver: the bytes outcome", SLOW, () => {
 const MISSING: Reply = { json: { error_key: "member.missing", message: "gone" }, status: 404 }
 /** MISSING as the trace records it, read through APIStatusError's attributes. */
 const MISSING_ERROR = plain({
-	chain: ["NotFoundError", "APIStatusError", "HoneyError"],
+	chain: ["NotFoundError", "APIStatusError", "HttpError"],
 	key: "member.missing",
 	keyMember: null,
 	message: "gone",
@@ -437,7 +437,7 @@ describe.skipIf(!PY)("the Python test driver's script: a call's Python error", S
 		).toEqual({
 			envelope: { ...sent, extraKeys: ["success", "trace"] },
 			hops: 2,
-			path: plain({ chain: ["PathParamError", "HoneyError"], text, type: "PathParamError" }),
+			path: plain({ chain: ["PathParamError", "HttpError"], text, type: "PathParamError" }),
 			unasked: true,
 		})
 	})

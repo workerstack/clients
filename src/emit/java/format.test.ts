@@ -206,7 +206,7 @@ describe.skipIf(!JAVA)("google-java-format --dry-run on the long-name SDK (bit 2
 describe.skipIf(!JAVA)("google-java-format on the shapes SDK's long strings (bit 21 i7a)", SLOW, () => {
 	it("reflows each one as GJF reflows the literal whole", () => {
 		const emitted = generateJavaSdk(FIXTURES.shapes.document()).files["src/main/java/com/example/Prose.java"] ?? ""
-		const dir = mkdtempSync(join(tmpdir(), "honey-gjf-"))
+		const dir = mkdtempSync(join(tmpdir(), "clients-gjf-"))
 		try {
 			const path = join(dir, "Prose.java")
 			writeFileSync(path, emitted.replace(/"\n\s*\+ "/g, ""))

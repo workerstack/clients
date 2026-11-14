@@ -141,7 +141,7 @@ const ROW_EXPORTS = [
 	"Ok",
 	"Err",
 	"Result",
-	"HoneyError",
+	"HttpError",
 	"APIStatusError",
 	...STATUS_ERRORS,
 	"APIConnectionError",
@@ -194,7 +194,7 @@ note(await each(lambda c: len([p for p in walk(c, "") if inspect.iscoroutinefunc
 note(await each(lambda c: walk(c.safe, "") == walk(c, "")))
 note(await both(lambda c: c.blobs.upload(b"\\x00\\x01")))`,
 	exports: `${IMPORT}note([e.__name__ for e in (${STATUS_ERRORS.join(", ")}) if not issubclass(e, APIStatusError)])
-note(issubclass(APIStatusError, HoneyError))
+note(issubclass(APIStatusError, HttpError))
 note([n for n in ${JSON.stringify(ROOT_EXPORTS)} if n not in sdk.__all__])
 note([n for n in ("ConnectionState", "ResumableConnection", "TypedWebSocket") if hasattr(sdk, n)])`,
 	new: `with sdk.SDK() as c:

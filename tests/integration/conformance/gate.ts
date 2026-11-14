@@ -1,6 +1,6 @@
 /**
  * The release's conformance gate (bit 19 i, R11). The harness records each cell a target runs, with what it observed
- * (`recordCell` under HONEY_CONFORMANCE_RECORD, harness.ts), and each cell a runner lacks by design. The gate holds
+ * (`recordCell` under CLIENTS_CONFORMANCE_RECORD, harness.ts), and each cell a runner lacks by design. The gate holds
  * every cell of every target in TARGETS against that record with compareCell: a regressed cell, or one no runner of
  * its target ran or lacks, blocks. ci.yml's conformance job runs it on the harness job's record: `bun gate.ts <dir>`.
  */

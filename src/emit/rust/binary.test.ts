@@ -355,7 +355,7 @@ describe.skipIf(!RUST)("a multipart file: a FilePart held in memory (Fc7)", () =
 					hops: hops.map((h) => `${h.method} ${h.url} ${h.headers.authorization}`),
 					parts,
 					same: bodies.length === 2 && bodies[0]?.equals(bodies[1] ?? Buffer.alloc(0)),
-					types: types.map((t) => t.startsWith("multipart/form-data; boundary=honey-")),
+					types: types.map((t) => t.startsWith("multipart/form-data; boundary=clients-")),
 					upload: seen(run, "upload"),
 				},
 				run.stderr,

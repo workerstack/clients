@@ -24,8 +24,8 @@ function project(files: Record<string, string>): string {
 	return dir
 }
 
-const HONEY = 'import { honey } from "@workerstack/backend/http"\n'
-const route = (path: string) => `honey().get(${JSON.stringify(path)}).handler((c) => c.res.text("ok", "ok"))`
+const HTTP_APP = 'import { httpApp } from "@workerstack/backend/http"\n'
+const route = (path: string) => `httpApp().get(${JSON.stringify(path)}).handler((c) => c.res.text("ok", "ok"))`
 const pathsOf = (document: Record<string, unknown>) => Object.keys(document.paths as object)
 
 /** Each of `refs` loaded in turn (loads share one module cache, so never two at once), or the message it failed with. */
@@ -46,8 +46,8 @@ describe("an --app module's document (bit 19 h2)", () => {
 
 	it("takes the named export, else app, else default", async () => {
 		const dir = project({
-			"src/app.ts": `${HONEY}export const app = ${route("/app")}\nexport default ${route("/default")}\nexport const admin = ${route("/admin")}\n`,
-			"src/only-default.ts": `${HONEY}export default ${route("/default")}\n`,
+			"src/app.ts": `${HTTP_APP}export const app = ${route("/app")}\nexport default ${route("/default")}\nexport const admin = ${route("/admin")}\n`,
+			"src/only-default.ts": `${HTTP_APP}export default ${route("/default")}\n`,
 		})
 		const documents = await loaded(["src/app.ts", "src/app.ts#admin", "src/only-default.ts"], dir)
 		expect(documents.map((document) => pathsOf(document as Record<string, unknown>))).toEqual([
@@ -60,8 +60,8 @@ describe("an --app module's document (bit 19 h2)", () => {
 	it("generates with the module's openApi export as the document's options, else a bare info", async () => {
 		const options = `{ info: { title: "Shop", version: "2.0.0" }, securitySchemes: { key: { in: "header", name: "x-key", type: "apiKey" } } }`
 		const dir = project({
-			"src/bare.ts": `${HONEY}export const app = ${route("/a")}\n`,
-			"src/shop.ts": `${HONEY}export const app = ${route("/a")}\nexport const openApi = ${options}\n`,
+			"src/bare.ts": `${HTTP_APP}export const app = ${route("/a")}\n`,
+			"src/shop.ts": `${HTTP_APP}export const app = ${route("/a")}\nexport const openApi = ${options}\n`,
 		})
 		const [bare, shop] = (await loaded(["src/bare.ts", "src/shop.ts"], dir)) as Record<string, unknown>[]
 		expect([bare.info, shop.info, (shop.components as { securitySchemes?: object }).securitySchemes]).toEqual([
@@ -72,11 +72,11 @@ describe("an --app module's document (bit 19 h2)", () => {
 	})
 
 	it("refuses a module that does not exist, and one with no such app, naming each", async () => {
-		const dir = project({ "src/app.ts": `${HONEY}export const app = ${route("/a")}\nexport const config = {}\n` })
+		const dir = project({ "src/app.ts": `${HTTP_APP}export const app = ${route("/a")}\nexport const config = {}\n` })
 		expect(await loaded(["src/nope.ts", "src/app.ts#admin", "src/app.ts#config"], dir)).toEqual([
 			"--app src/nope.ts: src/nope.ts does not exist",
-			'--app src/app.ts#admin: no export "admin" that is a honey app (name one as <module>#<export>)',
-			'--app src/app.ts#config: no export "config" that is a honey app (name one as <module>#<export>)',
+			'--app src/app.ts#admin: no export "admin" that is a backend app (name one as <module>#<export>)',
+			'--app src/app.ts#config: no export "config" that is a backend app (name one as <module>#<export>)',
 		])
 	})
 })
@@ -88,14 +88,14 @@ describe("an --app module's core (bit 19 h2)", () => {
 		projects.push(() => rmSync(lone, { force: true, recursive: true }))
 		writeFileSync(join(lone, "app.ts"), "export const app = { fetch() {} }\n")
 		expect([...(await loaded(["src/none.ts"], dir)), ...(await loaded(["app.ts"], lone))]).toEqual([
-			"--app src/none.ts: no `app` or `default` export that is a honey app (name one as <module>#<export>)",
+			"--app src/none.ts: no `app` or `default` export that is a backend app (name one as <module>#<export>)",
 			"--app app.ts: no @workerstack/backend is installed where app.ts resolves it",
 		])
 	})
 
 	it("reads an installed core (no checkout) through its exports, with no source aliases", async () => {
 		const { dir, done } = appProject(
-			{ "src/app.ts": `${HONEY}export const app = ${route("/installed")}\n` },
+			{ "src/app.ts": `${HTTP_APP}export const app = ${route("/installed")}\n` },
 			{ installed: true },
 		)
 		projects.push(done)
@@ -109,9 +109,9 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 
 	/**
 	 * Bun as the loader sees it, over a project whose app is at src/: a core subpath resolved by its `condition` (Bun
-	 * started with --conditions=honey-source) or its `default` (not), a missing file not found, as Bun's resolveSync.
+	 * started with --conditions=backend-source) or its `default` (not), a missing file not found, as Bun's resolveSync.
 	 */
-	const bunResolving = (condition: "default" | "honey-source"): BunResolver => ({
+	const bunResolving = (condition: "default" | "backend-source"): BunResolver => ({
 		resolveSync(specifier, from) {
 			if (isAbsolute(specifier)) return specifier
 			const root = join(from, "../node_modules/@workerstack/backend")
@@ -125,17 +125,17 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 		},
 	})
 
-	/* vitest resolves the app's own imports by Node's conditions, never honey-source, so the app reaches core by path */
-	const BY_PATH = `import { honey } from "../node_modules/@workerstack/backend/src/routing/app.${backend().ext}"\n`
+	/* vitest resolves the app's own imports by Node's conditions, never backend-source, so the app reaches core by path */
+	const BY_PATH = `import { httpApp } from "../node_modules/@workerstack/backend/src/routing/app.${backend().ext}"\n`
 
-	it("generates from a checkout core its source under the honey-source condition, and from an installed one", async () => {
+	it("generates from a checkout core its source under the backend-source condition, and from an installed one", async () => {
 		const checkout = project({ "src/app.ts": `${BY_PATH}export const app = ${route("/checkout")}\n` })
 		const { dir: installed, done } = appProject(
-			{ "src/app.ts": `${HONEY}export const app = ${route("/installed")}\n` },
+			{ "src/app.ts": `${HTTP_APP}export const app = ${route("/installed")}\n` },
 			{ installed: true },
 		)
 		projects.push(done)
-		vi.stubGlobal("Bun", bunResolving("honey-source"))
+		vi.stubGlobal("Bun", bunResolving("backend-source"))
 		const [fromCheckout] = await loaded(["src/app.ts"], checkout)
 		vi.stubGlobal("Bun", bunResolving("default"))
 		const [fromInstall] = await loaded(["src/app.ts"], installed)
@@ -145,7 +145,7 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 		])
 	})
 
-	it("refuses a checkout core Bun resolves without the honey-source condition, unbuilt or to a stale dist/", async () => {
+	it("refuses a checkout core Bun resolves without the backend-source condition, unbuilt or to a stale dist/", async () => {
 		const app = { "src/app.ts": `${BY_PATH}export const app = ${route("/a")}\n` }
 		const unbuilt = project(app)
 		const stale = project({
@@ -155,7 +155,7 @@ describe("an --app module on Bun, by Bun's own import (bit 20)", () => {
 		})
 		vi.stubGlobal("Bun", bunResolving("default"))
 		const refusal =
-			"--app src/app.ts: @workerstack/backend/http is a checkout, read from its source only under the honey-source condition: start Bun with --conditions=honey-source"
+			"--app src/app.ts: @workerstack/backend/http is a checkout, read from its source only under the backend-source condition: start Bun with --conditions=backend-source"
 		expect([...(await loaded(["src/app.ts"], unbuilt)), ...(await loaded(["src/app.ts"], stale))]).toEqual([
 			refusal,
 			refusal,

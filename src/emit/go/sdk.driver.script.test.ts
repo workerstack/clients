@@ -78,7 +78,7 @@ const hop = (origin: "alt" | "primary", to: string): Reply => ({ redirect: { ori
 /** A hook trace entry with the stale fields of a client without invalidation. */
 const hook = (entry: Json) => ({ invalidatedBy: [], isRetry: false, isStale: false, selector: "", ...entry })
 
-/** A Go error of no honey type, as the trace records it. */
+/** A Go error of no backend type, as the trace records it. */
 const plain = (entry: Partial<GoError>) => ({
 	canceled: false,
 	deadline: false,
@@ -154,7 +154,7 @@ goDescribe("the Go test driver's script: OnAuthExpired and the hooks", () => {
 			auth: ["Bearer old", "Bearer new", "Bearer new"],
 			error: plain({
 				chain: ["*fmt.wrapError", "*errors.errorString"],
-				text: "honey: OnAuthExpired failed: driver: no token left",
+				text: "httpsdk: OnAuthExpired failed: driver: no token left",
 				type: "*fmt.wrapError",
 			}),
 			expired: 2,
@@ -184,8 +184,8 @@ goDescribe("the Go test driver's script: OnAuthExpired and the hooks", () => {
 			order: shaped.run.trace?.hooks.map((h) => `${h.phase} ${h.index}`),
 			sent: shaped.hops[0]?.headers["x-hooked"],
 		}).toEqual({
-			after: [[null], "honey: OnResponse hook: bad", 1],
-			before: [[null], "honey: OnRequest hook: boom", 0],
+			after: [[null], "httpsdk: OnResponse hook: bad", 1],
+			before: [[null], "httpsdk: OnRequest hook: boom", 0],
 			observed: [{ data: { id: "h", text: "hooked" }, kind: "data", status: 200 }],
 			order: ["request 0", "request 1", "response 0"],
 			sent: "1",
@@ -220,7 +220,7 @@ goDescribe("the Go test driver's script: the response cap", () => {
 			errors: [
 				plain({
 					chain: ["*sdk.DecodeError", "*errors.errorString"],
-					text: "honey: decode response: honey: response body exceeds MaxResponseBytes",
+					text: "httpsdk: decode response: httpsdk: response body exceeds MaxResponseBytes",
 					tooLarge: true,
 					type: "*sdk.DecodeError",
 				}),
@@ -336,7 +336,7 @@ goDescribe("the Go test driver's script: a call's Go error", () => {
 		const { hops, run } = await drive(scriptedSdk(), [undecodable], calls, { script: {} })
 		const [refused, decoded] = run.trace?.calls ?? []
 		expect({
-			decoded: [sdkTypes(decoded?.error), decoded?.error?.text.startsWith("honey: decode response:")],
+			decoded: [sdkTypes(decoded?.error), decoded?.error?.text.startsWith("httpsdk: decode response:")],
 			hops: hops.map((h) => h.url),
 			observed: run.observed,
 			refused: refused?.error,

@@ -62,7 +62,7 @@ const CHUNKS = `final class Chunks extends java.io.InputStream {
 
 /**
  * Each case's chunks through the parser: each event's data (over 16 characters, as its length) until the end (`end`)
- * or the first HoneyException (`<type>: <message>`), each case on one line, its notes joined by `|`.
+ * or the first HttpException (`<type>: <message>`), each case on one line, its notes joined by `|`.
  */
 const PARSER = `final class ParseProbe {
   static final int MiB = 1 << 20;
@@ -85,7 +85,7 @@ const PARSER = `final class ParseProbe {
         notes.add(e.data().length() <= 16 ? e.data() : "<" + e.data().length() + " chars>");
       }
       notes.add("end");
-    } catch (HoneyException e) {
+    } catch (HttpException e) {
       notes.add(e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     System.out.println(name + " " + String.join("|", notes));

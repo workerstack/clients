@@ -150,7 +150,7 @@ function defaultsOf(schemes?: Readonly<Record<string, unknown>>): string | undef
 		openapi: "3.1.0",
 		paths: { "/echo": { get: { operationId: "echo.get", responses: answer } } },
 	}
-	const client = generatePythonSdk(document).files["src/honey_sdk/client.py"] ?? ""
+	const client = generatePythonSdk(document).files["src/http_sdk/client.py"] ?? ""
 	return client.split("\n").find((line) => line.startsWith("_DEFAULTS = "))
 }
 
@@ -308,7 +308,7 @@ describe.skipIf(!PY)("the auth refresh: a failing on_auth_expired is the call's 
 		const { hops, run } = await drive(client, [{ status: 401 }], [ECHO], { script, setup: OLD })
 		const text = "on_auth_expired: driver: no token left"
 		expect({ error: run.trace?.calls[0]?.error, hops: hops.length, observed: run.observed }, run.stderr).toEqual({
-			error: plain({ cause: "ValueError", chain: ["HookError", "HoneyError"], text, type: "HookError" }),
+			error: plain({ cause: "ValueError", chain: ["HookError", "HttpError"], text, type: "HookError" }),
 			hops: 1,
 			observed: [null],
 		})
@@ -404,7 +404,7 @@ try:
     note("built")
     c.users.get("1")
     note("answered")
-except sdk.HoneyError as error:
+except sdk.HttpError as error:
     note(f"{type(error).__name__}: {error}")
 
 section("sync")
@@ -413,7 +413,7 @@ try:
     note("built")
     c.users.get("1")
     note("answered")
-except sdk.HoneyError as error:
+except sdk.HttpError as error:
     note(f"{type(error).__name__}: {error}")
 
 section("async")
@@ -422,11 +422,11 @@ try:
     note("built")
     await ac.users.get("1")
     note("answered")
-except sdk.HoneyError as error:
+except sdk.HttpError as error:
     note(f"{type(error).__name__}: {error}")`
 
 describe.skipIf(!PY)("the hooks a client never runs: refused at construction (Fc1)", SLOW, () => {
-	/* ruling change: v0 ran a coroutine on_auth_expired from SDK on a worker thread (_runtime.py:161-188); honey-a8 ruled
+	/* ruling change: v0 ran a coroutine on_auth_expired from SDK on a worker thread (_runtime.py:161-188); clients-a8 ruled
 	   SDK plain-only, so SDK built inside a running loop (main runs under asyncio.run) with an async def refuses it */
 	// v0: 31aba57f46
 	it("refuses an async on_auth_expired on SDK inside a running loop, and a hook in the other client's list, nothing sent", async () => {
@@ -446,7 +446,7 @@ describe.skipIf(!PY)("the hooks a client never runs: refused at construction (Fc
 	it("type-checks a plain and an async on_auth_expired on the one ClientConfig: only the runtime refuses", () => {
 		const source = `import asyncio
 
-import honey_sdk as sdk
+import http_sdk as sdk
 
 
 async def refresh() -> str:

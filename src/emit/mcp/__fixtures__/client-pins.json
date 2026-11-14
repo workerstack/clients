@@ -1,5 +1,5 @@
 {
-	"name": "honey-mcp-clients",
+	"name": "mcp-clients",
 	"private": true,
 	"description": "The official MCP clients the bit 18 legs drive the emitted server with, pinned",
 	"dependencies": {

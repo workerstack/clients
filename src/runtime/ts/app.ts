@@ -1,4 +1,4 @@
-import type { HoneyClient, InferRoutes } from "./app-types.ts"
+import type { HttpClient, InferRoutes } from "./app-types.ts"
 import type { ClientConfig } from "./config.ts"
 import { isClientError } from "./error.ts"
 import { HTTPClient } from "./http.ts"
@@ -86,15 +86,15 @@ function safeMethods(http: HTTPClient): object {
 }
 
 /** The app-typed client: each call throws an error status, and `client.safe`'s calls answer it as a Result. */
-export function createClient<T>(config: ClientConfig): HoneyClient<InferRoutes<T>> {
+export function createClient<T>(config: ClientConfig): HttpClient<InferRoutes<T>> {
 	const http = new HTTPClient(config)
 	const safe = safeMethods(http)
-	return new Proxy({} as HoneyClient<InferRoutes<T>>, {
+	return new Proxy({} as HttpClient<InferRoutes<T>>, {
 		get(_target, prop: string | symbol) {
 			/* not a thenable, and printable: `await client` and `String(client)` must not hit the method table */
-			if (prop === Symbol.toStringTag) return "HoneyClient"
+			if (prop === Symbol.toStringTag) return "HttpClient"
 			if (typeof prop === "symbol" || prop === "then") return undefined
-			if (prop === "toString" || prop === "toJSON") return () => "[object HoneyClient]"
+			if (prop === "toString" || prop === "toJSON") return () => "[object HttpClient]"
 			if (prop === "safe") return safe
 			if (!HTTP_METHODS.includes(prop)) return helper(http, prop)
 			return (path: string, input?: RequestOptions) =>

@@ -1,7 +1,7 @@
 /**
  * The one way gen runs .NET (G10, G11, R7): every dotnet, MSBuild, csc and `dotnet format` a test, the driver or
  * the harness spawns goes through here. It runs only the SDK the repo root's `global.json` pins (exact,
- * `rollForward: disable`), extracted from Microsoft's tarball into `$HOME/.cache/honey-tmp/dotnet/toolchain/<pin>`
+ * `rollForward: disable`), extracted from Microsoft's tarball into `$HOME/.cache/backend-tmp/dotnet/toolchain/<pin>`
  * by `dotnetInstall` after a check against the committed `dotnet-sdk.sha512`: never `/usr/bin/dotnet`, `~/.dotnet`
  * or a `dotnet` on PATH. The CLI home, the NuGet caches and TMPDIR live under that dir too. HOME stays the
  * caller's: DOTNET_CLI_HOME takes the CLI's state and NuGet's user config (P2). Every build runs lean, with no
@@ -42,7 +42,7 @@ const tfm = () => `net${pinnedDotnet().split(".")[0]}.0`
 
 /** Where gen's .NET lives: one area under the toolchain cache, made on first use. */
 export function csharpCacheDir(...parts: string[]): string {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/dotnet", ...parts)
+	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/dotnet", ...parts)
 	mkdirSync(dir, { recursive: true })
 	return dir
 }
@@ -137,7 +137,7 @@ export function hasDotnet(): boolean {
 
 /** Whether a missing SDK must fail rather than skip: CI and the pre-push battery set one of these. */
 export function dotnetRequired(): boolean {
-	return process.env.HONEY_REQUIRE_TOOLCHAINS === "1" || process.env.HONEY_REQUIRE_DOTNET === "1"
+	return process.env.CLIENTS_REQUIRE_TOOLCHAINS === "1" || process.env.CLIENTS_REQUIRE_DOTNET === "1"
 }
 
 /**
@@ -149,7 +149,7 @@ export function withDotnet(): boolean {
 	const present = hasDotnet()
 	if (!present && dotnetRequired())
 		throw new Error(
-			`.NET SDK ${pinnedDotnet()} is required here (HONEY_REQUIRE_DOTNET or HONEY_REQUIRE_TOOLCHAINS) and is not installed: ${dotnetInstall(pinnedDotnet())}`,
+			`.NET SDK ${pinnedDotnet()} is required here (CLIENTS_REQUIRE_DOTNET or CLIENTS_REQUIRE_TOOLCHAINS) and is not installed: ${dotnetInstall(pinnedDotnet())}`,
 		)
 	return present
 }

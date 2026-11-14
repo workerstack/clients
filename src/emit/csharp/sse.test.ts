@@ -118,7 +118,7 @@ const TYPES = [
 
 /** csc's errors for TYPES against `sse`, each as `<the statement> → <CS code>: <message>`. */
 function findings(): string[] {
-	const source = program("HoneySdk", "HoneySdkClient", TYPES.join("\n"))
+	const source = program("HttpSdk", "HttpSdkClient", TYPES.join("\n"))
 	const lines = source.split("\n")
 	return checked("sse", source).map((line) => {
 		const found = /^\((\d+),\d+\): error (CS\d+: .*)$/.exec(line)
@@ -144,7 +144,7 @@ describe.skipIf(!DOTNET)("an SSE method: awaiting it opens EventStream<T>, read 
 	/* ported: python sse.test.ts:143 (a WebSocket cursor refused; C# has one client) */
 	it("types the methods EventStream<Tick> and EventStream<string>, and refuses a WebSocket cursor", () => {
 		expect(findings()).toEqual([
-			`${WRONG} → CS0029: Cannot implicitly convert type 'HoneySdk.EventStream<HoneySdk.Tick>' to 'HoneySdk.EventStream<string>'`,
+			`${WRONG} → CS0029: Cannot implicitly convert type 'HttpSdk.EventStream<HttpSdk.Tick>' to 'HttpSdk.EventStream<string>'`,
 			`${RESUMED} → CS1739: The best overload for 'StreamAsync' does not have a parameter named 'reconnectToken'`,
 		])
 	})
@@ -190,7 +190,7 @@ describe.skipIf(!DOTNET)("an SSE stream's failures and typed headers: thrown onc
 		]
 		const { run } = await drive(replies, [ticks(), ticks()], { script: {} })
 		const decoded = {
-			chain: ["DecodeException", "SdkException", "HoneyException"],
+			chain: ["DecodeException", "SdkException", "HttpException"],
 			status: undefined,
 			text: expect.stringMatching(/^an event's data does not decode: /),
 			type: "DecodeException",
@@ -217,7 +217,7 @@ describe.skipIf(!DOTNET)("an SSE stream's failures and typed headers: thrown onc
 	})
 })
 
-const STATUS = ["ApiStatusException", "SdkException", "HoneyException"]
+const STATUS = ["ApiStatusException", "SdkException", "HttpException"]
 /** An error status at the open as the trace records it: its class, the status class, the text, via return. */
 const statusError = (type: string, status: number, message: string) => ({
 	error: { chain: [type, ...STATUS], status, text: `HTTP ${status}: ${message}`, type, via: "return" },
@@ -259,7 +259,7 @@ const methodsOf = (lines: readonly string[], head: string) =>
 	lines.flatMap((line, i) => (line.startsWith(`    public ${head}`) ? [[line, lines[i + 1] ?? ""]] : []))
 
 const OPTIONS = "RequestOptions? options = null, CancellationToken cancellationToken = default"
-const CONTEXT = "HoneySdkJsonContext.Default"
+const CONTEXT = "HttpSdkJsonContext.Default"
 /** contract 50 §2.1's SSE lines, exact. */
 const EMITTED = [
 	'    private static readonly Operation _stream = new("GET", "/ticks", [], Idempotent: false, Accept: "text/event-stream");',
@@ -377,7 +377,7 @@ describe.skipIf(!DOTNET)("what bounds an SSE call: the timeout its open, the tok
 		expect(got, `${run.stderr} elapsed ${elapsed}`).toEqual({
 			bounded: true,
 			error: {
-				chain: ["ApiTimeoutException", "HoneyException"],
+				chain: ["ApiTimeoutException", "HttpException"],
 				status: undefined,
 				text: "GET /ticks timed out after 300 ms",
 				type: "ApiTimeoutException",

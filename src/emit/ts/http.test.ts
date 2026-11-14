@@ -250,7 +250,7 @@ describe("calls", () => {
 
 /** tsc's diagnostics on `consumer.ts`, typechecked beside the emitted `files`. */
 function consumerErrors(files: Readonly<Record<string, string>>, consumer: string): string[] {
-	const root = join(process.env.HOME ?? homedir(), ".cache/honey-tmp/gen-ts-types")
+	const root = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/gen-ts-types")
 	mkdirSync(root, { recursive: true })
 	const dir = mkdtempSync(join(root, "sdk-"))
 	const tsc = join(dirname(createRequire(import.meta.url).resolve("typescript/package.json")), "bin/tsc")

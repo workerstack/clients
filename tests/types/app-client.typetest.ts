@@ -12,7 +12,7 @@ import type { Result } from "../../src/runtime/ts/response.ts"
 import type { SSEEvent } from "../../src/runtime/ts/sse.ts"
 import { defineErrors } from "@workerstack/backend/http"
 import { streamed } from "@workerstack/backend/http/input"
-import { honey } from "@workerstack/backend/http"
+import { httpApp } from "@workerstack/backend/http"
 import type { InferRoutes } from "@workerstack/backend/http"
 
 const user = z.object({ email: z.string(), id: z.string(), name: z.string() })
@@ -20,7 +20,7 @@ const row = z.object({ id: z.string(), name: z.string() })
 const notFound = defineErrors({ not_found: "not_found" })
 
 /** v0's client fixture: each input source, a body plain and streamed(), each output media type, each verb. */
-const app = honey<{}>()
+const app = httpApp<{}>()
 	.get("/health")
 	.handler((ctx) => ctx.res.text("ok", "ok"))
 	.get("/users")
@@ -135,17 +135,17 @@ const app = honey<{}>()
 	.handler((ctx) => ctx.res.noContent())
 
 /** The fixture twice, the second under /v1: a 70-route map. */
-const big = app.route(honey<{}>().basePath("/v1").route(app))
+const big = app.route(httpApp<{}>().basePath("/v1").route(app))
 
 /** A route under a basePath. */
-const prefixed = honey<{}>()
+const prefixed = httpApp<{}>()
 	.basePath("/api")
 	.get("/users")
 	.output({ "application/json": { ok: z.object({ id: z.string() }).array() } })
 	.handler((ctx) => ctx.res.json("ok", [{ id: "1" }]))
 
 /** A declared no-content status (no body at 204), alone and beside a JSON body; an open media type. */
-const emptying = honey<{}>()
+const emptying = httpApp<{}>()
 	.get("/image")
 	.output({ "image/gif": { ok: true } })
 	.handler((ctx) => ctx.res.binary("ok", new Uint8Array([0]), { contentType: "image/gif" }))
@@ -227,16 +227,16 @@ describe("the paths across merged, prefixed and deep apps", () => {
 	// v0: 6d1905a168
 	// v0: 43b6c37acc
 	it("merged sub-apps keep each path under its own verbs, and a basePath route is called by its prefixed path", () => {
-		const items = honey<{}>()
+		const items = httpApp<{}>()
 			.get("/items")
 			.handler((ctx) => ctx.res.json("ok", []))
 			.post("/items")
 			.input({ json: z.object({ name: z.string() }) })
 			.handler((ctx) => ctx.res.json("created", { id: "1" }))
-		const tags = honey<{}>()
+		const tags = httpApp<{}>()
 			.get("/tags")
 			.handler((ctx) => ctx.res.json("ok", []))
-		const combined = honey<{}>().route(items).route(tags)
+		const combined = httpApp<{}>().route(items).route(tags)
 		expectTypeOf<PathsOf<"get", typeof combined>>().toEqualTypeOf<"/items" | "/tags">()
 		expectTypeOf<PathsOf<"post", typeof combined>>().toEqualTypeOf<"/items">()
 		expectTypeOf<PathsOf<"get", typeof prefixed>>().toEqualTypeOf<"/api/users">()

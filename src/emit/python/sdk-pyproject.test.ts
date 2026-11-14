@@ -2,7 +2,7 @@
  * The Python package's metadata (plan 39 8.4): the run's metadata block in pyproject.toml as PEP 621 and PEP 639 have
  * it, read back by the pinned interpreter's tomllib, then built into an sdist by hatchling at the floor the manifest
  * declares, whose PKG-INFO is what PyPI shows. The Python classifiers span the floor CI installs to the version
- * `.python-version` pins, and honey's own manifest stays out of the sdist.
+ * `.python-version` pins, and clients' own manifest stays out of the sdist.
  */
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -98,7 +98,7 @@ describe.skipIf(!PY)("the metadata block in pyproject.toml (plan 39 8.4)", () =>
 	)
 
 	it(
-		"keeps honey's manifest out of the sdist, and leaves out each field the block does not give",
+		"keeps clients' manifest out of the sdist, and leaves out each field the block does not give",
 		{ timeout: SPAWN_TIMEOUT },
 		async () => {
 			const toml = parsedToml((await pythonFiles({ targets: ["python"] }))["pyproject.toml"] ?? "") as {
@@ -110,7 +110,7 @@ describe.skipIf(!PY)("the metadata block in pyproject.toml (plan 39 8.4)", () =>
 				{
 					hatch: {
 						build: {
-							targets: { sdist: { exclude: [MANIFEST] }, wheel: { packages: ["src/honey_sdk"] } },
+							targets: { sdist: { exclude: [MANIFEST] }, wheel: { packages: ["src/http_sdk"] } },
 						},
 					},
 				},
@@ -162,7 +162,7 @@ describe.skipIf(!PY)("the package hatchling builds (plan 39 8.4, 8.7)", () => {
 	)
 
 	it(
-		"is an sdist whose PKG-INFO PyPI reads the metadata from, honey's manifest left out",
+		"is an sdist whose PKG-INFO PyPI reads the metadata from, clients' manifest left out",
 		{ timeout: 2 * SPAWN_TIMEOUT },
 		async () => {
 			const dir = written(await pythonFiles())

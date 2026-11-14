@@ -301,8 +301,8 @@ describe.skipIf(!RUST)("the Rust SDK's redirects: a caller's http_builder", () =
 			{ follow: { ...read(follow), hops: follow.hops.map(redirected) }, plain: read(plain) },
 			follow.run.stderr + plain.run.stderr,
 		).toEqual({
-			follow: { agents: ["honey-driver", "honey-driver"], hops: [LEAVING, LANDED], observed: [OK_DATA] },
-			plain: { agents: ["honey-driver"], observed: [OK_DATA] },
+			follow: { agents: ["clients-driver", "clients-driver"], hops: [LEAVING, LANDED], observed: [OK_DATA] },
+			plain: { agents: ["clients-driver"], observed: [OK_DATA] },
 		})
 	}, 600_000)
 

@@ -57,7 +57,7 @@ const plain = (entry: Partial<JavaError>) => ({
 /** The SDK's refusal of a decoded 2xx over `limit` bytes: its DecodeException stating the limit (bit 21 i6). */
 const capped = (limit: number) =>
 	plain({
-		chain: ["DecodeException", "SdkException", "HoneyException"],
+		chain: ["DecodeException", "SdkException", "HttpException"],
 		text: `the answer exceeds ${limit} bytes`,
 		type: "DecodeException",
 	})
@@ -67,7 +67,7 @@ const OVER = [{ kind: "decode", status: 200 }]
 /** The SDK's refusal of the restricted header `name`: a ConfigException naming it, never the JDK's. */
 const refused = (name: string) =>
 	plain({
-		chain: ["ConfigException", "HoneyException"],
+		chain: ["ConfigException", "HttpException"],
 		text: `the ${name} header is restricted and cannot be sent`,
 		type: "ConfigException",
 	})
@@ -256,7 +256,7 @@ describe.skipIf(!JAVA)(
 				{
 					error: run.trace?.calls[0]?.error,
 					observed: run.observed,
-					property: run.stderr.includes("honey-probe allowRestrictedHeaders=null"),
+					property: run.stderr.includes("clients-probe allowRestrictedHeaders=null"),
 				},
 				run.stderr,
 			).toEqual({ error: refused("Host"), observed: [null, OK_DATA], property: true })

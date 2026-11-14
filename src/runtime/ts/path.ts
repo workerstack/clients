@@ -1,7 +1,7 @@
 /**
  * Client-side path templates. Two spellings are accepted, segment by segment:
  *
- * - Honey route patterns: `:name` (or `:name?`) takes a whole segment, `*name` (or `*`) takes the
+ * - Backend route patterns: `:name` (or `:name?`) takes a whole segment, `*name` (or `*`) takes the
  *   rest of the path. Names follow the router grammar, so `:user-id` is one parameter.
  * - OpenAPI templates: `{name}` anywhere inside a segment (`/ops/{id}:cancel`).
  *

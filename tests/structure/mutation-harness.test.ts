@@ -208,7 +208,7 @@ describe("the harness where a toolchain is required", () => {
 		() => {
 			/* a PATH of one empty directory hides every go; the harness itself runs under this process's own runtime */
 			const harness = join(import.meta.dirname, "mutation-harness.ts")
-			const env = { ...process.env, HONEY_REQUIRE_GO: "1", PATH: goCacheDir("empty-path") }
+			const env = { ...process.env, CLIENTS_REQUIRE_GO: "1", PATH: goCacheDir("empty-path") }
 			const run = spawnSync(process.execPath, [harness], { encoding: "utf8", env, timeout: 60_000 })
 			expect({ status: run.status, stdout: run.stdout }).toEqual({ status: 1, stdout: "" })
 			expect(run.stderr).toMatch(/Go is required here/)
@@ -223,9 +223,9 @@ describe("the harness where a toolchain is required", () => {
 			const harness = join(import.meta.dirname, "mutation-harness.ts")
 			const env = {
 				...process.env,
-				HONEY_REQUIRE_GO: "",
-				HONEY_REQUIRE_RUST: "1",
-				HONEY_REQUIRE_TOOLCHAINS: "",
+				CLIENTS_REQUIRE_GO: "",
+				CLIENTS_REQUIRE_RUST: "1",
+				CLIENTS_REQUIRE_TOOLCHAINS: "",
 				PATH: rustCacheDir("empty-path"),
 			}
 			const run = spawnSync(process.execPath, [harness], { encoding: "utf8", env, timeout: 60_000 })
@@ -243,10 +243,10 @@ describe("the harness where a toolchain is required", () => {
 			const env = {
 				...process.env,
 				HOME: pythonCacheDir("tmp", "no-uv"),
-				HONEY_REQUIRE_GO: "",
-				HONEY_REQUIRE_PYTHON: "1",
-				HONEY_REQUIRE_RUST: "",
-				HONEY_REQUIRE_TOOLCHAINS: "",
+				CLIENTS_REQUIRE_GO: "",
+				CLIENTS_REQUIRE_PYTHON: "1",
+				CLIENTS_REQUIRE_RUST: "",
+				CLIENTS_REQUIRE_TOOLCHAINS: "",
 			}
 			const run = spawnSync(process.execPath, [harness], { encoding: "utf8", env, timeout: 60_000 })
 			expect({ status: run.status, stdout: run.stdout }).toEqual({ status: 1, stdout: "" })

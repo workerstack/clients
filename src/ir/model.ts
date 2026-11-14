@@ -57,7 +57,7 @@ export type IRParam = {
 	description?: string
 	/** a path param is always required */
 	required?: boolean
-	/** a path param spanning segments (`x-honey-wildcard`) */
+	/** a path param spanning segments (`x-backend-wildcard`) */
 	wildcard?: true
 	/** `schema.default`, as declared */
 	default?: unknown
@@ -92,19 +92,19 @@ export type IRResponse = {
 	headers?: { name: string; required: boolean; schema: IRSchema }[]
 	/** every media type it declares with its schema; `contentType`/`schema` are the preferred one */
 	contents?: { contentType: string; schema?: IRSchema }[]
-	/** a response a declared error produces (`x-honey-error`), never a declared output */
+	/** a response a declared error produces (`x-backend-error`), never a declared output */
 	error?: true
 }
 
 export type IROperationExtensions = {
 	deprecated?: true
-	/** every declared error key (`x-honey-errors`): its status, null when it has none, and its own schema */
+	/** every declared error key (`x-backend-errors`): its status, null when it has none, and its own schema */
 	errors?: Record<string, { schema?: IRSchema; status: number | null }>
 	idempotencyKey?: true
 	invalidates?: string[]
 	mcp?: true
 	realtime?: true
-	/** the honey route id the operation came from (`x-honey-route`): what extracted ctx types are keyed by */
+	/** the backend route id the operation came from (`x-backend-route`): what extracted ctx types are keyed by */
 	route?: string
 	sse?: true
 	websocket?: true

@@ -1,9 +1,9 @@
 /**
  * The API's error keys in Python (G6/G7, Fc3): one `ErrorKey` StrEnum over every key the API declares, in an
- * operation's `x-honey-errors` or as an error response's envelope keys, in the functional form (the class form
+ * operation's `x-backend-errors` or as an error response's envelope keys, in the functional form (the class form
  * trips ruff's S105 on a member spelling password, token or secret, and emitted code takes no `noqa`), its
  * members UPPER_SNAKE; the runtime reads a body's key into it through `Defaults.keys`, so it never names a
- * generated type. A key whose own schema is inline and not honey's envelope gets `<Key>Data`, the TypedDict
+ * generated type. A key whose own schema is inline and not backend's envelope gets `<Key>Data`, the TypedDict
  * `APIStatusError.decode_body` casts its body to, hoisted among the other declarations. Spec text reaches the
  * source only through the shared escape layer.
  */
@@ -26,7 +26,7 @@ function envelopeKeys(model: SdkModel): string[] {
 }
 
 /**
- * Every declared key in code-unit order with its schema: `x-honey-errors`' (the first operation by id to declare
+ * Every declared key in code-unit order with its schema: `x-backend-errors`' (the first operation by id to declare
  * the key, so the document's path order never changes it), then an envelope's keys, which carry none (Rust's rule).
  */
 function declaredKeys(model: SdkModel): [string, IRSchema | undefined][] {

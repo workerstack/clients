@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "honey.test/driver/sdk"
+	sdk "backend.test/driver/sdk"
 )
 
 // outcome is what a method returned: its answer (*T, []byte, string, a Result's Data, or none), its
@@ -244,7 +244,7 @@ func rawOf(resp *http.Response) (any, error) {
 	return map[string]any{"body": string(body), "headers": headers, "kind": "raw", "status": resp.StatusCode}, nil
 }
 
-// errorOf is an error status as the grid observes it: its status, honey error key (null without
+// errorOf is an error status as the grid observes it: its status, backend error key (null without
 // one) and the body, as JSON when it is JSON.
 func errorOf(ce *sdk.ClientError) any {
 	seen := map[string]any{"errorKey": nil, "kind": "error", "status": ce.StatusCode}

@@ -14,10 +14,10 @@ export const RESERVED = [
 	"Blob",
 	"ErrorEnvelope",
 	"ErrorField",
-	"HoneyArgs",
-	"HoneyCall",
-	"HoneySafe",
-	"HoneyStream",
+	"HttpArgs",
+	"HttpCall",
+	"HttpSafe",
+	"HttpStream",
 	"HttpOptions",
 	"Omit",
 	"Promise",
@@ -63,7 +63,7 @@ export type WsOptions = { protocols?: string | string[]; reconnectToken?: string
 const CALLS = `
 type ErrorField = { error_key: string; message: string; path: string }
 
-/** honey's error envelope at one status, its error keys as literals. */
+/** backend's error envelope at one status, its error keys as literals. */
 export type ErrorEnvelope<TStatus extends number, TKey extends string> = {
 	error_key: TKey
 	fields: Record<string, ErrorField[]>
@@ -77,33 +77,33 @@ export type ErrorEnvelope<TStatus extends number, TKey extends string> = {
 declare const answer: unique symbol
 
 /** A call's input: optional when none of its fields is required. */
-type HoneyArgs<I, O> = {} extends I ? [input?: I & O] : [input: I & O]
+type HttpArgs<I, O> = {} extends I ? [input?: I & O] : [input: I & O]
 
 /** A REST operation: its raw overload and its value, an error status thrown; its declared errors and headers. */
-type HoneyCall<I, D, E = never, H = never> = {
+type HttpCall<I, D, E = never, H = never> = {
 	(input: I & HttpOptions & { raw: true }): Promise<Response>
-	(...input: HoneyArgs<I, HttpOptions & { raw?: false }>): Promise<D>
+	(...input: HttpArgs<I, HttpOptions & { raw?: false }>): Promise<D>
 	readonly [answer]?: [E, H]
 }
 
 /** An event stream, sent when its iteration starts; its opening answer's declared errors. */
-type HoneyStream<I, V, E = never> = {
-	(...input: HoneyArgs<I, SseOptions>): AsyncIterable<V>
+type HttpStream<I, V, E = never> = {
+	(...input: HttpArgs<I, SseOptions>): AsyncIterable<V>
 	readonly [answer]?: [E, never]
 }
 
 /** \`client.safe\`: every REST and stream call answering a Result, never throwing an API answer; a connection as is. */
-export type HoneySafe<T> = {
+export type HttpSafe<T> = {
 	[K in keyof T]: `
 
 /* the safe mirror's REST and stream arms */
 const SAFE_ARMS = `			? {
 					(input: I & HttpOptions & { raw: true }): Promise<Result<Response, E>>
-					(...input: HoneyArgs<I, HttpOptions & { raw?: false }>): Promise<Result<D, E, H>>
+					(...input: HttpArgs<I, HttpOptions & { raw?: false }>): Promise<Result<D, E, H>>
 				}
-			: T[K] extends HoneyStream<infer I, infer V, infer E>
-				? (...input: HoneyArgs<I, SseOptions>) => Promise<Result<AsyncIterable<V>, E>>
-				: HoneySafe<T[K]>
+			: T[K] extends HttpStream<infer I, infer V, infer E>
+				? (...input: HttpArgs<I, SseOptions>) => Promise<Result<AsyncIterable<V>, E>>
+				: HttpSafe<T[K]>
 }
 `
 
@@ -116,7 +116,7 @@ export function shared(features: TsRuntimeFeatures): string {
 	const realtime = features.realtime
 		? `export type RealtimeCallOptions = Omit<HttpOptions, "idempotencyKey" | "timeout"> & RealtimeOptions\n`
 		: ""
-	const rest = "T[K] extends HoneyCall<infer I, infer D, infer E, infer H>"
+	const rest = "T[K] extends HttpCall<infer I, infer D, infer E, infer H>"
 	const safe =
 		connections.length === 0
 			? rest

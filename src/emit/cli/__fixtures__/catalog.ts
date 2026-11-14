@@ -4,7 +4,7 @@
  * - a summary of two sentences whose first runs past 80 characters, and a word only a summary carries (`tree`);
  * - an enum of 7 values (`<enum:7>` in the index) beside one of 2, and a required integer flag;
  * - a recursive schema (`Node`, its children `Node[]`) and an object nested past depth 3;
- * - honey's error envelope on 409 and 422 with their keys, a 400 with a plain JSON body, and a 404 with none;
+ * - backend's error envelope on 409 and 422 with their keys, a 400 with a plain JSON body, and a 404 with none;
  * - a hostile operation: control characters (ESC, CR, NEL, DEL, U+2028, the BOM) in its summary, an enum value, a
  *   field name;
  * - six commands whose path holds `get` or `list`, past search's 5.
@@ -19,7 +19,7 @@ const ok = (schema: Json) => ({ 200: { ...json(schema), description: "ok" } })
 /** The controls a hostile spec carries. */
 export const HOSTILE = "\u001b[2J\r\n\u0085\u007f\u2028\ufeff"
 
-/** honey's error envelope for `status`, its keys `keys`. */
+/** backend's error envelope for `status`, its keys `keys`. */
 const envelope = (status: number, keys: string[]) => ({
 	properties: {
 		error_key: { enum: keys, type: "string" },
@@ -78,7 +78,7 @@ const nodePaths = (): Json => ({
 	},
 })
 
-/** `/orgs`: a create with honey's envelope on 409 and 422 and a bare 404, a list; `/orgs/{id}`: a get. */
+/** `/orgs`: a create with backend's envelope on 409 and 422 and a bare 404, a list; `/orgs/{id}`: a get. */
 const orgPaths = (): Json => ({
 	"/orgs": {
 		get: { operationId: "orgs.list", responses: ok({ items: STRING, type: "array" }) },

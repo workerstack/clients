@@ -38,7 +38,7 @@ async function importConfig(path: string, options: LoadReleaseOptions): Promise<
 	if (runtime.runtime === "node" && (ext === ".ts" || ext === ".mts") && !stripsTypes(runtime.nodeVersion)) {
 		throw new Error(
 			`${path}: a TypeScript release config needs Node >= 22.18 (23.6 on Node 23; this is ${runtime.nodeVersion}); ` +
-				"run honey-clients with Bun, or upgrade Node",
+				"run clients with Bun, or upgrade Node",
 		)
 	}
 	const importModule = options.importModule ?? ((url) => import(url) as Promise<Record<string, unknown>>)

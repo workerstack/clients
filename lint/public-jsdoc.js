@@ -211,7 +211,7 @@ export const rule = {
 			Program(program) {
 				for (const { file, form } of surface.unknown) {
 					if (file !== context.filename) continue
-					const message = `honey/public-jsdoc cannot follow ${form} here, so what it exposes goes unchecked: write it as a plain export`
+					const message = `clients/public-jsdoc cannot follow ${form} here, so what it exposes goes unchecked: write it as a plain export`
 					context.report({ message, node: program })
 				}
 				const names = surface.names.get(context.filename)
@@ -228,6 +228,6 @@ export const rule = {
 }
 
 export default {
-	meta: { name: "honey" },
+	meta: { name: "clients" },
 	rules: { "public-jsdoc": rule },
 }

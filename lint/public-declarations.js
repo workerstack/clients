@@ -1,4 +1,4 @@
-/* What a declaration shows a consumer, read off the syntax: shared by the surface graph and honey/public-jsdoc. */
+/* What a declaration shows a consumer, read off the syntax: shared by the surface graph and clients/public-jsdoc. */
 
 const FUNCTIONS = new Set(["ArrowFunctionExpression", "FunctionDeclaration", "FunctionExpression"])
 const VALUE_HOLDERS = new Set(["AccessorProperty", "PropertyDefinition", "VariableDeclarator"])

@@ -1,12 +1,12 @@
-/* The package's import boundaries (00-rules "Environments", as honey-clients keeps them): src/ is build-time Node code,
+/* The package's import boundaries (00-rules "Environments", as clients keeps them): src/ is build-time Node code,
  * so node builtins and Node globals are fine; an import never leaves src/; ts-morph stays in extract/, the one place
  * that walks an app's types; and @workerstack/backend is read through its public subpaths, never its src/ or dist/. */
 import { inSource, repoPath } from "./repo-path.js"
 
 const MESSAGES = {
 	escape: "an import stays inside its package's src (no repo path outside it, no sibling package)",
-	internal: "honey-clients reads @workerstack/backend through public subpaths only",
-	tsMorph: "ts-morph is for honey-clients's extract/ only",
+	internal: "clients reads @workerstack/backend through public subpaths only",
+	tsMorph: "ts-morph is for clients's extract/ only",
 }
 
 /** The src-relative path of a non-test file under src/, else null. */
@@ -52,6 +52,6 @@ export const rule = {
 }
 
 export default {
-	meta: { name: "honey" },
+	meta: { name: "clients" },
 	rules: { boundaries: rule },
 }

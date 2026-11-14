@@ -70,9 +70,9 @@ function runStep(registries: Registry[], name: string, env: Record<string, strin
 	})
 }
 
-/** honey's record of the package: its name and version on each registry, as `.honey-generated.json` keeps it. */
+/** clients' record of the package: its name and version on each registry, as `.clients-generated.json` keeps it. */
 const record = (...packages: { name: string; registry: string; version?: string }[]) => ({
-	".honey-generated.json": JSON.stringify({ files: {}, packages }),
+	".clients-generated.json": JSON.stringify({ files: {}, packages }),
 })
 
 describe("releaseWorkflow triggers and publish steps", () => {
@@ -129,7 +129,7 @@ describe("releaseWorkflow waits on the registries", () => {
 	})
 
 	it(
-		"passes when honey's record holds the tag's version for every registry",
+		"passes when clients' record holds the tag's version for every registry",
 		() => {
 			const result = versionCheck(
 				[{ kind: "npm" }, { kind: "jsr" }],
@@ -168,7 +168,7 @@ describe("releaseWorkflow checks the recorded version", () => {
 				),
 			)
 			expect(result.status).not.toBe(0)
-			expect(result.stdout).toMatch(/tag v2\.0\.0, but \.honey-generated\.json holds version 1\.0\.0/)
+			expect(result.stdout).toMatch(/tag v2\.0\.0, but \.clients-generated\.json holds version 1\.0\.0/)
 		},
 		SPAWN_TIMEOUT,
 	)

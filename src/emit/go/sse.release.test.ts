@@ -77,7 +77,7 @@ goDescribe("an SSE body a consumer lets go, no ctx canceled: the runtime's own c
 		const { run, stderr } = await released(HOOKED, sse([tick(1)], "hold"), ["errors"])
 		expect(run, stderr).toEqual({
 			built: true,
-			out: ["honey: OnResponse hook: bad", "z <nil>"],
+			out: ["httpsdk: OnResponse hook: bad", "z <nil>"],
 			released: true,
 			vet: [],
 		})

@@ -74,7 +74,7 @@ const step = (h: HookTrace) =>
 const plain = (entry: Partial<PythonError>) => ({ cause: null, repr: expect.any(String), via: "return", ...entry })
 /** The HookError a hook's `ValueError(text)` became (Fc8). */
 const hookError = (text: string) =>
-	plain({ cause: "ValueError", chain: ["HookError", "HoneyError"], text, type: "HookError" })
+	plain({ cause: "ValueError", chain: ["HookError", "HttpError"], text, type: "HookError" })
 
 /** on_log entries, as the trace records them. */
 const start = { event: "request_start", level: "debug", operation: OPERATION }

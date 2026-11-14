@@ -61,7 +61,7 @@ describe("formatFiles: the emit post-pass (F4)", () => {
 		expect([out, out === files]).toEqual([files, false])
 	})
 
-	it("formats each file by its extension's formatter, in honey's style, and leaves any other file as it is", async () => {
+	it("formats each file by its extension's formatter, in backend's style, and leaves any other file as it is", async () => {
 		const seen: unknown[] = []
 		const formatter: Formatter = async (name, source, options) => {
 			seen.push([name, options])

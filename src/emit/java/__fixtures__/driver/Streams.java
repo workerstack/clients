@@ -47,7 +47,7 @@ final class Streams {
                 failed[0] = e;
               }
             },
-            "honey-stream");
+            "clients-stream");
     worker.setDaemon(true);
     Timer timer = Invoke.cancelAfter(worker, cancel);
     worker.start();

@@ -21,11 +21,11 @@ const NORMALIZED_VERSION = "0.0.0"
 const sha256 = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex")
 
 /**
- * sha256 over honey's `.honey-generated.json` file map in the package dir. A hand-kept package (no honey target)
+ * sha256 over clients' `.clients-generated.json` file map in the package dir. A hand-kept package (no clients target)
  * publishes its product's spec, so its output is `specSha`.
  */
 export function outputDigest(repoRoot: string, pkg: PublicPackage, specSha: string): string {
-	if (pkg.honey === undefined) return specSha
+	if (pkg.clients === undefined) return specSha
 	const files = generatedFiles(join(repoRoot, pkg.path))
 	if (files === undefined) throw new Error(`${pkg.path} has no ${MANIFEST}: codegen did not generate it`)
 	return canonicalSha(files)

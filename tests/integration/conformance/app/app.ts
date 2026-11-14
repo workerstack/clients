@@ -17,7 +17,7 @@ import type { MiddlewareFn, WSAdapter } from "@workerstack/backend/http"
 type NextFn = Parameters<MiddlewareFn>[1]
 import { requestId } from "@workerstack/backend/http/request-id"
 import { serveOpenApi } from "@workerstack/backend/http/openapi"
-import { honey } from "@workerstack/backend/http"
+import { httpApp } from "@workerstack/backend/http"
 import { sha256 } from "./digest.ts"
 import { createReferenceServer } from "./reference-server.ts"
 import { realtimeRoutes } from "./app-realtime.ts"
@@ -153,7 +153,7 @@ function createWire(originOf: (request: Request) => WireHop["origin"]) {
 
 /** The app with its settings, the wire capture and request ids: what every route group hangs off. */
 function configured(wire: ReturnType<typeof createWire>, wsAdapter: WSAdapter) {
-	return honey<{}>()
+	return httpApp<{}>()
 		.wsAdapter(wsAdapter)
 		.encodedSlashes("allow")
 		.errorFactory(errors)

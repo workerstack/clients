@@ -191,7 +191,7 @@ describe("the mounted handler's inner 401 and 403 (bit 21 e)", () => {
 		const meta = (forbidden.json?.result as { _meta?: Record<string, unknown> } | undefined)?._meta
 		expect([
 			[scoped.status, scoped.headers.get("www-authenticate")],
-			[forbidden.status, resultOf(forbidden)[0], meta?.["honey/status"]],
+			[forbidden.status, resultOf(forbidden)[0], meta?.["backend/status"]],
 		]).toEqual([
 			[403, 'Bearer error="insufficient_scope"'],
 			[200, true, 403],

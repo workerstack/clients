@@ -201,7 +201,7 @@ describe.skipIf(!PY)("the Python test driver: how an SSE call fails", SLOW, () =
 			stream: { retry: [null], yields: 2 },
 			via: "stream",
 		})
-		expect(call?.error?.chain).toEqual(["APIConnectionError", "HoneyError"])
+		expect(call?.error?.chain).toEqual(["APIConnectionError", "HttpError"])
 		const bare = await drive(sdk, [dropped], [ticks()])
 		expect({ observed: bare.run.observed, status: bare.run.status }, bare.run.stderr).toEqual({
 			observed: [seen],
@@ -400,7 +400,7 @@ describe.skipIf(!PY)("the Python test driver: how a WebSocket read ends", SLOW, 
 			},
 		})
 		/* a failed send is the SDK's own error (contract 34 §1: a TCP failure is APIConnectionError), never wsproto's, whose text carries the whole message */
-		expect(call?.error?.chain).toEqual(["APIConnectionError", "HoneyError"])
+		expect(call?.error?.chain).toEqual(["APIConnectionError", "HttpError"])
 	})
 })
 

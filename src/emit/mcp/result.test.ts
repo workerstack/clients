@@ -3,7 +3,7 @@
  * answer is text and structuredContent alike, an object as it is, any other value and an answer with declared headers
  * wrapped `{result, headers}`; text is text; bytes are image, audio or an embedded resource by their media type, a
  * body past 1 MiB refused isError, read only to the cap; text past 100,000 characters is cut with a note. A failure is isError: an answer outside 2xx its
- * status with honey's error key and message, else its message and body; no answer `transport` or `timeout`. A body
+ * status with backend's error key and message, else its message and body; no answer `transport` or `timeout`. A body
  * argument goes as base64-decoded bytes (at most 1 MiB, refused otherwise) or text. Both official clients validate the
  * structuredContent against the outputSchema.
  */
@@ -108,17 +108,17 @@ describe("a tool's JSON and text result (phase d)", SLOW, () => {
 		const structured = [{ id: "1" }, { result: ["a", "b"] }, { result: { page: 1 }, headers: { "x-total": "2" } }]
 		expect(results).toEqual([
 			...structured.map((value) => ({
-				_meta: { "honey/status": 200 },
+				_meta: { "backend/status": 200 },
 				content: [{ text: JSON.stringify(value), type: "text" }],
 				structuredContent: value,
 			})),
-			{ _meta: { "honey/status": 200 }, content: [{ text: "plain words", type: "text" }] },
+			{ _meta: { "backend/status": 200 }, content: [{ text: "plain words", type: "text" }] },
 			{
-				_meta: { "honey/status": 200 },
+				_meta: { "backend/status": 200 },
 				content: [{ text: `${"x".repeat(100_000)}\n[cut: 100000 of 100005 characters]`, type: "text" }],
 			},
 			{
-				_meta: { "honey/status": 200 },
+				_meta: { "backend/status": 200 },
 				content: [
 					{
 						text: JSON.stringify({ message: "The API answered something other than the object its schema declares" }),
@@ -148,13 +148,13 @@ describe("a tool's bytes result (phase d)", SLOW, () => {
 			[{ data: pattern(5), mimeType: "audio/mpeg", type: "audio" }],
 			[
 				{
-					resource: { blob: pattern(7), mimeType: "application/pdf", uri: "honey://pdf_get/result" },
+					resource: { blob: pattern(7), mimeType: "application/pdf", uri: "mcp://pdf_get/result" },
 					type: "resource",
 				},
 			],
 			[
 				{
-					resource: { blob: pattern(MiB), mimeType: "application/octet-stream", uri: "honey://big_get/result" },
+					resource: { blob: pattern(MiB), mimeType: "application/octet-stream", uri: "mcp://big_get/result" },
 					type: "resource",
 				},
 			],
@@ -171,7 +171,7 @@ describe("a tool's bytes result (phase d)", SLOW, () => {
 			const message = `Response body is over the ${MiB}-byte cap (application/octet-stream, ${64 * MiB} bytes)`
 			expect([result, api.written() < 16 * MiB]).toEqual([
 				{
-					_meta: { "honey/status": 200 },
+					_meta: { "backend/status": 200 },
 					content: [{ text: JSON.stringify({ status: 200, message, body: null }), type: "text" }],
 					isError: true,
 				},
@@ -185,7 +185,7 @@ describe("a tool's bytes result (phase d)", SLOW, () => {
 
 describe("a tool's failure (phase d)", SLOW, () => {
 	// v0: f6f97842f6
-	it("answers a status outside 2xx isError: honey's error key and message, else the message and body", async () => {
+	it("answers a status outside 2xx isError: backend's error key and message, else the message and body", async () => {
 		const envelope = {
 			error_key: "unauthorized",
 			fields: {},
@@ -244,7 +244,7 @@ describe("a result's status (phase f)", SLOW, () => {
 			],
 		)
 		expect(results.map((result) => result._meta)).toEqual(
-			[200, 201, 204, 200, 202, 410].map((status) => ({ "honey/status": status })),
+			[200, 201, 204, 200, 202, 410].map((status) => ({ "backend/status": status })),
 		)
 	})
 
@@ -260,7 +260,7 @@ describe("a result's status (phase f)", SLOW, () => {
 			value.status,
 			results[0]?._meta,
 			hops.map((hop) => [hop.origin, hop.url, hop.headers.authorization]),
-		]).toEqual([true, 302, { "honey/status": 302 }, [["primary", "/item", "Bearer secret-key"]]])
+		]).toEqual([true, 302, { "backend/status": 302 }, [["primary", "/item", "Bearer secret-key"]]])
 	})
 })
 

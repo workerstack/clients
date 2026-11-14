@@ -8,7 +8,7 @@ import { type PackageResult, syncAll } from "./sync.ts"
 const MIN_NAME_WIDTH = 4
 
 /** What `release sync --help` prints. */
-export const HELP = `Usage: honey-clients release sync --config <path> [options]
+export const HELP = `Usage: clients release sync --config <path> [options]
 
 Options:
   --config <path>   The release config (required)

@@ -53,7 +53,7 @@ const leaky = (fetch: typeof globalThis.fetch): Json => ({
 	headers: () => ({
 		"accept-language": "hr",
 		authorization: "Bearer secret",
-		"user-agent": "honey-test",
+		"user-agent": "clients-test",
 		"x-api-key": "secret",
 	}),
 	onRequest: [(ctx: { headers: Headers }) => void ctx.headers.set("x-hook", "h")],
@@ -123,7 +123,7 @@ describe("redirects: follow — a cross-origin hop carries only safe headers, ne
 		await api.get("/items", { headers: { "x-call": "c" } })
 		const atEvil = calls.filter((call) => call.url.startsWith("https://evil.test/"))
 		expect(atEvil).toHaveLength(1)
-		expect(crossed(atEvil[0])).toEqual([[], ["hr", "honey-test"]])
+		expect(crossed(atEvil[0])).toEqual([[], ["hr", "clients-test"]])
 	})
 
 	// v0: add250aa51
@@ -133,6 +133,6 @@ describe("redirects: follow — a cross-origin hop carries only safe headers, ne
 		await client.items.list({ headers: { "x-call": "c" } })
 		const atEvil = calls.filter((call) => call.url.startsWith("https://evil.test/"))
 		expect(atEvil).toHaveLength(1)
-		expect(crossed(atEvil[0])).toEqual([[], ["hr", "honey-test"]])
+		expect(crossed(atEvil[0])).toEqual([[], ["hr", "clients-test"]])
 	})
 })

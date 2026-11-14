@@ -134,7 +134,7 @@ const shown = (schema: IRSchema, at: At): string =>
 /** `schema` as a type sketch: refs inlined, one already open by its name, objects past SKETCH_DEPTH as `{…}`. */
 export const sketch = (schema: IRSchema, model: SdkModel): string => shown(schema, { depth: 0, model, open: [] })
 
-/** Each declared error status, with the keys its honey error envelope names: `[status, keys]`. */
+/** Each declared error status, with the keys its backend error envelope names: `[status, keys]`. */
 function errorsOf(op: SdkOp, model: SdkModel): [number, string[]][] {
 	return op.errorStatuses.map((status) => {
 		/* an error status is one of the operation's declared responses */

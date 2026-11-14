@@ -26,7 +26,7 @@ const plain = (entry: Partial<CsError>) => ({
 	via: "return",
 	...entry,
 })
-const config = (text: string) => plain({ chain: ["ConfigException", "HoneyException"], text, type: "ConfigException" })
+const config = (text: string) => plain({ chain: ["ConfigException", "HttpException"], text, type: "ConfigException" })
 
 describe.skipIf(!DOTNET)(
 	"a header the C# SDK cannot send: ConfigException by name, its value never quoted, nothing sent (bit 19 b1)",
@@ -91,7 +91,7 @@ describe.skipIf(!DOTNET)(
 				run.stderr,
 			).toEqual({
 				error: expect.objectContaining({
-					chain: ["ConfigException", "HoneyException"],
+					chain: ["ConfigException", "HttpException"],
 					text: "the X-Bad header's value cannot be sent",
 				}),
 				hops: 0,
@@ -133,7 +133,7 @@ describe.skipIf(!DOTNET)(
 				).toEqual({
 					encoding: "gzip, deflate, br",
 					error: plain({
-						chain: ["DecodeException", "SdkException", "HoneyException"],
+						chain: ["DecodeException", "SdkException", "HttpException"],
 						text: `the answer exceeds ${MiB} bytes`,
 						type: "DecodeException",
 					}),

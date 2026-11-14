@@ -57,7 +57,7 @@ const err = (status: number) => ({ data: false, ok: false, response: true, statu
 /** A 404 keyed `member.missing` as the trace reads it from an Err: the server's key, no member. */
 const MISSING = {
 	cause: null,
-	chain: ["NotFoundError", "APIStatusError", "HoneyError"],
+	chain: ["NotFoundError", "APIStatusError", "HttpError"],
 	key: "member.missing",
 	keyMember: null,
 	message: "gone",

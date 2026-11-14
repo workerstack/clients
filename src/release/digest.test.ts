@@ -11,14 +11,14 @@ import { handDigest, outputDigest } from "./digest.ts"
 let root = ""
 const PKG_DIR = "acme-release/sdk"
 
-const pkg = (honey: boolean): PublicPackage => ({
+const pkg = (generated: boolean): PublicPackage => ({
 	branch: "main",
 	codegen: ["true"],
 	commitMessage: "c",
 	committer: DEFAULT_COMMITTER,
 	description: "d",
 	homepage: "https://example.com",
-	...(honey ? { honey: { options: {}, target: "go" as const } } : {}),
+	...(generated ? { clients: { options: {}, target: "go" as const } } : {}),
 	mirror: "git@github.com:acme/sdk.git",
 	name: "sdk",
 	path: PKG_DIR,
@@ -38,7 +38,7 @@ function write(rel: string, text: string): void {
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" })
 
 function manifest(files: Record<string, string>): void {
-	write(".honey-generated.json", `${JSON.stringify({ files }, null, "\t")}\n`)
+	write(".clients-generated.json", `${JSON.stringify({ files }, null, "\t")}\n`)
 }
 
 beforeEach(() => {
@@ -78,14 +78,14 @@ describe("handDigest", () => {
 })
 
 describe("outputDigest", () => {
-	it("follows the generated files' hashes in honey's manifest", () => {
+	it("follows the generated files' hashes in clients' manifest", () => {
 		const before = outputDigest(root, pkg(true), "a".repeat(64))
 		manifest({ "client.go": "f".repeat(64) })
 		expect(outputDigest(root, pkg(true), "a".repeat(64))).not.toBe(before)
 	})
 
 	it("throws naming the dir when codegen wrote no manifest", () => {
-		rmSync(path.join(root, PKG_DIR, ".honey-generated.json"))
+		rmSync(path.join(root, PKG_DIR, ".clients-generated.json"))
 		expect(() => outputDigest(root, pkg(true), "a".repeat(64))).toThrow(PKG_DIR)
 	})
 

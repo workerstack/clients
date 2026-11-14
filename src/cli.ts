@@ -1,5 +1,5 @@
 /**
- * The honey-clients generate CLI (bit 17 phase h): `honey-clients generate --spec <openapi.json> --target <name>...
+ * The clients generate CLI (bit 17 phase h): `clients generate --spec <openapi.json> --target <name>...
  * --out <dir>` writes each target's generated files under `<out>/<target>`. A target's options are its generate
  * function's, spelled `--<target>-<option>` and passed through untouched: each generator validates its own. The go and
  * cli targets' whole trees go through gofmt (the post-pass), so a missing gofmt is a refusal, never unformatted Go; the
@@ -7,7 +7,7 @@
  * `--watch` regenerates in a fresh child on each change of the spec. Parsing is strict: an unknown flag, a missing
  * value, a stray argument or an option for a target not asked for is a usage error. Each target is written through
  * write.ts: only changed files, a hashed manifest, a removed operation's unedited files deleted (bit 19 h1). `--app`
- * generates from a honey app module instead of a spec, its document made by the app's own core (ir/load.ts, bit 19 h2).
+ * generates from a backend app module instead of a spec, its document made by the app's own core (ir/load.ts, bit 19 h2).
  */
 import { readFileSync, watch } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
@@ -79,11 +79,11 @@ function packageOf(
 	if (target === "cli") return generateGoCli(document, options)
 	if (target === "mcp") {
 		const server = generateMcpServer(document, options, metadata)
-		for (const op of server.skipped) report(`honey-clients: mcp: no tool serves ${op} yet: skipped\n`)
+		for (const op of server.skipped) report(`clients: mcp: no tool serves ${op} yet: skipped\n`)
 		return server
 	}
 	const sdk = sdkOf(target, document, options, metadata)
-	for (const notice of sdk.notices) report(`honey-clients: ${notice}\n`)
+	for (const notice of sdk.notices) report(`clients: ${notice}\n`)
 	return sdk
 }
 
@@ -110,7 +110,7 @@ export type GenerateRun = {
 /** What a generation reads beside its run: the environment, where skips are reported, the oxfmt module to load. */
 export type GenerateContext = {
 	/**
-	 * Where formatters are looked up (`PATH`, `GOROOT`, `GOFMT`, `RUFF`, `RUSTFMT`); `HONEY_REQUIRE_FORMATTERS=1` makes
+	 * Where formatters are looked up (`PATH`, `GOROOT`, `GOFMT`, `RUFF`, `RUSTFMT`); `CLIENTS_REQUIRE_FORMATTERS=1` makes
 	 * a missing one throw.
 	 */
 	readonly env: NodeJS.ProcessEnv
@@ -148,7 +148,7 @@ export type Generated = { readonly [T in Target]?: GeneratedTarget<T> }
 /**
  * Every file a run writes, by target and its path under the target's directory. Go goes through gofmt, Python through
  * ruff, Rust through rustfmt and TS through oxfmt; C# and Java go out as emitted, as does a target whose formatter is
- * missing, unless `HONEY_REQUIRE_FORMATTERS=1` makes that throw. The README and license file the metadata block names
+ * missing, unless `CLIENTS_REQUIRE_FORMATTERS=1` makes that throw. The README and license file the metadata block names
  * go into every target's root as they are, its icon into the C# package's alone.
  */
 export async function generated(
@@ -219,12 +219,10 @@ export async function writeGenerated(
 	let count = 0
 	for (const [target, { files, packages }] of Object.entries(await generated(run, document, { env, report: io.err }))) {
 		for (const rel of writeTarget(join(run.out, target), files, packages).kept)
-			io.err(
-				`honey-clients: ${join(target, rel)} is stale but edited since it was generated, or not its to delete: kept\n`,
-			)
+			io.err(`clients: ${join(target, rel)} is stale but edited since it was generated, or not its to delete: kept\n`)
 		count += Object.keys(files).length
 	}
-	io.out(`honey-clients: generated ${count} files into ${run.out}\n`)
+	io.out(`clients: generated ${count} files into ${run.out}\n`)
 	return 0
 }
 
@@ -253,7 +251,7 @@ export type RunOptions = {
 /**
  * Generates now and on each change of the spec, each run a fresh child after the one before it (a change during a run
  * is one more run, never two at once); `signal` stops the watch, which then ends 0 once the last run is done. A
- * generation child (HONEY_CODEGEN_CHILD) never watches: were `--watch` ever passed down, each child would start another.
+ * generation child (CLIENTS_CODEGEN_CHILD) never watches: were `--watch` ever passed down, each child would start another.
  */
 function watchSpec(
 	run: Generate,
@@ -261,14 +259,14 @@ function watchSpec(
 	io: Io,
 	options: RunOptions & { readonly cwd: string; readonly env: NodeJS.ProcessEnv },
 ): Promise<number> {
-	if (options.env.HONEY_CODEGEN_CHILD === "1") throw new Error("--watch is not allowed in a generation child")
+	if (options.env.CLIENTS_CODEGEN_CHILD === "1") throw new Error("--watch is not allowed in a generation child")
 	const args = ["generate", ...argv.filter((arg) => arg !== "--watch" && !arg.startsWith("--watch="))]
 	const spec = resolve(options.cwd, run.app === "" ? run.spec : appRef(run.app).module)
 	let queue = Promise.resolve()
 	const generate = () => {
 		queue = queue.then(() =>
 			runCli(args, { cwd: options.cwd, env: options.env }).catch((error: Error) =>
-				io.err(`honey-clients: ${error.message}\n`),
+				io.err(`clients: ${error.message}\n`),
 			),
 		)
 	}
@@ -278,7 +276,7 @@ function watchSpec(
 		clearTimeout(timer)
 		timer = setTimeout(generate, 100)
 	})
-	io.out(`honey-clients: watching ${spec}\n`)
+	io.out(`clients: watching ${spec}\n`)
 	generate()
 	return new Promise((settle) =>
 		options.signal?.addEventListener(
@@ -293,7 +291,7 @@ function watchSpec(
 	)
 }
 
-/** Runs `honey-clients <argv>`: the exit code it ends with (a watch ends only by `options.signal`). */
+/** Runs `clients <argv>`: the exit code it ends with (a watch ends only by `options.signal`). */
 export async function main(argv: readonly string[], io: Io = PROCESS_IO, options: RunOptions = {}): Promise<number> {
 	try {
 		/* release has subcommands of its own, each with its own --help */
@@ -310,10 +308,10 @@ export async function main(argv: readonly string[], io: Io = PROCESS_IO, options
 			: await generateOnce(run, io, env, cwd)
 	} catch (error) {
 		if (error instanceof UsageError) {
-			io.err(`honey-clients: ${error.message}\n\n${usage()}\n`)
+			io.err(`clients: ${error.message}\n\n${usage()}\n`)
 			return 1
 		}
-		io.err(`honey-clients: ${(error as Error).message}\n`)
+		io.err(`clients: ${(error as Error).message}\n`)
 		return 1
 	}
 }

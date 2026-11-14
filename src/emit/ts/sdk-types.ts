@@ -88,7 +88,7 @@ function dataOf(op: SdkOp, types: TypeOptions): string {
 	return schema ? irToTs(schema, types) : "unknown"
 }
 
-/** The declared error bodies by concrete status; honey's envelope with its keys as literals. */
+/** The declared error bodies by concrete status; backend's envelope with its keys as literals. */
 function errorsOf(op: SdkOp, types: TypeOptions, resolve: (schema: IRSchema) => IRSchema): string | null {
 	const entries = op.errorStatuses.flatMap((status) => {
 		const response = op.ir.responses[String(status)]
@@ -109,7 +109,7 @@ function headersOf(op: SdkOp): string | null {
 	return objectText(fields.map(([name, required]) => `${quoteKey(name)}${required ? "" : "?"}: string`))
 }
 
-/** `op`'s member line `name`: a REST call a HoneyCall, a stream a HoneyStream, defaults dropped; a connection its method. */
+/** `op`'s member line `name`: a REST call a HttpCall, a stream a HttpStream, defaults dropped; a connection its method. */
 function signature(name: string, op: SdkOp, ctx: Context): string {
 	const input = inputOf(op, ctx)
 	const arg = (extra: string) => {
@@ -128,11 +128,11 @@ function signature(name: string, op: SdkOp, ctx: Context): string {
 	if (sse) {
 		const events = sseEventSchema(op.ir, ctx.resolve)
 		const event = events === undefined ? "SSEEvent" : `SSEEvent<${irToTs(events, ctx.types)}>`
-		return `${key}: HoneyStream<${[input.type, event, ...(errors === null ? [] : [errors])].join(", ")}>`
+		return `${key}: HttpStream<${[input.type, event, ...(errors === null ? [] : [errors])].join(", ")}>`
 	}
 	const headers = headersOf(op)
 	const tail = headers === null ? (errors === null ? [] : [errors]) : [errors ?? "never", headers]
-	return `${key}: HoneyCall<${[input.type, dataOf(op, ctx.types), ...tail].join(", ")}>`
+	return `${key}: HttpCall<${[input.type, dataOf(op, ctx.types), ...tail].join(", ")}>`
 }
 
 type Context = { ops: Map<string, SdkOp>; resolve: (schema: IRSchema) => IRSchema; types: TypeOptions }
@@ -196,7 +196,7 @@ function configText(name: string, server: string | undefined, runtimeConfig: str
 export function sdkTypesText(ir: IR, name: string, runtime: string): string {
 	const model = sdkModel(ir)
 	/* the SDK named `SDK` declares `SDKConfig`, so the runtime's own is imported under another name */
-	const aliases: Record<string, string> = name === "SDK" ? { SDKConfig: "HoneySDKConfig" } : {}
+	const aliases: Record<string, string> = name === "SDK" ? { SDKConfig: "HttpSDKConfig" } : {}
 	const runtimeConfig = aliases["SDKConfig"] ?? "SDKConfig"
 	const own = [
 		name,
@@ -220,7 +220,7 @@ ${members(memberTree(ir.tree), ctx, "\t").join("\n")}
 }
 
 /** \`client.safe\`: every operation, a call answering a Result. */
-export type ${name}Safe = HoneySafe<${name}Operations>
+export type ${name}Safe = HttpSafe<${name}Operations>
 `
 	return `${importText(body, runtime, aliases)}
 ${body}`

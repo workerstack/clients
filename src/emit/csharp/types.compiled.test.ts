@@ -20,9 +20,9 @@ const DOTNET = withDotnet()
 /* a cold cache builds the SDK (MSBuild, two slots) before the first program compiles */
 const GATE = 120_000
 
-/* the `types` fixture takes every option at its default (§6.1): namespace HoneySdk, client HoneySdkClient */
-const NS = "HoneySdk"
-const CLIENT = "HoneySdkClient"
+/* the `types` fixture takes every option at its default (§6.1): namespace HttpSdk, client HttpSdkClient */
+const NS = "HttpSdk"
+const CLIENT = "HttpSdkClient"
 
 /** Thing's required members, every optional one absent. */
 const THING = { count: 1, id: "t", parent: null } as const
@@ -31,7 +31,7 @@ const THING = { count: 1, id: "t", parent: null } as const
 const WRITTEN = '{"count":1,"id":"t","parent":null}'
 
 /** A statement noting `value` as the SDK's context writes a Thing. */
-const write = (value: string) => `Note(JsonSerializer.Serialize(${value}, HoneySdkJsonContext.Default.Thing));`
+const write = (value: string) => `Note(JsonSerializer.Serialize(${value}, HttpSdkJsonContext.Default.Thing));`
 
 /** A consumer program on `types` run against the recording server answering `replies`: its notes, each request. */
 async function wire(name: string, body: string, replies: readonly Json[]) {

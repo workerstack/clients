@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Honey.Driver;
+namespace Http.Driver;
 
 /// <summary>What a method returned: its declared return type, the task's result (null without one), and the filled raw response.</summary>
 internal sealed record Answer(Type Declared, object? Result, object Raw);

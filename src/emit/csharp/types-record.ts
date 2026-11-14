@@ -5,7 +5,7 @@
  * and a value stay three states; an open value is a bare `JsonElement`, already tri-state. A property spelling a
  * member every record has, or the record's own name (CS0542), moves on to `…2`. An allOf is one record of its
  * parts' fields, a key once, its first part's (Python's merge). An object that declares `additionalProperties`
- * beside its fields keeps every other member in `[JsonExtensionData] Extra`, JsonElement-valued (honey-a8's ruling,
+ * beside its fields keeps every other member in `[JsonExtensionData] Extra`, JsonElement-valued (clients-a8's ruling,
  * Rust's flattened map), claimed after the fields: `{ get; set; }`, since an init-only one goes through the
  * deserialization constructor, which extension data cannot bind to.
  */

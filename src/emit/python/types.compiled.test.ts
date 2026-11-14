@@ -89,7 +89,7 @@ describe.skipIf(!PY)(
 			"types absent, None and a value as valid for an optional nullable key, and rejects another type",
 			() => {
 				const program = [
-					"from honey_sdk import Thing",
+					"from http_sdk import Thing",
 					"",
 					'absent: Thing = {"tags": [], "attrs": {}}',
 					'null: Thing = {"tags": [], "attrs": {}, "note": None}',
@@ -105,7 +105,7 @@ describe.skipIf(!PY)(
 		it(
 			"rejects a value missing a required key: the TypedDict is total",
 			() => {
-				const program = "from honey_sdk import X\n\nx: X = {}\n"
+				const program = "from http_sdk import X\n\nx: X = {}\n"
 				expect(checked("types", program)).toEqual([expect.stringContaining('Missing key "id" for TypedDict "X"')])
 			},
 			GATE,
@@ -114,7 +114,7 @@ describe.skipIf(!PY)(
 		it(
 			"rejects a key a closed object does not declare",
 			() => {
-				const program = 'from honey_sdk import Closed\n\nc: Closed = {"id": "1", "x": 1}\n'
+				const program = 'from http_sdk import Closed\n\nc: Closed = {"id": "1", "x": 1}\n'
 				expect(checked("types", program)).toEqual([expect.stringContaining('Extra key "x" for TypedDict "Closed"')])
 			},
 			GATE,
@@ -124,7 +124,7 @@ describe.skipIf(!PY)(
 			"type-checks recursive, mutually recursive, inherited, merged, empty, union and alias values",
 			() => {
 				const program = [
-					"from honey_sdk import A, Comment, Empty, Ext, Merged, Pet, Role, Tags",
+					"from http_sdk import A, Comment, Empty, Ext, Merged, Pet, Role, Tags",
 					"",
 					'comment: Comment = {"parent": {"parent": {}}}',
 					'a: A = {"b": {"a": {}}}',

@@ -7,7 +7,7 @@
  *
  * The HTTP legs drive `http` (documents-http.ts) through the driver. The bounds, the lapse and the lookup's cost are
  * measured IN-PROCESS: a consumer program in the SDK's package reaches the package-private tracker directly, so no
- * HTTP round trip hides the computation (honey-a8; memory hollow-perf-guard-through-http). The cost is the CPU time of
+ * HTTP round trip hides the computation (clients-a8; memory hollow-perf-guard-through-http). The cost is the CPU time of
  * the measuring thread, best of five rounds, because wall clock flakes under core contention (memory bit 15 d).
  *
  * ASSUMED SHAPE (step 2 implements exactly this, at C# Stale.cs parity; each name is a FLAG to the reviewer):
@@ -22,7 +22,7 @@
  * - Emitted only when a document has an `x-invalidate` (gate (a), the feature leg below): `StaleTracker.java`,
  *   `StaleMeta.java` and `InvalidationConfig.java`.
  * The M2 mutant the cost leg must catch (an O(n) exact-key scan in `readBy`) is the patch at
- * `~/.cache/honey-tmp/b16c2/w9-mutants/m2-exact-key-scan.patch`.
+ * `~/.cache/backend-tmp/b16c2/w9-mutants/m2-exact-key-scan.patch`.
  */
 import { describe, expect, it } from "vitest"
 import type { Call } from "../../../tests/integration/conformance/matrix.ts"

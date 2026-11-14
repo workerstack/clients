@@ -17,7 +17,7 @@ type Json = Record<string, unknown>
 type Files = Readonly<Record<string, string>>
 
 const OPTIONS = "RequestOptions? options = null, CancellationToken cancellationToken = default"
-const CONTEXT = "HoneySdkJsonContext.Default"
+const CONTEXT = "HttpSdkJsonContext.Default"
 
 const STRING = { type: "string" }
 const BINARY = { format: "binary", type: "string" }
@@ -362,7 +362,10 @@ describe("generateCSharpSdk: an error key's body type (Fc3)", () => {
 		const document = {
 			...single(
 				"x.get",
-				{ ...DONE, "x-honey-errors": { "code.taken": { schema: { $ref: "#/components/schemas/Code" }, status: 409 } } },
+				{
+					...DONE,
+					"x-backend-errors": { "code.taken": { schema: { $ref: "#/components/schemas/Code" }, status: 409 } },
+				},
 				"get",
 			),
 			components: { schemas: { Code: STRING } },
@@ -387,7 +390,7 @@ describe("generateCSharpSdk: names phase c claims", () => {
 		const plan = csharpCallPlans(NAMES)["part.get"]
 		expect({
 			accessors: plan?.accessors,
-			client: classOf(files, "HoneySdkClient : IDisposable").filter((line) => line.includes("Part2")),
+			client: classOf(files, "HttpSdkClient : IDisposable").filter((line) => line.includes("Part2")),
 			headers: plan?.headers,
 			method: methodAt(classOf(files, "PartResource"), signature),
 		}).toEqual({

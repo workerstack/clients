@@ -2,7 +2,7 @@
  * The recording server's streams (recording-server.ts): the stage every stream runs on (server-sent
  * events are written on it by sse-steps.ts), and scripted WebSocket endpoints on Node built-ins alone
  * (the wire is ws-frames.ts): the subprotocol, the client's data and close frames recorded, the close handshake
- * both ways, ping answered with pong. No `ws` package: honey/boundaries keeps it out of gen. A
+ * both ways, ping answered with pong. No `ws` package: clients/boundaries keeps it out of gen. A
  * client breaking the protocol is a violation the stage collects, and the recording server's
  * `close()` rejects with it, so a fixture or client bug fails the test instead of passing quietly.
  */

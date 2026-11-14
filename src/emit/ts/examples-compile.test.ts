@@ -45,7 +45,7 @@ const SHOP = {
 	webhooks: {
 		"order.shipped": {
 			post: {
-				"x-honey-webhook": "standard-webhooks",
+				"x-backend-webhook": "standard-webhooks",
 				requestBody: {
 					content: {
 						"application/json": {

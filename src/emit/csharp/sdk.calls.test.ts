@@ -14,7 +14,7 @@ type Json = Record<string, unknown>
 type Files = Readonly<Record<string, string>>
 
 const FIELD = "    private static readonly Operation"
-const CONTEXT = "HoneySdkJsonContext.Default"
+const CONTEXT = "HttpSdkJsonContext.Default"
 /* how every public method's signature opens */
 const TASK = "    public Task<"
 

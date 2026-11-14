@@ -136,11 +136,11 @@ describe("describeDrift", () => {
 })
 
 describe("generatedPaths", () => {
-	it("lists the paths a dir's .honey-generated.json records", () => {
+	it("lists the paths a dir's .clients-generated.json records", () => {
 		const dir = tempDir()
 		mkdirSync(path.join(dir, "src"))
 		writeFileSync(
-			path.join(dir, ".honey-generated.json"),
+			path.join(dir, ".clients-generated.json"),
 			JSON.stringify({ files: { "client.go": "a".repeat(64), "src/types.go": "b".repeat(64) } }),
 		)
 		expect([...generatedPaths(dir)].sort()).toEqual(["client.go", "src/types.go"])
@@ -180,7 +180,7 @@ describe("checkDeployedSpec on odd answers", () => {
 describe("generatedPaths of a manifest that lists no files", () => {
 	it("is empty", () => {
 		const dir = tempDir()
-		writeFileSync(path.join(dir, ".honey-generated.json"), "{}")
+		writeFileSync(path.join(dir, ".clients-generated.json"), "{}")
 		expect(generatedPaths(dir).size).toBe(0)
 	})
 })

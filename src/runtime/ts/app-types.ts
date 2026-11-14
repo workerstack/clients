@@ -1,7 +1,7 @@
 /**
  * The app-typed client's types. They read the app's `$routes` phantom structurally, so the
- * emitted client imports nothing from honey (D3): `InferRoutes`, the path params and a schema's
- * output type are spelled here as honey spells them.
+ * emitted client imports nothing from backend (D3): `InferRoutes`, the path params and a schema's
+ * output type are spelled here as backend spells them.
  */
 import type { ClientError } from "./error.ts"
 import type { Result, StatusOf } from "./response.ts"
@@ -109,7 +109,7 @@ export type IsSSE<TRoutes, P extends string, M extends string> =
 type ErrorsByStatusFor<TRoutes, P extends string, M extends string> =
 	RouteOf<TRoutes, P, M> extends { errorsByStatus: infer S } ? S : never
 
-/** honey's error envelope, as a route without a schema of its own answers an error. */
+/** backend's error envelope, as a route without a schema of its own answers an error. */
 export type ErrorEnvelope<TStatus extends number = number, TKey extends string = string> = {
 	error_key: TKey
 	fields: Record<string, FieldError[]>
@@ -122,7 +122,7 @@ export type ErrorEnvelope<TStatus extends number = number, TKey extends string =
 /** `null` in a route's errorsByStatus means the default envelope, not a null body. */
 type ResolveErrorBody<S extends number, T> = T extends null ? ErrorEnvelope<S> : T
 
-/** Each declared status's error body, honey's envelope where the route names none. */
+/** Each declared status's error body, backend's envelope where the route names none. */
 type ErrorBodies<S> = { [K in keyof S]: ResolveErrorBody<StatusOf<K>, S[K]> }
 
 /** What a call resolves to, by transport. */
@@ -177,7 +177,7 @@ type PathHelper<TRoutes> = <P extends keyof TRoutes & string>(
 ) => string
 
 /** The typed client: each call resolves to its value and throws an error status; `safe`'s answer a Result. */
-export type HoneyClient<TRoutes> = {
+export type HttpClient<TRoutes> = {
 	$isClientError: (e: unknown) => e is ClientError
 	$path: PathHelper<TRoutes>
 	$url: PathHelper<TRoutes>

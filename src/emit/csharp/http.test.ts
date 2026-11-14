@@ -96,7 +96,7 @@ const plain = (entry: Partial<CsError>) => ({
 /** The trace of a `user-id` value refused as a path segment (phase b's `Path.cs` text). */
 const refused = (value: string) =>
 	plain({
-		chain: ["PathParamException", "HoneyException"],
+		chain: ["PathParamException", "HttpException"],
 		text: `path param user-id: "${value}" is not a path segment`,
 		type: "PathParamException",
 	})

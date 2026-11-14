@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * The generated CLI's release path, end to end (roadmap 14 slice 3): a fixture spec through `honey-clients generate
+ * The generated CLI's release path, end to end (roadmap 14 slice 3): a fixture spec through `clients generate
  * --target cli`, a goreleaser snapshot of the generated module (signed keyless by cosign when a GitHub OIDC token is
  * available), the release served from loopback, `installgen check` and `installgen build` from this package's packed
  * tarball against a fixture config whose base is that server and whose identity is this workflow run, then install.sh
@@ -63,7 +63,7 @@ function goreleaser(): string {
 	if (process.env.GORELEASER) return process.env.GORELEASER
 	const found = spawnSync("sh", ["-c", "command -v goreleaser"], { encoding: "utf8" })
 	if (found.status === 0) return found.stdout.trim()
-	const cached = join(homedir(), ".cache/honey-tmp/tools/goreleaser-2.18.3/goreleaser")
+	const cached = join(homedir(), ".cache/backend-tmp/tools/goreleaser-2.18.3/goreleaser")
 	return existsSync(cached) ? cached : die("goreleaser not found: install v2.18.3 or set GORELEASER")
 }
 
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
 	writeFileSync(spec, JSON.stringify(shop()))
 	const out = join(work, "out")
 	await step("generate", process.execPath, [
-		join(ROOT, "bin/honey-clients.js"),
+		join(ROOT, "bin/clients.js"),
 		"generate",
 		"--spec",
 		spec,

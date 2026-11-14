@@ -98,8 +98,8 @@ const UNAUTHORIZED: Observed = {
 /** An `ApiStatusException` subclass the method threw, as the trace records it (`Errors.cs:44-45`'s text). */
 const statusError = (type: string, status: number, key: [string, string], message: string): CsError => ({
 	canceled: false,
-	chain: [type, "ApiStatusException", "SdkException", "HoneyException"],
-	display: `HoneySdk.${type}: HTTP ${status}: ${message}`,
+	chain: [type, "ApiStatusException", "SdkException", "HttpException"],
+	display: `HttpSdk.${type}: HTTP ${status}: ${message}`,
 	inner: null,
 	key: key[0],
 	keyMember: key[1],
@@ -113,9 +113,9 @@ const statusError = (type: string, status: number, key: [string, string], messag
 /** Each hop's value of the header `name` (lower case), `undefined` where it is absent. */
 const headerOf = (hops: readonly WireHop[], name: string) => hops.map((h) => h.headers[name])
 
-/** A multipart content type's boundary when it is `honey-<uuid>`, else null (`binary.test.ts:386`). */
+/** A multipart content type's boundary when it is `clients-<uuid>`, else null (`binary.test.ts:386`). */
 const boundaryOf = (type: string | undefined) =>
-	/^multipart\/form-data; boundary=(honey-[0-9a-f-]{36})$/.exec(type ?? "")?.[1] ?? null
+	/^multipart\/form-data; boundary=(clients-[0-9a-f-]{36})$/.exec(type ?? "")?.[1] ?? null
 
 /** Consumer program `name` around `body` on the served SDK, aimed at the app: its notes, and the app's hops. */
 async function consumed(name: string, body: string): Promise<{ hops: readonly WireHop[]; out: unknown }> {
@@ -213,7 +213,7 @@ csDescribe("OnAuthExpired", () => {
 		])
 		const boundaries = hops.map((h) => boundaryOf(h.headers["content-type"]))
 		expect([boundaries[0], boundaries[1], hops[1]?.body.sha256]).toEqual([
-			expect.stringMatching(/^honey-/),
+			expect.stringMatching(/^clients-/),
 			boundaries[0],
 			hops[0]?.body.sha256,
 		])

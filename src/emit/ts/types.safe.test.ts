@@ -115,8 +115,8 @@ describe("the safe twin's undeclared statuses (bit 21 i1)", () => {
 		expect(check(declared, consumer)).toEqual([])
 	})
 
-	it("names a component past the safe twin's names, so a schema called Result or HoneyCall keeps compiling", () => {
-		const names = ["HoneyArgs", "HoneyCall", "HoneySafe", "HoneyStream", "Result", "TestSDKSafe"]
+	it("names a component past the safe twin's names, so a schema called Result or HttpCall keeps compiling", () => {
+		const names = ["HttpArgs", "HttpCall", "HttpSafe", "HttpStream", "Result", "TestSDKSafe"]
 		const clashing = {
 			components: { schemas: Object.fromEntries(names.map((name) => [name, object({ [name]: STRING })])) },
 			...doc({

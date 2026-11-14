@@ -2,7 +2,7 @@
  * The release fixture runs this checkout as a consumer would. release-fixture.yml's bump job on main finds no change
  * only while every package's `.release-state.json` holds the hand digest of the files beside it; a file edited there
  * without the local bump the fixture's README asks for would otherwise open a real release PR. And the reusable
- * release workflows reach honey-clients through their `cli` input: a consumer's installed bin by default, while this
+ * release workflows reach clients through their `cli` input: a consumer's installed bin by default, while this
  * repo, whose root package bun never links into its own node_modules/.bin, passes the checkout's bin.
  */
 import { spawnSync } from "node:child_process"
@@ -18,7 +18,7 @@ import { releaseStateSchema } from "../../src/release/release-state.ts"
 const ROOT = resolve(import.meta.dirname, "../..")
 const CONFIG = ".github/release-fixture/release.config.ts"
 const REUSABLE = ["release-validate", "release-sync", "release-bump"]
-const DEFAULT_CLI = "bun x --no-install honey-clients"
+const DEFAULT_CLI = "bun x --no-install clients"
 
 type Step = { run?: string }
 type Workflow = {
@@ -41,7 +41,7 @@ describe("the release fixture", () => {
 		}
 	})
 
-	it("reaches honey-clients in every reusable release workflow only through its cli input", () => {
+	it("reaches clients in every reusable release workflow only through its cli input", () => {
 		for (const name of REUSABLE) {
 			const parsed = workflow(name)
 			expect({ name, cli: parsed.on.workflow_call?.inputs?.cli }).toEqual({
@@ -49,7 +49,7 @@ describe("the release fixture", () => {
 				cli: expect.objectContaining({ default: DEFAULT_CLI, required: false, type: "string" }),
 			})
 			const runs = Object.values(parsed.jobs).flatMap((job) => (job.steps ?? []).flatMap((step) => step.run ?? []))
-			const direct = runs.filter((run) => run.includes("honey-clients"))
+			const direct = runs.filter((run) => run.includes("clients"))
 			expect({ name, direct }).toEqual({ name, direct: [] })
 			expect(runs.some((run) => run.includes('"${cli[@]}" release'))).toBe(true)
 		}
@@ -62,9 +62,9 @@ describe("the release fixture", () => {
 			REUSABLE.map((name) => `./.github/workflows/${name}.yml`).toSorted(),
 		)
 		const clis = new Set(calls.map((job) => job.with?.cli))
-		expect([...clis]).toEqual(["node bin/honey-clients.js"])
+		expect([...clis]).toEqual(["node bin/clients.js"])
 		const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { bin: Record<string, string> }
-		expect(pkg.bin["honey-clients"]).toBe("bin/honey-clients.js")
+		expect(pkg.bin["clients"]).toBe("bin/clients.js")
 		const [command = "", ...args] = String([...clis][0]).split(" ")
 		const ran = spawnSync(command, [...args, "release", "toolchains", "--config", CONFIG], {
 			cwd: ROOT,

@@ -2,7 +2,7 @@
  * A header the TS SDK cannot send (bit 19 b1): any control character but tab in a value, or a name outside the
  * token grammar, is a TypeError before anything goes out, naming the header and never quoting its value. The
  * platforms differ underneath: Node's Headers quotes a CR/LF/NUL value in its own error, and Bun sends `\u0001` and
- * DEL raw (probe: ~/.cache/honey-tmp/b19/probes/undici-header.txt), so the SDK checks before Headers sees either.
+ * DEL raw (probe: ~/.cache/backend-tmp/b19/probes/undici-header.txt), so the SDK checks before Headers sees either.
  * Nothing was answered, so the safe call (bit 21 i1) throws it too, never an Err.
  */
 import { describe, expect, it } from "vitest"

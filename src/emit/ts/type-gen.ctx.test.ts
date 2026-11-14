@@ -5,7 +5,7 @@
 import * as tsMorph from "ts-morph"
 import { describe, expect, it } from "vitest"
 import type { ExtractedTypes } from "../../extract/extract.ts"
-import { extracted, type HoneyApp, honeyDoc, object } from "./__fixtures__/honey-doc.ts"
+import { extracted, type HttpApp, httpDoc, object } from "./__fixtures__/http-doc.ts"
 import { typechecker } from "./__fixtures__/typecheck.ts"
 import { generateTypes } from "./type-gen.ts"
 
@@ -14,23 +14,23 @@ const typecheck = typechecker(tsMorph)
 const STRING = { type: "string" }
 
 /** generateTypes over `app`, what it reported and its text, and each diagnostic of `consumer` beside it. */
-function check(app: HoneyApp, consumer: string, types: ExtractedTypes | null, files: Record<string, string> = {}) {
+function check(app: HttpApp, consumer: string, types: ExtractedTypes | null, files: Record<string, string> = {}) {
 	const reports: string[] = []
 	const text = generateTypes({ ...app, extracted: types, report: (m) => reports.push(m) })
 	return { diagnostics: typecheck(text, consumer, files), reports, text }
 }
 
 /** An app of `GET` routes at `patterns`, nothing declared. */
-const gets = (...patterns: string[]): HoneyApp => honeyDoc(patterns.map((pattern) => ({ method: "GET", pattern })))
+const gets = (...patterns: string[]): HttpApp => httpDoc(patterns.map((pattern) => ({ method: "GET", pattern })))
 
 describe("BaseCtx", () => {
 	// v0: 8c8a800da4
-	it("is HoneyContext<Record<string, unknown>> with nothing extracted, imported without HoneyError", () => {
-		const consumer = `expectType<Equal<BaseCtx, HoneyContext<Record<string, unknown>>>>()`
+	it("is HttpContext<Record<string, unknown>> with nothing extracted, imported without HttpError", () => {
+		const consumer = `expectType<Equal<BaseCtx, HttpContext<Record<string, unknown>>>>()`
 		const { diagnostics, text } = check(gets("/health"), consumer, null)
 		expect({
 			diagnostics,
-			imports: text.includes('import type { HoneyContext, WithOutput } from "@workerstack/backend/http"'),
+			imports: text.includes('import type { HttpContext, WithOutput } from "@workerstack/backend/http"'),
 		}).toEqual({
 			diagnostics: [],
 			imports: true,
@@ -38,21 +38,21 @@ describe("BaseCtx", () => {
 	})
 
 	// v0: 5b5963dc6a
-	it("takes the extracted env as HoneyContext's generic and the middleware additions beside it", () => {
+	it("takes the extracted env as HttpContext's generic and the middleware additions beside it", () => {
 		const types = extracted({
 			env: "{ DB: string; KV: Map<string, string> }",
 			middleware: { user: "{ id: string; role: string }" },
 		})
 		const consumer = `expectType<Same<BaseCtx["env"], { DB: string; KV: Map<string, string> }>>()
 expectType<Same<BaseCtx["user"], { id: string; role: string }>>()
-expectType<BaseCtx extends HoneyContext<{ DB: string; KV: Map<string, string> }> ? true : false>()
+expectType<BaseCtx extends HttpContext<{ DB: string; KV: Map<string, string> }> ? true : false>()
 expectType<Same<RouteCtx<"/health", "get">["user"], { id: string; role: string }>>()`
 		expect(check(gets("/health"), consumer, types).diagnostics).toEqual([])
 	})
 
 	// v0: b762ffb505
-	it("is HoneyContext<env> alone when middleware added nothing", () => {
-		const consumer = `expectType<Equal<BaseCtx, HoneyContext<{ DB: string }>>>()`
+	it("is HttpContext<env> alone when middleware added nothing", () => {
+		const consumer = `expectType<Equal<BaseCtx, HttpContext<{ DB: string }>>>()`
 		expect(check(gets("/health"), consumer, extracted({ env: "{ DB: string }" })).diagnostics).toEqual([])
 	})
 
@@ -81,7 +81,7 @@ ctx.tap("other", {})`
 	})
 
 	// v0: 99e217739e
-	it("keeps HoneyContext's any-key tap and emits no TapMap when no taps are declared", () => {
+	it("keeps HttpContext's any-key tap and emits no TapMap when no taps are declared", () => {
 		const consumer = `declare const ctx: RouteCtx<"/test", "get">
 ctx.tap("anything", { any: 1 })`
 		const { diagnostics, text } = check(gets("/test"), consumer, extracted({ taps: null }))
@@ -100,7 +100,7 @@ expectType<Equal<"auth" extends keyof RouteCtx<"/public", "get"> ? true : false,
 
 	// v0: 1a7a0badb1
 	it("combines with the route's input and declared errors", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			{
 				errors: { forbidden: { status: 403 } },
 				input: { json: object({ action: STRING }) },
@@ -113,7 +113,7 @@ expectType<Equal<"auth" extends keyof RouteCtx<"/public", "get"> ? true : false,
 expectType<Same<C["auth"], { role: string; sub: string }>>()
 expectType<Same<C["input"], { json: { action: string } }>>()
 expectType<Equal<RouteErrors<"/admin/action", "post">, "forbidden">>()
-expectType<Equal<ReturnType<C["errors"]["forbidden"]>, HoneyError>>()`
+expectType<Equal<ReturnType<C["errors"]["forbidden"]>, HttpError>>()`
 		expect(check(app, consumer, types).diagnostics).toEqual([])
 	})
 
@@ -163,12 +163,12 @@ type ParsedFields = { root: { relations: Record<string, ParsedFields["root"] | n
 expectType<Same<S["parsedFields"], ParsedFields | null>>()
 expectType<Equal<NonNullable<S["filterAst"]>["root"]["subgroups"][number]["logic"], "and" | "or">>()
 expectType<Equal<"filter" extends keyof S ? true : false, false>>()`
-		const app = honeyDoc([{ input: { search }, method: "GET", pattern: "/items" }])
+		const app = httpDoc([{ input: { search }, method: "GET", pattern: "/items" }])
 		expect(check(app, consumer, types, { "app.ts": APP_TS }).diagnostics).toEqual([])
 	})
 
 	it("mirrors v1 HandlerCtx: readonly input, the route's meta and its pattern", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			{ input: { search: object({ q: STRING }) }, meta: { auth: true }, method: "GET", pattern: "/users/:id" },
 		])
 		const consumer = `declare const ctx: RouteCtx<"/users/:id", "get">
@@ -181,7 +181,7 @@ ctx.input = { search: { q: "" } }`
 	})
 
 	it("types ctx.params by the extracted type where a param schema declares one, else the path's strings", () => {
-		const app = honeyDoc([
+		const app = httpDoc([
 			{ method: "POST", pattern: "/scans/:scan" },
 			{ method: "GET", pattern: "/items/:id" },
 		])
@@ -192,7 +192,7 @@ expectType<Equal<RouteCtx<"/items/:id", "get">["params"]["id"], string>>()`
 	})
 
 	it("falls back to the document's wire input when the route has no extracted input", () => {
-		const app = honeyDoc([{ input: { search: object({ q: STRING }) }, method: "GET", pattern: "/find" }])
+		const app = httpDoc([{ input: { search: object({ q: STRING }) }, method: "GET", pattern: "/find" }])
 		const consumer = `expectType<Same<RouteCtx<"/find", "get">["input"], { search: { q: string } }>>()`
 		expect(check(app, consumer, extracted({ inputs: { "GET /other": "{ json: number }" } })).diagnostics).toEqual([])
 	})

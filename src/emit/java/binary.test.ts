@@ -3,7 +3,7 @@
  * binary.test.ts with its C#-only legs dropped). A binary answer is its `byte[]`, asked for under its declared media
  * type, which a per-call Accept overrides and a config one never does; a text answer is a `String` as sent. A `byte[]`
  * body goes out sized and is sent again on a 401, an `InputStream` goes out chunked and never again. A multipart file
- * is a `FilePart` held in memory and sent again too, under a `honey-<uuid>` boundary, and an empty map is no part.
+ * is a `FilePart` held in memory and sent again too, under a `clients-<uuid>` boundary, and an empty map is no part.
  * The grid drives a binary request body (C#'s legs too), so the sized and one-shot uploads run through `runCalls`; a
  * multipart body is C#'s consumer program and stays one (`exec`). Typed response headers are `new`: the grid observes
  * the holder's declared headers, as C#'s does.
@@ -244,7 +244,7 @@ const ITEMS_GET: Call = { operation: "items.get", params: { id: "i1" }, route: r
 /** A DecodeException as the trace records it: the SDK's own, thrown by the method. */
 const decodeError = (message: string) => ({
 	canceled: false,
-	chain: ["DecodeException", "SdkException", "HoneyException"],
+	chain: ["DecodeException", "SdkException", "HttpException"],
 	display: expect.any(String),
 	inner: null,
 	text: message,
@@ -315,8 +315,8 @@ let multipartRun: ReturnType<typeof consume> | undefined
 const multipart = () =>
 	(multipartRun ??= consume([{ status: 401 }, OK, OK, OK, OK], (url) => program(MULTIPART_STATEMENTS(url))))
 
-/** A multipart content type's boundary when it is `honey-<uuid>`, else null. */
-const boundaryOf = (type: string) => /^multipart\/form-data; boundary=(honey-[0-9a-f-]{36})$/.exec(type)?.[1] ?? null
+/** A multipart content type's boundary when it is `clients-<uuid>`, else null. */
+const boundaryOf = (type: string) => /^multipart\/form-data; boundary=(clients-[0-9a-f-]{36})$/.exec(type)?.[1] ?? null
 
 /** One multipart body's parts by name, as a server's form parser reads them: a file as its name, type and text. */
 async function partsOf(body: Buffer, type: string): Promise<Record<string, unknown[]>> {
@@ -346,7 +346,7 @@ const BATCH_PARTS = {
 	meta: ['{"k":1}'],
 }
 
-describe.skipIf(!JAVA)("multipart: FilePart parts held in memory, a honey-<uuid> boundary", SLOW, () => {
+describe.skipIf(!JAVA)("multipart: FilePart parts held in memory, a clients-<uuid> boundary", SLOW, () => {
 	/* pin */
 	it("sends file and text parts under multipart/form-data, the same body again after a 401", async () => {
 		const { bodies, hops, run } = await multipart()

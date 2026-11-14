@@ -61,7 +61,7 @@ const plain = (entry: Partial<JavaError>) => ({
 /** The method's DecodeException for a 2xx whose body does not decode (§5.6 pins its class, not its text). */
 const UNDECODED = expect.objectContaining({
 	canceled: false,
-	chain: ["DecodeException", "SdkException", "HoneyException"],
+	chain: ["DecodeException", "SdkException", "HttpException"],
 	type: "DecodeException",
 	via: "return",
 })
@@ -131,7 +131,7 @@ describe.skipIf(!JAVA)(
 					{ error: UNDECODED },
 					{
 						error: plain({
-							chain: ["NotFoundException", "ApiException", "SdkException", "HoneyException"],
+							chain: ["NotFoundException", "ApiException", "SdkException", "HttpException"],
 							envelope: { extraKeys: [] },
 							key: null,
 							keyMember: null,
@@ -196,7 +196,7 @@ describe.skipIf(!JAVA)("a refused connection is a transport error, never a statu
 		const run = await driven().runCalls({ calls: [USER], setup: {} }, { url: REFUSED_URL }, { script: {} })
 		expect({ error: run.trace?.calls[0]?.error, observed: run.observed, status: run.status }, run.stderr).toEqual({
 			error: plain({
-				chain: ["ApiConnectionException", "HoneyException"],
+				chain: ["ApiConnectionException", "HttpException"],
 				inner: "ConnectException",
 				text: expect.any(String),
 				type: "ApiConnectionException",

@@ -1,6 +1,6 @@
 /**
- * The honey-clients bin's Bun handoff (bit 17 phase h): started by Node under `bun run` (a bun user agent, npm_execpath
- * a bun binary), it hands its arguments to that Bun once, marked so the child never hands off again; HONEY_NO_BUN_HANDOFF
+ * The clients bin's Bun handoff (bit 17 phase h): started by Node under `bun run` (a bun user agent, npm_execpath
+ * a bun binary), it hands its arguments to that Bun once, marked so the child never hands off again; CLIENTS_NO_BUN_HANDOFF
  * keeps it from handing off at all; the child's exit code is its own, and a signal it gets reaches the child and ends
  * it by that signal; anything else (another user agent, an npm_execpath that is not a bun) runs on Node, no loop. A fake
  * `bun` records each call, then runs the pinned Bun (package.json's packageManager, never PATH's newest) or ends as the
@@ -16,7 +16,7 @@ import { MARK_KEY, marked, markOf, reap } from "../../src/gen/__fixtures__/survi
 import { SPAWN_TIMEOUT } from "../../src/gen/__fixtures__/spawn-timeout.ts"
 
 const MARK = markOf()
-const BIN = resolve(import.meta.dirname, "../../bin/honey-clients.js")
+const BIN = resolve(import.meta.dirname, "../../bin/clients.js")
 /* the preload that signals the process as spawn returns: the window between a bin's spawn and its next statement */
 const SIGNAL_ON_SPAWN = resolve(import.meta.dirname, "signal-on-spawn.ts")
 
@@ -29,19 +29,23 @@ async function until(check: () => boolean, ms: number): Promise<boolean> {
 const PINNED = pinnedBunVersion()
 const PINNED_BUN = withPinnedBun()
 
-/** A fake `bun` in a fresh dir, logging `$HONEY_NO_BUN_HANDOFF $@` and its pid, then running `then`. */
+/** A fake `bun` in a fresh dir, logging `$CLIENTS_NO_BUN_HANDOFF $@` and its pid, then running `then`. */
 function fakeBun(then: string): { bun: string; log: string; pid: string } {
 	const dir = mkdtempSync(join(tmpdir(), "codegen-bun-"))
 	const log = join(dir, "log")
 	const pid = join(dir, "pid")
-	writeFileSync(join(dir, "bun"), `#!/bin/sh\necho "$HONEY_NO_BUN_HANDOFF $*" >> ${log}\necho $$ > ${pid}\n${then}\n`, {
-		mode: 0o755,
-	})
+	writeFileSync(
+		join(dir, "bun"),
+		`#!/bin/sh\necho "$CLIENTS_NO_BUN_HANDOFF $*" >> ${log}\necho $$ > ${pid}\n${then}\n`,
+		{
+			mode: 0o755,
+		},
+	)
 	return { bun: join(dir, "bun"), log, pid }
 }
 
 /** Whether a run printed the CLI's own usage. */
-const usage = (stdout: string) => stdout.startsWith("usage: honey-clients generate")
+const usage = (stdout: string) => stdout.startsWith("usage: clients generate")
 
 /** The bin run by Node with `args`, as `bun run` would start it, over `env`. */
 const underBunRun = (args: readonly string[], bun: string, env: NodeJS.ProcessEnv = {}) =>
@@ -63,23 +67,23 @@ describe.skipIf(PINNED_BUN === undefined)(`the bin under the pinned Bun ${PINNED
 		() => {
 			const fake = fakeBun(`exec ${PINNED_BUN} "$@"`)
 			const ran = underBunRun(["--help"], fake.bun)
-			expect([
-				ran.status,
-				ran.stdout.startsWith("usage: honey-clients generate"),
-				readFileSync(fake.log, "utf8"),
-			]).toEqual([0, true, `1 ${BIN} --help\n`])
+			expect([ran.status, ran.stdout.startsWith("usage: clients generate"), readFileSync(fake.log, "utf8")]).toEqual([
+				0,
+				true,
+				`1 ${BIN} --help\n`,
+			])
 		},
 	)
 })
 
 describe("the bin's Bun handoff (phase h)", () => {
 	it(
-		"hands nothing off under HONEY_NO_BUN_HANDOFF, nor for another runtime or an npm_execpath that is not a bun",
+		"hands nothing off under CLIENTS_NO_BUN_HANDOFF, nor for another runtime or an npm_execpath that is not a bun",
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
 			const fake = fakeBun("exit 9")
 			const runs = [
-				underBunRun(["--help"], fake.bun, { HONEY_NO_BUN_HANDOFF: "1" }),
+				underBunRun(["--help"], fake.bun, { CLIENTS_NO_BUN_HANDOFF: "1" }),
 				underBunRun(["--help"], fake.bun, { npm_config_user_agent: "npm/10.9.2 node/v24.11.0 linux x64" }),
 				underBunRun(["--help"], "/bin/true"),
 			]
@@ -152,7 +156,7 @@ function bunAt(dir: string, version: string): string {
 
 describe("finding the pinned Bun (phase i)", () => {
 	it(
-		"takes HONEY_PINNED_BUN, then mise's, then ~/.bun's, each only at the pinned version",
+		"takes CLIENTS_PINNED_BUN, then mise's, then ~/.bun's, each only at the pinned version",
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
 			const root = mkdtempSync(join(tmpdir(), "codegen-pin-"))
@@ -171,12 +175,12 @@ describe("finding the pinned Bun (phase i)", () => {
 			mkdirSync(empty)
 			const find = (env: NodeJS.ProcessEnv) => findPinnedBun({ PATH: tools, ...env }, "1.3.11")
 			expect([
-				find({ HOME: home, HONEY_PINNED_BUN: named }),
+				find({ HOME: home, CLIENTS_PINNED_BUN: named }),
 				find({ HOME: home }),
 				find({ HOME: home, PATH: empty }),
 				find({ HOME: newer, PATH: empty }),
 			]).toEqual([named, mised, homed, undefined])
-			expect(() => find({ HONEY_PINNED_BUN: bunAt(join(root, "wrong"), "1.4.3") })).toThrow(
+			expect(() => find({ CLIENTS_PINNED_BUN: bunAt(join(root, "wrong"), "1.4.3") })).toThrow(
 				`is Bun 1.4.3, not the pinned 1.3.11`,
 			)
 		},
@@ -187,7 +191,7 @@ describe("finding the pinned Bun (phase i)", () => {
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
 			expect(() =>
-				withPinnedBun({ HOME: "/nonexistent", HONEY_REQUIRE_TOOLCHAINS: "1", PATH: "/nonexistent" }),
+				withPinnedBun({ HOME: "/nonexistent", CLIENTS_REQUIRE_TOOLCHAINS: "1", PATH: "/nonexistent" }),
 			).toThrow(`Bun ${PINNED} (package.json's packageManager) is required here and is not found`)
 		},
 	)

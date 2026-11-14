@@ -1,7 +1,7 @@
 /**
  * The C# SDK's errors (contract 47 §5.8; Fc3, Fc4): an error status throws its `ApiStatusException` subclass, its
  * `Message` `HTTP <status>: <Detail>` (the detail sanitized and cut at 512 runes), every other failure its own
- * `HoneyException`; each API's `ErrorKey`, a static class of string constants (§2.3), and its `<Key>Data`, read
+ * `HttpException`; each API's `ErrorKey`, a static class of string constants (§2.3), and its `<Key>Data`, read
  * through `Key` and `DecodeBody<T>()`; `ErrorEnvelope`, the body's envelope. Driven through the C# driver on
  * `errors` (its one async client: no drift check), one consumer program, and csc's findings. Safe mode is
  * errors.safe.test.ts. Ported from Python's errors.test.ts:60-434 (contract 47 §6).
@@ -78,7 +78,7 @@ describe("ErrorKey: the string constants each API declares (Fc3, §2.3)", () => 
 			context: true,
 			declared: true,
 			defaults:
-				'    private static readonly Defaults _defaults = new(null, "X-API-Key", "", HoneySdkJsonContext.Default.Options);',
+				'    private static readonly Defaults _defaults = new(null, "X-API-Key", "", HttpSdkJsonContext.Default.Options);',
 			unnamed: [],
 		})
 	})
@@ -94,7 +94,7 @@ describe("ErrorKey: the string constants each API declares (Fc3, §2.3)", () => 
 		}).toEqual({
 			declared: [],
 			defaults:
-				'    private static readonly Defaults _defaults = new(null, "Authorization", "Bearer ", HoneySdkJsonContext.Default.Options);',
+				'    private static readonly Defaults _defaults = new(null, "Authorization", "Bearer ", HttpSdkJsonContext.Default.Options);',
 		})
 	})
 })
@@ -108,7 +108,7 @@ const NAMES = {
 			get: {
 				operationId: "x.get",
 				responses: { 204: { description: "done" } },
-				"x-honey-errors": Object.fromEntries(
+				"x-backend-errors": Object.fromEntries(
 					["NotFound", "equals", "error_key", "not-found", "not_found"].map((key) => [key, { status: 409 }]),
 				),
 			},
@@ -166,7 +166,7 @@ const plain = (entry: Partial<CsError>) => ({
 	via: "return",
 	...entry,
 })
-const statusChain = (type: string) => [type, "ApiStatusException", "SdkException", "HoneyException"]
+const statusChain = (type: string) => [type, "ApiStatusException", "SdkException", "HttpException"]
 /** An error status with no key whose detail is `message`, as the trace records it. */
 const unkeyed = (status: number, type: string, message = "m") =>
 	plain({
@@ -259,7 +259,7 @@ describe.skipIf(!DOTNET)("a hostile error body in Detail and Message", SLOW, () 
 })
 
 describe.skipIf(!DOTNET)(
-	"each way a call fails, one HoneyException class each: a status only with an answer",
+	"each way a call fails, one HttpException class each: a status only with an answer",
 	SLOW,
 	() => {
 		// ported: python errors.test.ts:238
@@ -278,9 +278,9 @@ describe.skipIf(!DOTNET)(
 				path: 'path param id: ".." is not a path segment',
 				shapes: [
 					[statusChain("NotFoundException"), 404, null],
-					[["DecodeException", "SdkException", "HoneyException"], undefined, "JsonException"],
-					[["PathParamException", "HoneyException"], undefined, null],
-					[["ApiConnectionException", "HoneyException"], undefined, "HttpRequestException"],
+					[["DecodeException", "SdkException", "HttpException"], undefined, "JsonException"],
+					[["PathParamException", "HttpException"], undefined, null],
+					[["ApiConnectionException", "HttpException"], undefined, "HttpRequestException"],
 				],
 			})
 		})
@@ -301,7 +301,7 @@ describe.skipIf(!DOTNET)(
 				observed: [{ data: { id: "i1", name: "n" }, kind: "data", status: 200 }, { kind: "timeout" }, null],
 				statuses: [undefined, undefined],
 				timeout: plain({
-					chain: ["ApiTimeoutException", "HoneyException"],
+					chain: ["ApiTimeoutException", "HttpException"],
 					inner: expect.stringMatching(/^(Task|Operation)CanceledException$/),
 					text: "GET /items/{id} timed out after 300 ms",
 					type: "ApiTimeoutException",
@@ -474,7 +474,7 @@ const TYPES = [
 
 /** csc's errors for TYPES against `errors`, each as `<the statement> → <CS code>: <message>`. */
 function findings(): string[] {
-	const source = program("HoneySdk", "HoneySdkClient", TYPES.join("\n"))
+	const source = program("HttpSdk", "HttpSdkClient", TYPES.join("\n"))
 	const text = source.split("\n")
 	return checked("errors", source).map((line) => {
 		const found = /^\((\d+),\d+\): error (CS\d+: .*)$/.exec(line)

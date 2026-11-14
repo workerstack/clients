@@ -263,7 +263,7 @@ export class Serializer {
 	#resolved(type: ts.Type): void {
 		if ((type as { intrinsicName?: string }).intrinsicName !== "error") return
 		throw new Error(
-			`type ${this.checker.typeToString(type)} does not resolve in the program honey reads: the entry, its imports and its tsconfig's .d.ts files`,
+			`type ${this.checker.typeToString(type)} does not resolve in the program clients reads: the entry, its imports and its tsconfig's .d.ts files`,
 		)
 	}
 

@@ -180,7 +180,7 @@ describe.skipIf(!DOTNET)("redirects: a cross-origin hop is followed only under F
 	it("throws a refused cross-origin 307 as UnexpectedStatusException 307", async () => {
 		const { hops, run } = await drive([AWAY, OK], [HOP], { script: {} })
 		const error = run.trace?.calls[0]?.error
-		const chain = ["UnexpectedStatusException", "ApiStatusException", "SdkException", "HoneyException"]
+		const chain = ["UnexpectedStatusException", "ApiStatusException", "SdkException", "HttpException"]
 		expect(
 			{ error: [error?.type, error?.chain, error?.status], hops: hops.length, observed: run.observed },
 			run.stderr,
@@ -271,8 +271,8 @@ describe.skipIf(!DOTNET)("redirects: a caller handler chain is stripped too on a
 		const { hops, run } = await drive([moved(302, "primary", "/echo"), OK], [HOP], { script })
 		expect({ hops: hops.map(marked), observed: run.observed }, run.stderr).toEqual({
 			hops: [
-				{ agent: "honey-driver", builder: "b", to: "primary /hop" },
-				{ agent: "honey-driver", builder: "b", to: "primary /echo" },
+				{ agent: "clients-driver", builder: "b", to: "primary /hop" },
+				{ agent: "clients-driver", builder: "b", to: "primary /echo" },
 			],
 			observed: [OK_DATA],
 		})
@@ -285,12 +285,12 @@ describe.skipIf(!DOTNET)("redirects: a caller handler chain is stripped too on a
 		expect({ landed, leaving: marked(hops[0]), observed: run.observed }, run.stderr).toEqual({
 			landed: {
 				...LANDED,
-				agent: "honey-driver",
+				agent: "clients-driver",
 				builder: undefined,
 				/* the caller's primary governs its own decompression (Fc1): a bare SocketsHttpHandler sends no accept-encoding */
 				names: ["accept-language", "host", "user-agent"],
 			},
-			leaving: { agent: "honey-driver", builder: "b", to: "primary /hop" },
+			leaving: { agent: "clients-driver", builder: "b", to: "primary /hop" },
 			observed: [OK_DATA],
 		})
 	})
@@ -310,12 +310,12 @@ internal sealed class Link : System.Net.Http.DelegatingHandler
 internal sealed class Bare : System.Net.Http.DelegatingHandler { }
 `
 
-/** `Try(section, act)`: `act` run in `section`, a HoneyException noted as `<type>: <message>`. */
+/** `Try(section, act)`: `act` run in `section`, a HttpException noted as `<type>: <message>`. */
 const TRY = `async Task Try(string section, Func<Task> act)
 {
     Section(section);
     try { await act(); }
-    catch (HoneyException e) { Note($"{e.GetType().Name}: {e.Message}"); }
+    catch (HttpException e) { Note($"{e.GetType().Name}: {e.Message}"); }
 }
 `
 
@@ -447,7 +447,7 @@ const USED =
 describe.skipIf(!DOTNET)("redirects: a caller handler, under the SDK's strip (Fc2, the install)", SLOW, () => {
 	// parity: Q-c1, Q-c10 (C#-only)
 	it("refuses a primary's unscoped Credentials at construction, nothing sent; a scoped CredentialCache never answers another origin", async () => {
-		const challenge: Reply = { headers: { "www-authenticate": 'Basic realm="honey"' }, status: 401 }
+		const challenge: Reply = { headers: { "www-authenticate": 'Basic realm="clients"' }, status: 401 }
 		const { hops, run } = await handled("credentials", [moved(307, "alt", "/landing"), challenge], CREDENTIALS)
 		const refused =
 			"ConfigException: ClientConfig.Handler's Credentials answer every origin's challenge: scope them with a CredentialCache"

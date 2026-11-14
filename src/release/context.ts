@@ -14,7 +14,7 @@ export type ReleaseContext = {
 	readonly err: (text: string) => void
 }
 
-/** A mistake in how a release command was called: printed after `honey-clients: release <command>: `. */
+/** A mistake in how a release command was called: printed after `clients: release <command>: `. */
 export class ReleaseUsageError extends Error {
 	/** Always `"ReleaseUsageError"`, so a caught error is told apart from a failure by name. */
 	override name = "ReleaseUsageError"

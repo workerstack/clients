@@ -421,7 +421,7 @@ describe.skipIf(!RUST)("a multipart body: FilePart files in memory, a text part 
 				wire: ["POST /upload", "POST /upload", "POST /batch"],
 			})
 			expect(hops.map((h) => h.body.contentType)).toEqual(
-				hops.map(() => expect.stringMatching(/^multipart\/form-data; boundary=honey-/)),
+				hops.map(() => expect.stringMatching(/^multipart\/form-data; boundary=clients-/)),
 			)
 			const uploads = await Promise.all(bodies.slice(0, 2).map((body, i) => upload(body, hops[i])))
 			expect(uploads).toEqual([

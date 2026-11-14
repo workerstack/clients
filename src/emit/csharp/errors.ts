@@ -1,9 +1,9 @@
 /**
  * The API's error keys in C# (Fc3, §2.3): a `public static class ErrorKey` of `public const string` members over
- * every key the API declares, in an operation's `x-honey-errors` or as an error response's envelope keys, in
+ * every key the API declares, in an operation's `x-backend-errors` or as an error response's envelope keys, in
  * code-unit order of the key, so `ApiStatusException.Key` (the server's own string) compares, switches and matches
  * against a constant with no conversion and an undeclared key stays the server's string. A key whose own schema is
- * inline, declares a type and is not honey's envelope gets `<Key>Data`, the type `DecodeBody<T>()` reads its body
+ * inline, declares a type and is not backend's envelope gets `<Key>Data`, the type `DecodeBody<T>()` reads its body
  * into, hoisted among the declarations (and so listed in the JSON context); a ref's component is listed already.
  * No key: nothing is emitted. Spec text reaches the source only through the shared escape layer.
  */
@@ -30,7 +30,7 @@ function envelopeKeys(model: SdkModel): string[] {
 }
 
 /**
- * Every declared key in code-unit order with its schema: `x-honey-errors`' (the first operation by id to declare
+ * Every declared key in code-unit order with its schema: `x-backend-errors`' (the first operation by id to declare
  * the key, so the document's path order never changes it), over an envelope's keys, which carry none.
  */
 function declaredKeys(model: SdkModel): [string, IRSchema | undefined][] {

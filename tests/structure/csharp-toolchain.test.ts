@@ -1,7 +1,7 @@
 /**
  * Toolchain parity (G10, G11, R7) for C#: gen runs .NET only through `src/emit/csharp/__fixtures__/csharp-env.ts`,
  * under the SDK the repo root's `global.json` pins (exact, `rollForward: disable`), extracted from Microsoft's
- * tarball after a check against the committed `dotnet-sdk.sha512` into `$HOME/.cache/honey-tmp/dotnet` (never
+ * tarball after a check against the committed `dotnet-sdk.sha512` into `$HOME/.cache/backend-tmp/dotnet` (never
  * `/usr/bin/dotnet`, `~/.dotnet` or a `dotnet` on PATH), and CI installs exactly that, by the command a missing SDK
  * names. As with Python, importing the env file does not license a raw spawn. It hands out two paths, the SDK root
  * and the reference pack, and only to the compile fixture and the toolchain legs. Every build runs lean (no MSBuild
@@ -188,25 +188,29 @@ describe("CI installs the SDK global.json pins", () => {
 	})
 })
 
-/** The `~/.dotnet/tools` entries that point into the honey cache, by link or by the path a shim holds. */
+/** The `~/.dotnet/tools` entries that point into the backend-tmp cache, by link or by the path a shim holds. */
 function toolsIntoCache(): string[] {
 	const tools = join(process.env.HOME ?? homedir(), ".dotnet/tools")
 	if (!existsSync(tools)) return []
 	return readdirSync(tools).filter((name) => {
 		const path = join(tools, name)
-		if (lstatSync(path).isSymbolicLink()) return resolve(tools, readlinkSync(path)).includes("/.cache/honey-tmp/")
-		return statSync(path).isFile() && readFileSync(path, "latin1").includes("/.cache/honey-tmp/")
+		if (lstatSync(path).isSymbolicLink()) return resolve(tools, readlinkSync(path)).includes("/.cache/backend-tmp/")
+		return statSync(path).isFile() && readFileSync(path, "latin1").includes("/.cache/backend-tmp/")
 	})
 }
 
 describe("the SDK a run uses", () => {
 	const DOTNET = withDotnet()
 
-	it.skipIf(!DOTNET)("runs the pinned SDK from the honey cache, the only SDK there", { timeout: SPAWN_TIMEOUT }, () => {
-		expect(runDotnet(["--version"]).stdout.trim()).toBe(pinnedDotnet())
-		const sdks = runDotnet(["--list-sdks"]).stdout.trim().split("\n")
-		expect(sdks).toEqual([`${pinnedDotnet()} [${join(dotnetRoot(), "sdk")}]`])
-	})
+	it.skipIf(!DOTNET)(
+		"runs the pinned SDK from the backend-tmp cache, the only SDK there",
+		{ timeout: SPAWN_TIMEOUT },
+		() => {
+			expect(runDotnet(["--version"]).stdout.trim()).toBe(pinnedDotnet())
+			const sdks = runDotnet(["--list-sdks"]).stdout.trim().split("\n")
+			expect(sdks).toEqual([`${pinnedDotnet()} [${join(dotnetRoot(), "sdk")}]`])
+		},
+	)
 
 	it.skipIf(!DOTNET)("keeps the CLI's first-use state in the cache's CLI home", { timeout: SPAWN_TIMEOUT }, () => {
 		runDotnet(["--version"], { cwd: csharpCacheDir("tmp") })
@@ -251,17 +255,17 @@ describe("what a run never does", () => {
 		"never installs a missing SDK: it skips, or fails naming the install where .NET is required",
 		{ timeout: SPAWN_TIMEOUT },
 		() => {
-			vi.stubEnv("HONEY_REQUIRE_TOOLCHAINS", "")
-			vi.stubEnv("HONEY_REQUIRE_DOTNET", "")
+			vi.stubEnv("CLIENTS_REQUIRE_TOOLCHAINS", "")
+			vi.stubEnv("CLIENTS_REQUIRE_DOTNET", "")
 			vi.stubEnv("HOME", csharpCacheDir("tmp", "no-dotnet"))
 			expect(withDotnet()).toBe(false)
-			vi.stubEnv("HONEY_REQUIRE_DOTNET", "1")
+			vi.stubEnv("CLIENTS_REQUIRE_DOTNET", "1")
 			expect(() => withDotnet()).toThrow(dotnetInstall(pinnedDotnet()))
 		},
 	)
 
 	it("sets every dir under the cache and leaves HOME the caller's, with no tool linked into ~/.dotnet/tools", () => {
-		const cache = `${join(process.env.HOME ?? homedir(), ".cache/honey-tmp/dotnet")}/`
+		const cache = `${join(process.env.HOME ?? homedir(), ".cache/backend-tmp/dotnet")}/`
 		const dirs = Object.entries(dotnetEnv()).filter(
 			([key, value]) => process.env[key] !== value && value?.includes("/"),
 		)

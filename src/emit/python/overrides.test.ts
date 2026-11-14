@@ -214,7 +214,7 @@ describe.skipIf(!PY)("RawResponse: the answer's status, headers, body and the UR
 
 /** The program's lines: a `headers=` keyword next to the `options` that carries them, on both clients. */
 const KWARGS = [
-	"import honey_sdk as sdk",
+	"import http_sdk as sdk",
 	"",
 	"c = sdk.SDK()",
 	'c.echo.get(headers={"x-trace": "a"})',

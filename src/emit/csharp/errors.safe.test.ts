@@ -130,7 +130,7 @@ describe.skipIf(!DOTNET)(
 			expect({ error: call?.error, result: call?.result }, run.stderr).toEqual({
 				error: {
 					canceled: false,
-					chain: ["NotFoundException", "ApiStatusException", "SdkException", "HoneyException"],
+					chain: ["NotFoundException", "ApiStatusException", "SdkException", "HttpException"],
 					display: expect.any(String),
 					inner: null,
 					key: "member.missing",
@@ -244,13 +244,13 @@ describe.skipIf(!DOTNET)("Result<T> from a consumer program (http)", SLOW, () =>
 /** The removed safe mode's pattern, unchanged (R-i4): its type, its members, and a normal call read as a result. */
 const OLD = `// consumer old-safe: a test program, never shipped
 using System.Threading.Tasks;
-using HoneySdk;
+using HttpSdk;
 
 internal static class Program
 {
     private static async Task Main()
     {
-        using var c = new HoneySdkClient(new ClientConfig { BaseUrl = "http://127.0.0.1:9" });
+        using var c = new HttpSdkClient(new ClientConfig { BaseUrl = "http://127.0.0.1:9" });
         SdkResult<UsersGetResponse> old = await c.Users.GetAsync("1");
         var plain = await c.Users.GetAsync("1");
         var safe = await c.Safe.Users.GetAsync("1");
@@ -264,9 +264,9 @@ describe.skipIf(!DOTNET)("the removed safe mode (R-i4)", SLOW, () => {
 		const errors = checked("http", OLD).map((line) => /error (CS\d{4}): (.*)$/.exec(line)?.slice(1).join(" ") ?? line)
 		expect(errors).toEqual([
 			expect.stringMatching(/^CS0246 .*'SdkResult<>'/),
-			expect.stringMatching(/^CS1061 '(HoneySdk\.)?UsersGetResponse' .*'IsSuccess'/),
-			expect.stringMatching(/^CS1061 '(HoneySdk\.)?Result<(HoneySdk\.)?UsersGetResponse>' .*'Status'/),
-			expect.stringMatching(/^CS1061 '(HoneySdk\.)?Result<(HoneySdk\.)?UsersGetResponse>' .*'Data'/),
+			expect.stringMatching(/^CS1061 '(HttpSdk\.)?UsersGetResponse' .*'IsSuccess'/),
+			expect.stringMatching(/^CS1061 '(HttpSdk\.)?Result<(HttpSdk\.)?UsersGetResponse>' .*'Status'/),
+			expect.stringMatching(/^CS1061 '(HttpSdk\.)?Result<(HttpSdk\.)?UsersGetResponse>' .*'Data'/),
 		])
 	})
 })
