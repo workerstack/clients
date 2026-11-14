@@ -18,7 +18,18 @@ export const ALLOW: Record<string, readonly string[]> = {
 	honey: ["honeymoon", "Honeydew", "honeypot", "honeybadger", "HoneyBadger", "migrating-from-honey", "no-honey"],
 }
 
-const TOKEN_CHAR = /[A-Za-z0-9_$-]/
+/** A character of a whole token: what a brand segment's token runs over, and what ALLOW matches whole. */
+export const TOKEN_CHAR = /[A-Za-z0-9_$-]/
+
+/** Whether `text[start, end)` sits inside a token some brand's ALLOW list keeps, so a rename leaves it. */
+export function allowedAt(text: string, from: number, to: number): boolean {
+	let start = from
+	let end = to
+	while (start > 0 && TOKEN_CHAR.test(text.charAt(start - 1))) start--
+	while (end < text.length && TOKEN_CHAR.test(text.charAt(end))) end++
+	const token = text.slice(start, end)
+	return Object.values(ALLOW).some((words) => words.includes(token))
+}
 
 function segmentPattern(brand: string): RegExp {
 	const lower = brand.toLowerCase()
