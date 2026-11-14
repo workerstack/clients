@@ -110,22 +110,24 @@ describe("routes: a mount with no prefix", () => {
 	)
 })
 
+/** A group mounting a sub, itself mounted with `.use()` between; `group` is the export when `exported`. */
+const nested = (exported: boolean) =>
+	lines(
+		IMPORT,
+		DB,
+		"const mw = createMiddleware((_c, next) => next({}))",
+		"const sub = httpApp<{}>()",
+		`sub.use(withDb).get("/x").handler(${OK})`,
+		`${exported ? "export " : ""}const group = httpApp<{}>()`,
+		'group.route("/v1", sub)',
+		`${exported ? "" : "export "}const app = httpApp<{}>().basePath("/api")`,
+		'app.route("/g", group.use(mw))',
+	)
+
 describe("routes: nested mounts", () => {
 	it(
 		"composes nested mounts and never types the inner mount's own id, unless that group is the export",
 		() => {
-			const nested = (exported: boolean) =>
-				lines(
-					IMPORT,
-					DB,
-					"const mw = createMiddleware((_c, next) => next({}))",
-					"const sub = httpApp<{}>()",
-					`sub.use(withDb).get("/x").handler(${OK})`,
-					`${exported ? "export " : ""}const group = httpApp<{}>()`,
-					'group.route("/v1", sub)',
-					`${exported ? "" : "export "}const app = httpApp<{}>().basePath("/api")`,
-					'app.route("/g", group.use(mw))',
-				)
 			const inner = extract(project.write("mount/nested.ts", nested(false))).types.routes
 			expect(Object.keys(inner)).toEqual(["GET /api/g/v1/x"])
 			const outer = extract(project.write("mount/nested-export.ts", nested(true)), { exportName: "group" }).types
