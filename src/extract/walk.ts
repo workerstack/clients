@@ -205,6 +205,10 @@ function mountOf(
 	const sub = call.arguments.at(-1)
 	if (sub === undefined || call.arguments.length > 2 || APP_MEMBERS.some((m) => app.getProperty(m) === undefined))
 		return null
+	/* core mounts nothing when the sub is the receiver's own app (`register.ts` `mount`): the groups that share one
+	   app keep their own ids */
+	const [into, from] = [origin(receiver), origin(sub)]
+	if (into === from) return null
 	const base = basePathOf(entry, app)
 	const first = call.arguments[0] as ts.Expression
 	const prefix = call.arguments.length === 1 ? "/" : literalOf(checker.getTypeAtLocation(first))
@@ -212,7 +216,7 @@ function mountOf(
 		report(`${placeOf(call)}: the mount's path is not a literal type; the routes it mounts keep their own paths`)
 		return null
 	}
-	return { prefix: mergePath(base, prefix), receiver: origin(receiver), sub: origin(sub) }
+	return { prefix: mergePath(base, prefix), receiver: into, sub: from }
 }
 
 /**

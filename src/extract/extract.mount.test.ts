@@ -137,6 +137,36 @@ describe("routes: nested mounts", () => {
 	)
 })
 
+describe("routes: an app mounted into itself", () => {
+	it(
+		"keeps the own ids of groups that share one app, as core drops a mount of an app into itself",
+		() => {
+			const entryPath = project.write(
+				"mount/self.ts",
+				lines(
+					IMPORT,
+					DB,
+					schema("page", "{ page: number }"),
+					"function createApp() {",
+					"\tconst base = httpApp<{}>()",
+					`\tconst feed = base.get("/feed").input({ search: page }).handler(${OK})`,
+					`\tconst account = base.use(withDb).get("/account").handler(${OK})`,
+					'\tbase.route("/self", base)',
+					"\treturn feed.route(account)",
+					"}",
+					"export const app = createApp()",
+				),
+			)
+			const { reports, types } = extract(entryPath)
+			expect(Object.keys(types.routes)).toEqual(["GET /account"])
+			expect(shown(types.routes["GET /account"])).toEqual(["db: { name: string }"])
+			expect(types.inputs).toEqual({ "GET /feed": "{ search: { page: number } }" })
+			expect(reports).toEqual([])
+		},
+		SLOW,
+	)
+})
+
 describe("routes: one id from two mounts", () => {
 	it(
 		"reports two subs mounted at one id with different middleware, and types one sub at each of its mounts",
