@@ -7,6 +7,9 @@ import type { SSEStream } from "@workerstack/backend"
 import type { ConformanceApp, errors } from "./app.ts"
 import type { HoneyRes } from "@workerstack/backend"
 
+/** How often an open `realtime.capped` stream looks for a send it has not framed yet. */
+const POLL_MS = 10
+
 /** A Response the route does not declare: a fault injected on purpose, past the handler's typed return. */
 const undeclared = (ctx: { readonly res: object }, response: Response) => (ctx.res as HoneyRes).raw(response) as never
 
@@ -44,10 +47,11 @@ export function realtimeRoutes(app: ConformanceApp, streams: { dialed: number },
  * `realtime.capped` (bit 21 i7): a send's answer past a small response cap. The upgrade 404s, so the SDK dials the
  * event stream, which stays open with only a retry directive (a streamed answer's headers go out with its first
  * bytes); each send (a POST, internal so in no generated artifact) answers a 2xx past 16 bytes, then `{ n: 1 }` goes
- * to every open stream, so a client that took that answer reads a frame.
+ * to every open stream, so a client that took that answer reads a frame. The send only counts: each stream writes
+ * the frame itself, from its own request, since workerd refuses I/O on another request's stream.
  */
 function cappedRoutes(app: ConformanceApp, feed: { "text/event-stream": { ok: z.ZodType } }): void {
-	const open = new Set<SSEStream>()
+	let sends = 0
 	app
 		.get("/realtime/capped")
 		.meta({ extensions: { "x-realtime": true }, operationId: "realtime.capped" })
@@ -58,9 +62,13 @@ function cappedRoutes(app: ConformanceApp, feed: { "text/event-stream": { ok: z.
 				return undeclared(ctx, new Response(null, { status: 503 }))
 			return ctx.res.sse(
 				async (sse) => {
-					open.add(sse)
-					await new Promise((resolve) => sse.signal.addEventListener("abort", resolve, { once: true }))
-					open.delete(sse)
+					let seen = sends
+					while (!sse.signal.aborted) {
+						await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+						if (sends === seen || sse.signal.aborted) continue
+						seen = sends
+						await sse.send({ data: { n: 1 }, event: "message", id: "1" })
+					}
 				},
 				{ defaultRetry: 1000 },
 			)
@@ -69,9 +77,7 @@ function cappedRoutes(app: ConformanceApp, feed: { "text/event-stream": { ok: z.
 		.post("/realtime/capped")
 		.meta({ internal: true })
 		.handler((ctx) => {
-			setTimeout(() => {
-				for (const sse of open) void sse.send({ data: { n: 1 }, event: "message", id: "1" })
-			}, 0)
+			sends++
 			return ctx.res.raw(Response.json({ accepted: "the send, answered past the cap" }))
 		})
 }
