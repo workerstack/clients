@@ -54,6 +54,8 @@ const HISTORY = [
 	/(^|\/)docs\/(.*\/)?[^/]*migrat[^/]*\.md$/,
 	/(^|\/)tests\/structure\/no-[a-z-]+\.test\.ts$/,
 	/(^|\/)__snapshots__\/released-[^/]+$/,
+	/* a directory named by an exact version pins a published release: its package names and bins are that release's */
+	/(^|\/)\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?\//,
 	/(^|\/)brand-names(\.test)?\.ts$/,
 	/(^|\/)rename-brand\//,
 ]
