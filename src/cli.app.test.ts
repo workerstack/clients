@@ -213,7 +213,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app through the bin under Bun ${pinnedB
 	// v0: aeff0f4b4d
 	it("hands the load to the Bun that started it, so a module Bun alone can load generates", () => {
 		const dir = project({
-			"src/app.ts": `import terms from "./terms.md"\n${HTTP_APP}export const app = httpApp().get("/terms").handler((c) => c.res.text("ok", String(terms)))\n`,
+			"src/app.ts": `import terms from "./terms.md"\n${HTTP_APP}export const app = httpApp().get("/terms").meta({ operationId: "terms" }).handler((c) => c.res.text("ok", String(terms)))\n`,
 			"src/terms.md": "# Terms\n",
 		})
 		const run = bin(dir, ["generate", "--app", "src/app.ts", ...GENERATE.slice(1)], PINNED_BUN as string)
@@ -223,7 +223,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app through the bin under Bun ${pinnedB
 	// v0: 619b088296
 	it("ends once it has written, though the app's module left a timer running", () => {
 		const dir = project({
-			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\nsetInterval(() => {}, 1000)\n`,
+			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").meta({ operationId: "health" }).handler((c) => c.res.text("ok", "ok"))\nsetInterval(() => {}, 1000)\n`,
 		})
 		const started = Date.now()
 		const run = bin(dir, ["generate", "--app", "src/app.ts", ...GENERATE.slice(1)])
@@ -263,7 +263,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 	 * hooked Error.prepareStackTrace, Bun throws "First argument must be an Error object" there */
 	it("generates from a module importing vite, a cold jiti cache", () => {
 		const dir = project({
-			"src/app.ts": `import { defaultClientConditions } from "vite"\n${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\nexport const conditions = defaultClientConditions\n`,
+			"src/app.ts": `import { defaultClientConditions } from "vite"\n${HTTP_APP}export const app = httpApp().get("/health").meta({ operationId: "health" }).handler((c) => c.res.text("ok", "ok"))\nexport const conditions = defaultClientConditions\n`,
 		})
 		symlinkSync(join(REPO, "node_modules/vite"), join(dir, "node_modules/vite"), "dir")
 		const run = onBun(dir)
@@ -278,7 +278,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
 		const dir = project({
 			"node_modules/@workerstack/backend/dist/openapi/register.js": stale("openapi/register"),
 			"node_modules/@workerstack/backend/dist/routing/app.js": stale("routing/app"),
-			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
+			"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").meta({ operationId: "health" }).handler((c) => c.res.text("ok", "ok"))\n`,
 		})
 		const run = onBun(dir)
 		expect([run.status, run.stderr, existsSync(join(dir, "evaluations.log"))]).toEqual([0, "", false])
@@ -292,7 +292,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
  */
 function counted(options: string, strip = false): [number | null, string, number] {
 	const dir = project({
-		"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").handler((c) => c.res.text("ok", "ok"))\n`,
+		"src/app.ts": `${HTTP_APP}export const app = httpApp().get("/health").meta({ operationId: "health" }).handler((c) => c.res.text("ok", "ok"))\n`,
 	})
 	const starts = join(dir, "starts.log")
 	const unseen =
@@ -334,7 +334,7 @@ describe("generate --app --watch (bit 19 h2)", () => {
 
 	it("generates again on each change of the app module", async () => {
 		const route = (path: string) =>
-			`${HTTP_APP}export const app = httpApp().get("${path}").handler((c) => c.res.text("ok", "ok"))\n`
+			`${HTTP_APP}export const app = httpApp().get("${path}").meta({ operationId: "probe" }).handler((c) => c.res.text("ok", "ok"))\n`
 		const dir = project({ "src/app.ts": route("/first") })
 		const stop = new AbortController()
 		let stdout = ""

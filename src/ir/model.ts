@@ -97,6 +97,8 @@ export type IRResponse = {
 }
 
 export type IROperationExtensions = {
+	/** the id the route declared, when the document renamed its operationId (`x-backend-declared-id`) */
+	declaredId?: string
 	deprecated?: true
 	/** every declared error key (`x-backend-errors`): its status, null when it has none, and its own schema */
 	errors?: Record<string, { schema?: IRSchema; status: number | null }>

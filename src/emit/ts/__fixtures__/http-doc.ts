@@ -22,6 +22,8 @@ export type HttpRoute = {
 	readonly errors?: Record<string, { schema?: Json; status: number | null }>
 	/** the route's resolved meta (chain, middleware and route), as the tree carries it */
 	readonly meta?: Record<string, unknown>
+	/** the id the route declared, when core renamed its `meta.operationId` (`x-backend-declared-id`) */
+	readonly declaredId?: string
 }
 
 export type HttpApp = { readonly document: Json; readonly tree: RouteTree }
@@ -101,12 +103,12 @@ function responsesOf(route: HttpRoute): Record<string, Json> {
 }
 
 function operationOf(route: HttpRoute, id: string): Json {
-	if (route.method === "WS")
-		return { responses: { 101: { description: "WebSocket upgrade" } }, "x-backend-route": id, "x-websocket": true }
-	const op: Json = { "x-backend-route": id }
+	const op: Json = route.method === "WS" ? { "x-websocket": true, "x-backend-route": id } : { "x-backend-route": id }
 	if (typeof route.meta?.operationId === "string") op.operationId = route.meta.operationId
+	if (route.declaredId !== undefined) op["x-backend-declared-id"] = route.declaredId
 	const parameters = parametersOf(route)
 	if (parameters.length > 0) op.parameters = parameters
+	if (route.method === "WS") return { ...op, responses: { 101: { description: "WebSocket upgrade" } } }
 	const { form, json } = route.input ?? {}
 	if (json !== undefined) op.requestBody = { content: { "application/json": { schema: json } }, required: true }
 	if (form !== undefined)
@@ -169,7 +171,6 @@ export type ExtractedSpec = {
 	readonly middleware?: Record<string, string>
 	/** route id → what that route's middleware added, as `middleware` */
 	readonly routes?: Record<string, Record<string, string>>
-	readonly taps?: string | null
 }
 
 const props = (spec: Record<string, string> = {}): ExtractedProp[] =>
@@ -184,6 +185,5 @@ export function extracted(spec: ExtractedSpec = {}): ExtractedTypes {
 		meta: spec.meta ?? null,
 		middleware: props(spec.middleware),
 		routes: Object.fromEntries(Object.entries(spec.routes ?? {}).map(([id, added]) => [id, props(added)])),
-		taps: spec.taps ?? null,
 	}
 }

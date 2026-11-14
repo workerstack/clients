@@ -25,7 +25,9 @@ function project(files: Record<string, string>): string {
 }
 
 const HTTP_APP = 'import { httpApp } from "@workerstack/backend/http"\n'
-const route = (path: string) => `httpApp().get(${JSON.stringify(path)}).handler((c) => c.res.text("ok", "ok"))`
+/* every operation declares an id, as generateOpenApi requires: the path's characters, a bare `/` as `root` */
+const route = (path: string) =>
+	`httpApp().get(${JSON.stringify(path)}).meta({ operationId: ${JSON.stringify(path.replace(/\W/g, "") || "root")} }).handler((c) => c.res.text("ok", "ok"))`
 const pathsOf = (document: Record<string, unknown>) => Object.keys(document.paths as object)
 
 /** Each of `refs` loaded in turn (loads share one module cache, so never two at once), or the message it failed with. */

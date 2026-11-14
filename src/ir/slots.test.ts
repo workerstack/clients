@@ -386,6 +386,13 @@ describe("operation extensions", () => {
 			operation({ "x-backend-route": 1 }).extensions,
 		]).toEqual([{ route: "GET /users/:id?" }, {}])
 	})
+
+	it("reads the id a renamed operation declared (x-backend-declared-id), ignoring a non-string", () => {
+		expect([
+			operation({ operationId: "multi_get", "x-backend-declared-id": "multi" }).extensions,
+			operation({ "x-backend-declared-id": 1 }).extensions,
+		]).toEqual([{ declaredId: "multi" }, {}])
+	})
 })
 
 describe("responses: declared headers (A2)", () => {

@@ -159,7 +159,7 @@ function ordersApp(endpoint: () => string, tokens: Map<string, Token>) {
 	}
 	app
 		.get("/orders")
-		.meta({ mcp: true, security: [{ oauth: ["orders:read"] }] })
+		.meta({ mcp: true, operationId: "orders.list", security: [{ oauth: ["orders:read"] }] })
 		.output({ "application/json": { ok: z.object({ orders: z.array(z.string()) }) } })
 		.handler((ctx) => {
 			authorize(ctx.req, "orders:read")
@@ -167,7 +167,7 @@ function ordersApp(endpoint: () => string, tokens: Map<string, Token>) {
 		})
 	app
 		.post("/orders")
-		.meta({ mcp: true, security: [{ oauth: ["orders:write"] }] })
+		.meta({ mcp: true, operationId: "orders.create", security: [{ oauth: ["orders:write"] }] })
 		.output({ "application/json": { created: z.object({ created: z.string() }) } })
 		.handler((ctx) => {
 			authorize(ctx.req, "orders:write")

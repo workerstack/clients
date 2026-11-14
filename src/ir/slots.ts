@@ -223,6 +223,7 @@ export function extensionsOf(op: Json, sse: boolean): IROperationExtensions {
 	if (op["x-idempotency-key"] === true) out.idempotencyKey = true
 	if (op["x-mcp"] === true) out.mcp = true
 	if (typeof op["x-backend-route"] === "string") out.route = op["x-backend-route"]
+	if (typeof op["x-backend-declared-id"] === "string") out.declaredId = op["x-backend-declared-id"]
 	const invalidate = op["x-invalidate"]
 	if (Array.isArray(invalidate)) out.invalidates = invalidate.filter((target) => typeof target === "string")
 	const errors = declaredErrors(op["x-backend-errors"])

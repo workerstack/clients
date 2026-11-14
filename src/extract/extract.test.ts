@@ -183,29 +183,27 @@ describe("the base: the app's own additions and its taps", () => {
 	)
 
 	it(
-		"writes taps structurally, null when none are declared",
+		"extracts an app that registers a defined tap as it extracts one without",
 		() => {
-			// v0: 159d58f309
-			// v0: 73a8f61442
-			// v0: 34d3db2a0c
-			// v0: 81c8d17a0a
+			const schema = [
+				'type Audit = { action: "create" | "delete"; id: string }',
+				'declare const schema: { readonly "~standard": { readonly version: 1; readonly vendor: "t"; readonly validate: (v: unknown) => { readonly value: Audit }; readonly types?: { readonly input: Audit; readonly output: Audit } } }',
+			]
 			const none = project.write(
 				"taps/none.ts",
-				lines('import { httpApp } from "@workerstack/backend/http"', "export const app = httpApp<{}>()"),
+				lines('import { httpApp } from "@workerstack/backend/http"', "export const app = httpApp<{ DB: string }>()"),
 			)
-			const declared = project.write(
-				"taps/declared.ts",
+			const tapped = project.write(
+				"taps/defined.ts",
 				lines(
-					'import { httpApp } from "@workerstack/backend/http"',
-					'type Payload = { action: "create" | "delete"; id: string }',
-					"type Taps = { audit: Payload }",
-					"export const app = httpApp<{}>().taps<Taps>()",
+					'import { defineTap, httpApp } from "@workerstack/backend/http"',
+					...schema,
+					'const audit = defineTap("audit", schema, () => undefined)',
+					"export const app = httpApp<{ DB: string }>().tap(audit)",
 				),
 			)
-			expect([extract(none).types.taps, extract(declared).types.taps]).toEqual([
-				null,
-				'{ audit: { action: "create" | "delete"; id: string } }',
-			])
+			const [plain, defined] = [extract(none).types, extract(tapped).types]
+			expect({ defined, taps: "taps" in defined }).toEqual({ defined: plain, taps: false })
 		},
 		SLOW,
 	)
@@ -248,7 +246,6 @@ describe("routes: keyed by the caller's route id", () => {
 				middleware: [],
 				params: {},
 				routes: {},
-				taps: null,
 			})
 		},
 		SLOW,

@@ -330,7 +330,7 @@ describe("generateRouteTree: the meta export", () => {
 	})
 })
 
-describe("generateRouteTree: MetaShape and RouteSelector", () => {
+describe("generateRouteTree: MetaShape", () => {
 	// v0: e0ff761d81
 	it("gives the meta export each route's own mt object, typed by MetaShape", async () => {
 		const tree = treeOf([
@@ -372,19 +372,16 @@ expectType<Equal<MetaShape["permissions"], false>>()`
 		expect(typecheck(tree, consumer)).toEqual([])
 	})
 
-	it("types RouteSelector as the documented ids, leaving out websocket and internal routes, and omits it when none", () => {
+	it("exports no RouteSelector: types.gen.d.ts's operationId slot names the operations", () => {
 		const tree = treeOf([
 			["GET", "/a"],
 			["POST", "/a"],
 			["WS", "/chat"],
-			["GET", "/spec", { mt: { internal: true } }],
-			["GET", "/docs", { i: 1 }],
 		])
-		const selector = `import type { RouteSelector } from "./routes.gen.ts"
-expectType<Equal<RouteSelector, "GET /a" | "POST /a">>()`
-		expect(typecheck(tree, selector)).toEqual([])
-		const internalOnly = treeOf([["GET", "/spec", { mt: { internal: true } }]])
-		expect(typecheck(internalOnly, selector).some((d) => d.includes("RouteSelector"))).toBe(true)
+		const selector = `import type { RouteSelector } from "./routes.gen.ts"`
+		expect(typecheck(tree, selector)).toEqual([
+			"consumer.ts:4: Module '\"./routes.gen.ts\"' has no exported member 'RouteSelector'.",
+		])
 	})
 })
 

@@ -1,6 +1,6 @@
 /**
  * Extract the types a generated file needs from the app's source: its env, what its middleware
- * added (the app's own, and each route's beyond them), and its taps. Written inline, so the
+ * added (the app's own, and each route's beyond them), its parsed inputs and meta. Written inline, so the
  * generated file imports nothing from the app but the named types it references by `import()`,
  * each through a specifier the output can resolve. ts-morph is the caller's, passed in.
  */
@@ -45,12 +45,10 @@ export type ExtractedTypes = {
 	meta: string | null
 	/** per route id, what the route's middleware added beyond `middleware`; a route that added nothing has none */
 	routes: Record<string, ExtractedProp[]>
-	/** the declared tap payloads, or null when none are */
-	taps: string | null
 }
 
 /* the type-only members every backend app carries */
-const APP_MEMBERS = ["$ctx", "$env", "$taps"]
+const APP_MEMBERS = ["$ctx", "$env"]
 
 /* the declared meta, read when the app carries it: an app from an older backend has no $meta and still extracts */
 const META_MEMBER = "$meta"
@@ -203,7 +201,7 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 		const missing = APP_MEMBERS.filter((_, index) => members[index] === undefined)
 		throw new Error(`Export "${exportName}" is not a backend app: it carries no ${missing.join(", ")}`)
 	}
-	const [ctx, env, tapsType] = members as ts.Type[]
+	const [ctx, env] = members as ts.Type[]
 	const metaSym = appType.getProperty(META_MEMBER)
 	const metaType = metaSym === undefined ? undefined : checker.getTypeOfSymbol(metaSym)
 	const owner = frameworkClass(ctx as ts.Type, compiler)
@@ -211,7 +209,6 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 	const base = new Set(middleware.map((p) => p.name))
 	const found = registrations(entry)
 	const routes = routeAdditions(found, ser, { base, owner, report, routeId })
-	const taps = ser.serialize(tapsType as ts.Type)
 	/* what `metaType<AppMeta>()` declared, written out: the ctx's meta is this and the OpenAPI keys, never the tree's
 	   literal values, so a handler may pass its own ctx to a function typed with the generated ctx (bit 22 a) */
 	const meta = metaType === undefined ? "{}" : ser.shape(metaType)
@@ -236,6 +233,5 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 			routeId,
 		),
 		routes: Object.fromEntries(Object.entries(routes).map(([id, list]) => [id, props(list)])),
-		taps: taps === "{}" ? null : text(taps),
 	}
 }

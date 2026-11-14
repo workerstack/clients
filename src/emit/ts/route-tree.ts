@@ -49,7 +49,7 @@ export type RouteEntry = {
 	es?: Readonly<Record<string, string>>
 	/** The live handler record; present in a snapshot of a running app, never written. */
 	h?: unknown
-	/** Set on an internal route (spec, docs, manifest): it is left out of the route selectors. */
+	/** Set on an internal route (spec, docs, manifest): it is left out of the document. */
 	i?: 1 | true
 	/** What the route's `.input()` declares; a live value, never written. */
 	iv?: unknown
@@ -267,16 +267,6 @@ function N(s: Record<string, TreeNode> = S({}), m: Record<string, string> | null
 }
 `
 
-/** The exported selectors: every HTTP route that is neither internal nor marked internal by its meta. */
-function selectorType(routes: readonly Emitted[], intern: InternPool): string {
-	const ids = routes
-		.filter((route) => !route.id.startsWith("WS ") && route.i === null && route.mt?.internal !== true)
-		.map((route) => route.id)
-		.sort(compareCodeUnits)
-	if (ids.length === 0) return ""
-	return `\nexport type RouteSelector = ${ids.map((id) => `typeof ${intern.id(id)}`).join(" | ")}\n`
-}
-
 /** The route-tree module for `tree` (a snapshot or a merged tree); throws on anything it cannot carry. */
 export function generateRouteTree(tree: RouteTree): string {
 	if (tree.v !== 2) throw new Error(`route tree version ${String(tree.v)} is not supported: generateRouteTree reads v2`)
@@ -297,7 +287,6 @@ export function generateRouteTree(tree: RouteTree): string {
 		/* S typed by its entry: inferred from the literals, the union of entries would give each es the others' keys */
 		`export const routes: RouteTree["routes"] = S<RouteTree["routes"][string]>({\n${routes.map((route) => routeLine(route, intern)).join(",\n")}\n})\n`,
 		shape ?? "",
-		selectorType(routes, intern),
 		meta.length > 0 ? `export const meta: ${metaType} = S({\n${meta.join(",\n")}\n})\n` : "",
 		`export const routeTree: RouteTree = { v: 2, root: tree, routes, ${meta.length > 0 ? "meta" : "meta: {}"} }\n`,
 	]

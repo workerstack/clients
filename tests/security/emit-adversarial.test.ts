@@ -241,32 +241,38 @@ describe("gen adversarial: generateTypes and generateRouteTree keep spec text as
 			search: { properties: { kind: { enum: values, type: "string" } }, required: ["kind"], type: "object" },
 		}
 		const text = typesOf(httpDoc([{ input, method: "GET", pattern: "/kinds" }]))
-		const union = compiled(text.match(/kind: ([^;}]+)/)?.[1] ?? "never")
+		const union = compiled(text.match(/search: \{ kind\??: ([^;}]+)/)?.[1] ?? "never")
 		expect([syntaxErrors(text), [...union.values].sort()]).toEqual([[], [...values].sort()])
 	})
 })
 
 describe("gen adversarial: an adversarial app compiles under strict", () => {
 	// v0: 88a8924ee0
-	it("types.gen.d.ts and the SDK files compile together, the augmentation narrowing selectors", async () => {
+	it("types.gen.d.ts and the SDK files compile together, the operationId slot keyed by adversarial ids", async () => {
 		const { typechecker } = (await import(
 			resolve(REPO, "src/emit/ts/__fixtures__/typecheck.ts")
 		)) as typeof import("../../src/emit/ts/__fixtures__/typecheck.ts")
 		const tsMorph = await import("ts-morph")
 		const kinds = { properties: { kind: { enum: ['a"b', "x\ny"], type: "string" } }, type: "object" }
 		const app = httpDoc([
-			{ input: { search: kinds }, method: "GET", pattern: "/users/:user-id" },
-			{ errors: { "rate-limited": { status: 429 } }, method: "POST", pattern: "/state" },
-			{ method: "GET", pattern: "/files/*path" },
-			{ method: "GET", pattern: "/then" },
+			{ input: { search: kinds }, meta: { operationId: 'users."get"' }, method: "GET", pattern: "/users/:user-id" },
+			{
+				errors: { "rate-limited": { status: 429 } },
+				meta: { operationId: "state\nset" },
+				method: "POST",
+				pattern: "/state",
+			},
+			{ meta: { operationId: "files.*" }, method: "GET", pattern: "/files/*path" },
+			{ meta: { operationId: "then" }, method: "GET", pattern: "/then" },
+			{ meta: { operationId: "__proto__" }, method: "WS", pattern: "/feed/:room" },
 		])
 		const { files } = generateSdk(app.document, { name: "AdvSDK", stem: "adv" })
-		const consumer = `import type { RouteSelectorOf } from "@workerstack/backend/http"
-import type { RouteSelector } from "./types.gen"
+		const consumer = `import type { HttpOperationId, OperationCtx, OperationId } from "@workerstack/backend/http"
 import { AdvSDK } from "./adv.index.gen.ts"
-expectType<Equal<RouteSelectorOf, RouteSelector>>()
-expectType<"GET /users/:user-id" extends RouteSelectorOf ? true : false>()
-expectType<"GET /no-such-route" extends RouteSelectorOf ? false : true>()
+expectType<Equal<OperationId, "__proto__" | "files.*" | "state\\nset" | "then" | 'users."get"'>>()
+expectType<Equal<HttpOperationId, "files.*" | "state\\nset" | "then" | 'users."get"'>>()
+expectType<Equal<OperationCtx<'users."get"'>["routePattern"], "/users/:user-id">>()
+expectType<Same<OperationCtx<"__proto__">["params"], { room: string }>>()
 void new AdvSDK({ baseURL: "https://x" })`
 		expect(typechecker(tsMorph)(typesOf(app), consumer, files)).toEqual([])
 	})

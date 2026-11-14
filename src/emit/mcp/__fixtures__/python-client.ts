@@ -103,8 +103,8 @@ async def main():
         async with httpx2.AsyncClient(auth=provider, timeout=httpx2.Timeout(30)) as http:
             async with Client(streamable_http_client(world["endpoint"], http_client=http), mode="2026-07-28") as client:
                 out["tools"] = sorted(tool.name for tool in (await client.list_tools()).tools)
-                out["read"] = dumped(await client.call_tool("get_orders", {}))
-                out["created"] = dumped(await client.call_tool("post_orders", {}))
+                out["read"] = dumped(await client.call_tool("orders_list", {}))
+                out["created"] = dumped(await client.call_tool("orders_create", {}))
     except Exception as error:
         out["failed"] = repr(error)
     print(json.dumps(out))

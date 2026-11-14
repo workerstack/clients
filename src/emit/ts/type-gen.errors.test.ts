@@ -116,7 +116,7 @@ expectType<Equal<RouteErrorsByStatus<"/door", "get">, { 409: null }>>()`
 
 describe("the ctx error factories", () => {
 	it("holds one v1 factory per declared key: a standard key takes options, a schema key its payload", () => {
-		const consumer = `declare const ctx: RouteCtx<"/items/:id", "get">
+		const consumer = `declare const ctx: Routes["/items/:id"]["get"]["ctx"]
 expectType<Equal<keyof typeof ctx.errors, "email_taken" | "item_not_found">>()
 expectType<Equal<ReturnType<typeof ctx.errors.email_taken>, HttpError>>()
 ctx.errors.email_taken({ cause: 1, fields: { email: [{ error_key: "taken", message: "m", path: "email" }] }, headers: {}, vars: { n: 1 } })

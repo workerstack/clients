@@ -81,7 +81,6 @@ expectType<Equal<RouteInput<"/note", "post">, {}>>()`
 			middleware: [{ name: "user", optional: true, type: "string" }],
 			params: {},
 			routes: {},
-			taps: null,
 		}
 		const text = generateTypes({ document, extracted, report: () => {}, tree: EMPTY_TREE })
 		expect(

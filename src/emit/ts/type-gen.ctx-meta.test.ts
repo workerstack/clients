@@ -1,6 +1,6 @@
 /**
  * The ctx's `meta` in `types.gen.d.ts` (bit 22 a): the type the app declares, with the OpenAPI keys it leaves
- * alone, so a service typed with the generated `RouteCtx` takes the handler's own ctx. The tree's literal values
+ * alone, so a service typed with the generated ctx takes the handler's own ctx. The tree's literal values
  * stay the sibling `meta` field. Split from type-gen.test.ts at its 500-line cap.
  */
 import * as tsMorph from "ts-morph"
@@ -55,8 +55,8 @@ describe("the ctx's meta (bit 22 a)", () => {
 		const types = extracted({ env: "{}", meta: declared })
 		/* `live` is the handler's own meta: the declared keys at their declared types, the OpenAPI keys widened */
 		const consumer = `declare const live: ${declared} & { readonly operationId?: string; readonly tags?: string[] }
-declare const generated: RouteCtx<"/orgs", "get">["meta"]
-const intoGenerated: RouteCtx<"/orgs", "get">["meta"] = live
+declare const generated: Routes["/orgs"]["get"]["ctx"]["meta"]
+const intoGenerated: Routes["/orgs"]["get"]["ctx"]["meta"] = live
 expectType<Equal<(typeof generated)["auth"], "public" | "required" | undefined>>()
 expectType<Equal<RouteMeta<"/orgs", "get">, { auth: "required"; operationId: "listOrgs"; rateLimit: "strict"; summary: "List orgs"; tags: ["Organization"] }>>()
 void intoGenerated`
@@ -71,16 +71,16 @@ describe("the ctx's meta and a declared key (bit 22 a)", () => {
 		const declared = "{ readonly security?: readonly { readonly scheme: string }[] }"
 		const types = extracted({ env: "{}", meta: declared })
 		const consumer = `declare const live: ${declared}
-const intoGenerated: RouteCtx<"/orgs", "get">["meta"] = live
+const intoGenerated: Routes["/orgs"]["get"]["ctx"]["meta"] = live
 expectType<Equal<(typeof intoGenerated)["security"], readonly { readonly scheme: string }[] | undefined>>()`
 		expect(check(META_APP, consumer, types).diagnostics).toEqual([])
 	})
 
 	it("falls back to the tree's literal meta in the ctx when nothing was extracted", () => {
 		const consumer = `declare const widened: { summary: string }
-const literal: RouteCtx<"/health", "get">["meta"] = { summary: "Health check" }
+const literal: Routes["/health"]["get"]["ctx"]["meta"] = { summary: "Health check" }
 // @ts-expect-error the fallback is the tree's literal, which a widened string does not satisfy
-const notLiteral: RouteCtx<"/health", "get">["meta"] = widened
+const notLiteral: Routes["/health"]["get"]["ctx"]["meta"] = widened
 void literal
 void notLiteral`
 		expect(check(META_APP, consumer).diagnostics).toEqual([])

@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
 const GENERATORS_READ = [
+	"x-backend-declared-id",
 	"x-backend-error",
 	"x-backend-errors",
 	"x-backend-route",

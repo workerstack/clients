@@ -1,8 +1,9 @@
 /**
  * `generateTypes` (F3): an app's `_gen/types.gen.d.ts` — the `Routes` map, each route's ctx,
- * input, output, errors and meta, the route selectors with the `HttpCodegen` augmentation, and
- * `BaseCtx`. Read from the app's OpenAPI document (the IR), its route tree (meta, O1) and the
- * extracted ctx types (middleware, env, taps, parsed inputs, O3), joined on `x-backend-route`.
+ * input, output, errors and meta, the `HttpCodegen` `operationId` slot mapping each declared id
+ * to its context, and `BaseCtx`. Read from the app's OpenAPI document (the IR), its route tree
+ * (meta, O1) and the extracted ctx types (middleware, env, parsed inputs, O3), joined on
+ * `x-backend-route`.
  */
 import type { ExtractedProp, ExtractedTypes } from "../../extract/extract.ts"
 import { type OpenApiDocument, toIR } from "../../ir/build.ts"
@@ -35,25 +36,13 @@ export type GenerateTypesOptions = {
 }
 
 /* the names the file declares, which a component schema never takes */
-const RESERVED = [
-	"HttpContext",
-	"HttpError",
-	"HttpMeta",
-	"Omit",
-	"Partial",
-	"Readonly",
-	"Record",
-	"Routes",
-	"RouteSelector",
-	"TapMap",
-]
+const RESERVED = ["HttpContext", "HttpError", "HttpMeta", "Omit", "Partial", "Readonly", "Record", "Routes"]
 
 /* the v1 error-factory signature of a key without a schema (core errors.ts ErrorFactoryOpts) */
 const STANDARD_FACTORY =
 	"(opts?: { cause?: unknown; fields?: Record<string, { error_key: string; message: string; path: string }[]>; headers?: Record<string, string>; vars?: Record<string, number | string> }) => HttpError"
 
 const EXTRACTORS: readonly (readonly [string, string])[] = [
-	["RouteCtx", "ctx"],
 	["RouteInput", "input"],
 	["RouteOutput", "output"],
 	["RouteErrors", "errors"],
@@ -228,16 +217,62 @@ function routeEntry(id: string, op: IROperation, options: GenerateTypesOptions, 
 	return entry.map(([key, type]) => `\t\t\t${key}: ${type}`).join("\n")
 }
 
-/** `BaseCtx`: the app's context over its env, the middleware's additions and its typed taps. */
-function baseCtx(extracted: ExtractedTypes | null, name: string): string[] {
-	const env = extracted?.env ?? "Record<string, unknown>"
-	const taps = extracted?.taps ?? null
-	const parts = [taps === null ? `HttpContext<${env}>` : `Omit<HttpContext<${env}>, "tap">`]
+/** `BaseCtx`: the app's context over its env, with the middleware's additions. */
+function baseCtx(extracted: ExtractedTypes | null, name: string): string {
+	const parts = [`HttpContext<${extracted?.env ?? "Record<string, unknown>"}>`]
 	const middleware = extracted?.middleware ?? []
 	if (middleware.length > 0) parts.push(propsText(middleware))
-	if (taps !== null) parts.push("{ tap<K extends keyof TapMap>(key: K, payload: TapMap[K]): void }")
-	const lines = taps === null ? [] : [`type TapMap = ${taps}`]
-	return [...lines, `export type ${name} = ${parts.join(" & ")}`]
+	return `export type ${name} = ${parts.join(" & ")}`
+}
+
+/**
+ * A WebSocket route's ctx, as core's `WSRouteCtx` types its callbacks: the base with the pattern's params, and the
+ * search input `.input()` declares. Extracted additions are keyed by HTTP routes only, so none join here.
+ */
+function wsCtx(op: IROperation, id: string, options: GenerateTypesOptions, ctx: Ctx): string {
+	const own: Field[] = []
+	const search = wireInput(op, ctx).find(([key]) => key === "search")
+	if (search !== undefined) own.push(["readonly input", objectText([search])])
+	const params = ctxParams(options.extracted, id, pathOf(id))
+	if (params !== "{}") own.push(["readonly params", params])
+	const base = options.baseCtxName ?? "BaseCtx"
+	return own.length === 0 ? base : `${base} & ${objectText(own)}`
+}
+
+/**
+ * The `HttpCodegen` augmentation: each declared id (the route's own, before core's suffix) to its kind and ctx, in
+ * code-unit order. An HTTP id names its `Routes` entry's ctx, a declared id over several routes its first route's in
+ * code-unit order (D3: no union of contexts). An operation without `x-backend-route` has no entry: `routesOf`
+ * reports an HTTP one, this a WebSocket one. Null with no operations, so core's plain string ids apply.
+ */
+function operationSlot(ir: IR, options: GenerateTypesOptions, ctx: Ctx): string | null {
+	const routeIds = new Map<string, { op: IROperation; routes: string[] }>()
+	const missing: string[] = []
+	for (const op of ir.operations) {
+		const route = op.extensions.route
+		if (route === undefined) {
+			if (op.extensions.websocket === true)
+				missing.push(`${op.method} ${op.path}: no x-backend-route; left out of the operationId slot`)
+			continue
+		}
+		const declared = op.extensions.declaredId ?? op.id
+		const entry = routeIds.get(declared) ?? { op, routes: [] }
+		if (!entry.routes.includes(route)) entry.routes.push(route)
+		routeIds.set(declared, entry)
+	}
+	for (const message of missing.sort(compareCodeUnits)) options.report(message)
+	if (routeIds.size === 0) return null
+	const entries = [...routeIds].sort(([a], [b]) => compareCodeUnits(a, b))
+	const lines = entries.map(([declared, { op, routes }]) => {
+		const id = routes.sort(compareCodeUnits)[0] as string
+		const method = id.slice(0, id.indexOf(" ")).toLowerCase()
+		const entry =
+			op.extensions.websocket === true
+				? `kind: "ws"; ctx: ${wsCtx(op, id, options, ctx)}`
+				: `kind: "http"; ctx: Routes[${tsString(pathOf(id))}][${tsString(method)}]["ctx"]`
+		return `\t\t\t${tsString(declared)}: { ${entry} }`
+	})
+	return `declare module "@workerstack/backend/http" {\n\tinterface HttpCodegen {\n\t\toperationId: {\n${lines.join("\n")}\n\t\t}\n\t}\n}`
 }
 
 /** A route id's path: `GET /a` → `/a`. */
@@ -269,7 +304,6 @@ export function generateTypes(options: GenerateTypesOptions): string {
 	const names: TypeOptions = { refName: componentNames(ir, [...RESERVED, name]) }
 	const ctx: Ctx = { names, resolve: (schema) => irToTs(schema, names) }
 	const hasErrors = [...routes.values()].some((op) => Object.keys(op.extensions.errors ?? {}).length > 0)
-	const selectors = [...routes.keys()].sort(compareCodeUnits)
 	/* HttpMeta only when a declared meta is emitted: the ctx's meta is that type and the keys a route may add */
 	const declaredMeta = options.extracted?.meta ?? null
 	const imports = [
@@ -279,13 +313,9 @@ export function generateTypes(options: GenerateTypesOptions): string {
 		...(declaredMeta === null ? [] : ["HttpMeta"]),
 	]
 	const out = [`import type { ${imports.join(", ")} } from "@workerstack/backend/http"`]
-	out.push(...baseCtx(options.extracted, name))
-	if (selectors.length > 0) {
-		out.push(`export type RouteSelector = ${selectors.map(tsString).join(" | ")}`)
-		out.push(
-			'declare module "@workerstack/backend/http" {\n\tinterface HttpCodegen {\n\t\trouteSelector: RouteSelector\n\t}\n}',
-		)
-	}
+	out.push(baseCtx(options.extracted, name))
+	const slot = operationSlot(ir, options, ctx)
+	if (slot !== null) out.push(slot)
 	for (const schema of Object.keys(ir.schemas).sort(compareCodeUnits))
 		out.push(`type ${names.refName?.(schema)} = ${ctx.resolve(ir.schemas[schema] as IRSchema)}`)
 	out.push(routesType(routes, options, ctx))

@@ -44,7 +44,7 @@ describe.skipIf(!withPython())("the mounted resource server under the Python cli
 				authorizations: ["orders:read", "orders:read orders:write"],
 				created: expect.objectContaining({ _meta: { "backend/status": 201 }, structuredContent: { created: "o-2" } }),
 				read: expect.objectContaining({ _meta: { "backend/status": 200 }, structuredContent: { orders: ["o-1"] } }),
-				tools: ["get_orders", "post_orders"],
+				tools: ["orders_create", "orders_list"],
 			},
 			[
 				"app POST /mcp 401",

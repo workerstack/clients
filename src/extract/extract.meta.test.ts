@@ -53,7 +53,7 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
 			)
 			const notAnApp = project.write("meta/not-an-app.ts", lines("export const app = { get: 1 }"))
 			expect(extract(typeOnly).types.meta).toBe('{ tenant?: "organization" | "project"; worker: "extract" }')
-			expect(() => extract(notAnApp)).toThrow('Export "app" is not a backend app: it carries no $ctx, $env, $taps')
+			expect(() => extract(notAnApp)).toThrow('Export "app" is not a backend app: it carries no $ctx, $env')
 		},
 		SLOW,
 	)
@@ -63,7 +63,7 @@ describe("an app from an older backend", () => {
 	it(
 		"extracts with no declared meta at all, where the app carries no $meta",
 		() => {
-			/* the three members extraction needs, and no $meta: what a pre-1.0 backend's app type had */
+			/* the two members extraction needs, and no $meta: what a pre-1.0 backend's app type had */
 			const older = project.write(
 				"meta/older.ts",
 				lines(
@@ -71,7 +71,6 @@ describe("an app from an older backend", () => {
 					"type OlderApp = {",
 					"\treadonly $ctx: HttpContext<{ DB: string }>",
 					"\treadonly $env: { DB: string }",
-					"\treadonly $taps: {}",
 					"}",
 					"export const app = {} as OlderApp",
 				),

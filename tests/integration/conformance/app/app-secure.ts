@@ -37,9 +37,12 @@ function secured(root: ConformanceApp, factory: typeof errors) {
 
 type Secure = ReturnType<typeof secured>
 
-/** The reads a users mutation invalidates (`x-invalidate`), which the SDK harnesses' stale tracking resolves. */
-const LIST = "GET /v1/secure/users"
-const ONE = "GET /v1/secure/users/:id"
+/**
+ * The reads a users mutation invalidates, by operationId: the document writes each as its route (`x-invalidate`),
+ * which the SDK harnesses' stale tracking resolves.
+ */
+const LIST = "users.list"
+const ONE = "users.get"
 
 /** `users.*`, the users in this app's closure, `taken@example.com` seeded; each mutation names what it invalidates. */
 function userRoutes(app: Secure, factory: typeof errors): void {
