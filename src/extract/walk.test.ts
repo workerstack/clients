@@ -8,6 +8,11 @@ import { findTsConfig, loadEntry, registrations } from "./walk.ts"
 
 const SLOW = 60_000
 
+/** A registration walk says nothing here: every mount path is a literal. */
+const report = (message: string) => {
+	throw new Error(`unexpected report: ${message}`)
+}
+
 describe("findTsConfig: the project's own tsconfig", () => {
 	it("is the nearest one walking up, never one past the package root, and none when there is none", () => {
 		const root = mkdtempSync(join(tmpdir(), "clients-tsconfig-"))
@@ -120,11 +125,41 @@ describe("registrations: the routes the program's own files register", () => {
 					"more(app)",
 				),
 			)
-			const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }))
-			expect(found.map(({ at, methods, path }) => ({ at: at.slice(project.root.length + 1), methods, path }))).toEqual([
-				{ at: "walk/app.ts:6", methods: ["GET"], path: "/a" },
-				{ at: "walk/more.ts:2", methods: ["GET", "PUT"], path: "/more" },
+			const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }), report)
+			expect(
+				found.map(({ at, methods, paths }) => ({ at: at.slice(project.root.length + 1), methods, paths })),
+			).toEqual([
+				{ at: "walk/app.ts:6", methods: ["GET"], paths: ["/a"] },
+				{ at: "walk/more.ts:2", methods: ["GET", "PUT"], paths: ["/more"] },
 			])
+		},
+		SLOW,
+	)
+})
+
+describe("registrations: a route on a mounted sub", () => {
+	let project: FixtureProject
+	beforeAll(() => {
+		project = fixtureProject()
+	})
+	afterAll(() => project.dispose())
+
+	it(
+		"gives it the paths its mounts serve it at",
+		() => {
+			const entryPath = project.write(
+				"walk/mounted.ts",
+				lines(
+					'import { httpApp } from "@workerstack/backend/http"',
+					"const sub = httpApp<{}>()",
+					'sub.get("/a").handler((c) => c.res.text("ok", "ok"))',
+					"export const app = httpApp<{}>()",
+					'app.route("/m", sub)',
+					'app.route("/n/", sub)',
+				),
+			)
+			const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }), report)
+			expect(found.map(({ paths }) => paths)).toEqual([["/m/a", "/n//a"]])
 		},
 		SLOW,
 	)

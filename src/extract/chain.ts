@@ -8,6 +8,9 @@ import type { ts } from "ts-morph"
 import { isPublicName, type Serializer } from "./serialize.ts"
 import type { Registration } from "./walk.ts"
 
+/** A registration with the route ids its methods and paths give: the router's, never guessed. */
+export type Routed = Registration & { ids: string[] }
+
 /** One property on `ctx` that the framework's context class does not declare: what the middleware added. */
 export type ExtractedProp = {
 	/** Its name on `ctx`. */
@@ -67,35 +70,21 @@ export type RouteOptions = {
 	base: ReadonlySet<string>
 	owner: ts.Node | undefined
 	report: (message: string) => void
-	routeId: (method: string, path: string) => string
 }
 
-const SKIPPED = "its ctx is not extracted"
+/** What a skip says of the route it skips. */
+export const SKIPPED = "its ctx is not extracted"
 
-/**
- * Each route's own additions by route id. A route whose path is no literal, or one the router
- * refuses, is skipped; an id two registrations give different additions is dropped, never guessed.
- */
+/** Each route's own additions by route id. An id two registrations give different additions is dropped, never guessed. */
 export function routeAdditions(
-	found: readonly Registration[],
+	found: readonly Routed[],
 	ser: Serializer,
 	options: RouteOptions,
 ): Record<string, ExtractedProp[]> {
-	const { base, owner, report, routeId } = options
+	const { base, owner, report } = options
 	const byId = new Map<string, { props: ExtractedProp[]; key: string }>()
 	const conflicted = new Set<string>()
-	for (const { at, ctx, methods, path } of found) {
-		if (path === null) {
-			report(`${at}: the route's path is not a literal type; ${SKIPPED}`)
-			continue
-		}
-		let ids: string[]
-		try {
-			ids = methods.map((method) => routeId(method, path))
-		} catch (error) {
-			report(`${at}: the router refuses ${JSON.stringify(path)} (${(error as Error).message}); ${SKIPPED}`)
-			continue
-		}
+	for (const { ctx, ids } of found) {
 		const props = addedProps(ctx, owner, ser).filter((p) => !base.has(p.name))
 		const key = JSON.stringify(props)
 		for (const id of ids) {

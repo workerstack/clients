@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { dirname, join, relative, sep } from "node:path"
 import type { ts } from "ts-morph"
-import { addedProps, type ExtractedProp, frameworkClass, routeAdditions } from "./chain.ts"
+import { addedProps, type ExtractedProp, frameworkClass, routeAdditions, type Routed, SKIPPED } from "./chain.ts"
 import { Serializer } from "./serialize.ts"
 import { type EntryOptions, loadEntry, type Registration, registrations, type TsMorph } from "./walk.ts"
 
@@ -146,29 +146,45 @@ function resolvable(text: string, outputDir: string | undefined, cache: Packages
 	)
 }
 
+/**
+ * Each registration with its route ids, methods by paths. A registration whose path is no literal, or a path the
+ * router refuses, is said once and gives no id.
+ */
+function routed(
+	found: readonly Registration[],
+	routeId: (method: string, path: string) => string,
+	report: (message: string) => void,
+): Routed[] {
+	return found.map((registration) => {
+		const { at, methods, paths } = registration
+		if (paths === null) {
+			report(`${at}: the route's path is not a literal type; ${SKIPPED}`)
+			return { ...registration, ids: [] }
+		}
+		const ids = paths.flatMap((path) => {
+			try {
+				return methods.map((method) => routeId(method, path))
+			} catch (error) {
+				report(`${at}: the router refuses ${JSON.stringify(path)} (${(error as Error).message}); ${SKIPPED}`)
+				return []
+			}
+		})
+		return { ...registration, ids }
+	})
+}
+
 /** Each route's `pick` type (its parsed `ctx.input`, its `ctx.params`) as text by route id; an id two registrations type differently is left out. */
 function routeTypes(
-	found: readonly Registration[],
+	found: readonly Routed[],
 	pick: (found: Registration) => ts.Type | null,
 	serialize: (type: ts.Type) => string,
-	routeId: (method: string, path: string) => string,
 ): Record<string, string> {
 	const byId = new Map<string, string | null>()
 	for (const registration of found) {
-		const { methods, path } = registration
 		const type = pick(registration)
-		if (type === null || path === null) continue
+		if (type === null) continue
 		const text = serialize(type)
-		for (const method of methods) {
-			let id: string
-			try {
-				id = routeId(method, path)
-			} catch {
-				/* the router refuses the path: routeAdditions said so once */
-				continue
-			}
-			byId.set(id, byId.has(id) && byId.get(id) !== text ? null : text)
-		}
+		for (const id of registration.ids) byId.set(id, byId.has(id) && byId.get(id) !== text ? null : text)
 	}
 	return Object.fromEntries([...byId].filter((entry): entry is [string, string] => entry[1] !== null))
 }
@@ -207,8 +223,8 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 	const owner = frameworkClass(ctx as ts.Type, compiler)
 	const middleware = addedProps(ctx as ts.Type, owner, ser)
 	const base = new Set(middleware.map((p) => p.name))
-	const found = registrations(entry)
-	const routes = routeAdditions(found, ser, { base, owner, report, routeId })
+	const found = routed(registrations(entry, report), routeId, report)
+	const routes = routeAdditions(found, ser, { base, owner, report })
 	/* what `metaType<AppMeta>()` declared, written out: the ctx's meta is this and the OpenAPI keys, never the tree's
 	   literal values, so a handler may pass its own ctx to a function typed with the generated ctx (bit 22 a) */
 	const meta = metaType === undefined ? "{}" : ser.shape(metaType)
@@ -222,7 +238,6 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 			found,
 			(r) => r.input,
 			(type) => text(ser.shape(type)),
-			routeId,
 		),
 		meta: meta === "{}" ? null : text(meta),
 		middleware: props(middleware),
@@ -230,7 +245,6 @@ export function extractTypes(options: ExtractOptions): ExtractedTypes | null {
 			found,
 			(r) => r.params,
 			(type) => text(ser.shape(type)),
-			routeId,
 		),
 		routes: Object.fromEntries(Object.entries(routes).map(([id, list]) => [id, props(list)])),
 	}

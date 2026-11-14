@@ -22,4 +22,5 @@ All notable changes to [`@workerstack/clients`](https://www.npmjs.com/package/@w
 
 ### Fixed
 
+- **A sub-app mounted with `.route()` is typed at its mounted path.** `types.gen.d.ts` typed a route registered on a sub-app at the sub's own path (`GET /`), so a mounted route lost its middleware additions, input and params, and generate said "extracted ctx additions match no documented operation". The extractor now follows each app to its `.route(prefix, sub)` and `.route(sub)` mounts, whether the sub is built as a chain or by statements, imported or returned from a function, and nested mounts compose. A sub reached only through a function parameter keeps its own path, and a mount whose path is no literal type says so.
 - **A GitHub release's live check has the job's token.** The rendered `release.yml` step that confirms a `github` registry's release ran `gh release view` without `GH_TOKEN`, so it failed in Actions after the release was created. It now gets `GH_TOKEN: ${{ github.token }}` like the publish step. The release guide also lists `administration: write` for the sync App, which sync needs to set a repo's description, homepage and topics.

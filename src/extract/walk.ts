@@ -1,7 +1,9 @@
 /**
  * The program an app is read from: its tsconfig, the exported app, and every route registration in
  * the program's own files. A registration is a `.handler()` call on a route builder, recognized by
- * the type-only `$ctx`, `$method` and `$path` it carries, whatever method or helper started it.
+ * the type-only `$ctx`, `$method` and `$path` it carries, whatever method or helper started it. Its
+ * path is the one its own app gives it; a `.route()` mount serves it under the mount's prefix, so its
+ * paths follow every chain of mounts that carries that app.
  */
 import { existsSync } from "node:fs"
 import { dirname, resolve } from "node:path"
@@ -26,6 +28,8 @@ export type EntryOptions = {
 }
 
 export type LoadedEntry = {
+	/** the exported declaration: a variable, or for `export default <expr>` the expression */
+	appNode: ts.Node
 	/** the app's type */
 	appType: ts.Type
 	checker: ts.TypeChecker
@@ -36,7 +40,10 @@ export type LoadedEntry = {
 /* the type-only members every route builder carries */
 const BUILDER_MEMBERS = ["$ctx", "$method", "$path"]
 
-/** One route a `.handler()` call registers: where, its methods, its full path (null if not a literal) and its ctx. */
+/* the type-only members every app carries */
+const APP_MEMBERS = ["$ctx", "$env"]
+
+/** One route a `.handler()` call registers: where, its methods, the full paths it is served at and its ctx. */
 export type Registration = {
 	at: string
 	ctx: ts.Type
@@ -45,7 +52,11 @@ export type Registration = {
 	/** `ctx.params` as the handler receives it, or null when every param is the path's string */
 	params: ts.Type | null
 	methods: string[]
-	path: string | null
+	/**
+	 * the full paths the route is served at: under each chain of mounts that carries its app, else the path it was
+	 * registered at; null when that path is not a literal. Code-unit sorted, without duplicates.
+	 */
+	paths: string[] | null
 }
 
 /**
@@ -82,7 +93,13 @@ export function loadEntry(tsMorph: TsMorph, options: EntryOptions): LoadedEntry 
 	if (decl === undefined) throw new Error(`Export "${options.exportName}" not found in ${options.entryPath}`)
 	const checker = project.getTypeChecker().compilerObject
 	/* for `export default <expr>` the declaration is the expression itself */
-	return { appType: checker.getTypeAtLocation(decl.compilerNode), checker, compiler: tsMorph.ts, project }
+	return {
+		appNode: decl.compilerNode,
+		appType: checker.getTypeAtLocation(decl.compilerNode),
+		checker,
+		compiler: tsMorph.ts,
+		project,
+	}
 }
 
 /** The string literal values among `type` (itself, or a union's members). */
@@ -90,8 +107,139 @@ function literals(type: ts.Type): string[] {
 	return (type.isUnion() ? type.types : [type]).filter((t) => t.isStringLiteral()).map((t) => t.value)
 }
 
+/** Where an app value comes from: the expression that made it, or the symbol it is only read through (a parameter). */
+type AppNode = ts.Node | ts.Symbol
+
+/** A `.route()` call: the sub's app served inside the receiver's under `prefix`, the receiver's base path joined in. */
+type Mount = { prefix: string; receiver: AppNode; sub: AppNode }
+
+/** Core's `MergePath`: `"/"` gives the other side, anything else is joined as is (the router normalizes the result). */
+const mergePath = (a: string, b: string): string => (a === "/" ? b : b === "/" ? a : `${a}${b}`)
+
+/** `file:line` of a node, as reports name a place. */
+function placeOf(node: ts.Node): string {
+	const file = node.getSourceFile()
+	return `${file.fileName}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`
+}
+
+/** The single string literal `type` is, or null. */
+function literalOf(type: ts.Type): string | null {
+	const values = literals(type)
+	return values.length === 1 && !type.isUnion() ? (values[0] as string) : null
+}
+
+/**
+ * The origin of each app expression. A handle (`use`, `basePath`, a route builder, `.handler()`, `.route()`) is its
+ * receiver's app; a variable, an import or an object's property is what it was bound to; anything else, `httpApp()` or
+ * a factory's call, makes its own app.
+ */
+function appOrigins(entry: LoadedEntry): (node: ts.Node) => AppNode {
+	const { checker, compiler } = entry
+	const memo = new Map<ts.Node, AppNode>()
+	const carries = (node: ts.Node) => checker.getTypeAtLocation(node).getProperty("$ctx") !== undefined
+	const bound = (symbol: ts.Symbol | undefined, at: ts.Node): AppNode => {
+		if (symbol === undefined) return at
+		const target = symbol.flags & compiler.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+		const decl = target.valueDeclaration
+		if (decl !== undefined && compiler.isShorthandPropertyAssignment(decl))
+			return bound(checker.getShorthandAssignmentValueSymbol(decl), decl)
+		const init =
+			decl !== undefined && (compiler.isVariableDeclaration(decl) || compiler.isPropertyAssignment(decl))
+				? decl.initializer
+				: undefined
+		return init === undefined ? target : origin(init)
+	}
+	const step = (expr: ts.Node): AppNode => {
+		if (
+			compiler.isParenthesizedExpression(expr) ||
+			compiler.isAsExpression(expr) ||
+			compiler.isSatisfiesExpression(expr) ||
+			compiler.isNonNullExpression(expr)
+		)
+			return origin(expr.expression)
+		if (compiler.isIdentifier(expr)) return bound(checker.getSymbolAtLocation(expr), expr)
+		if (compiler.isPropertyAccessExpression(expr)) return bound(checker.getSymbolAtLocation(expr.name), expr)
+		const callee = compiler.isCallExpression(expr) ? expr.expression : undefined
+		if (
+			callee !== undefined &&
+			compiler.isPropertyAccessExpression(callee) &&
+			carries(callee.expression) &&
+			carries(expr)
+		)
+			return origin(callee.expression)
+		return expr
+	}
+	const origin = (expr: ts.Node): AppNode => {
+		const known = memo.get(expr)
+		if (known !== undefined) return known
+		/* a binding that reads itself ends at the expression */
+		memo.set(expr, expr)
+		const found = step(expr)
+		memo.set(expr, found)
+		return found
+	}
+	return origin
+}
+
+/** The receiver's base path: its `HttpApp` type argument `TBasePath`, when that is one literal. */
+function basePathOf(entry: LoadedEntry, app: ts.Type): string | null {
+	const { checker, compiler } = entry
+	/* a class's instance type is a reference to it: its type arguments are the app's */
+	const decl = app.getSymbol()?.declarations?.find((d) => compiler.isClassDeclaration(d))
+	const index = decl?.typeParameters?.findIndex((p) => p.name.text === "TBasePath") ?? -1
+	const arg = index < 0 ? undefined : checker.getTypeArguments(app as ts.TypeReference)[index]
+	return arg === undefined ? null : literalOf(arg)
+}
+
+/** The mount a call is, if it is `<app>.route(sub)` or `<app>.route(prefix, sub)`; a path no literal is said, never guessed. */
+function mountOf(
+	entry: LoadedEntry,
+	call: ts.CallExpression,
+	origin: (node: ts.Node) => AppNode,
+	report: (message: string) => void,
+): Mount | null {
+	const { checker, compiler } = entry
+	if (!compiler.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "route") return null
+	const receiver = call.expression.expression
+	const app = checker.getTypeAtLocation(receiver)
+	const sub = call.arguments.at(-1)
+	if (sub === undefined || call.arguments.length > 2 || APP_MEMBERS.some((m) => app.getProperty(m) === undefined))
+		return null
+	const base = basePathOf(entry, app)
+	const first = call.arguments[0] as ts.Expression
+	const prefix = call.arguments.length === 1 ? "/" : literalOf(checker.getTypeAtLocation(first))
+	if (base === null || prefix === null) {
+		report(`${placeOf(call)}: the mount's path is not a literal type; the routes it mounts keep their own paths`)
+		return null
+	}
+	return { prefix: mergePath(base, prefix), receiver: origin(receiver), sub: origin(sub) }
+}
+
+/**
+ * The prefixes an app is served under: `"/"` when no mount takes it as a sub, or when it is the export; else the
+ * mount's prefix under each of its receiver's. An app mounted only inside a cycle is served nowhere.
+ */
+function servedPrefixes(mounts: readonly Mount[], exported: AppNode): (node: AppNode) => string[] {
+	const bySub = new Map<AppNode, Mount[]>()
+	for (const mount of mounts) bySub.set(mount.sub, [...(bySub.get(mount.sub) ?? []), mount])
+	const visiting = new Set<AppNode>()
+	const prefixes = (node: AppNode): string[] => {
+		const edges = bySub.get(node) ?? []
+		if (edges.length === 0) return ["/"]
+		if (visiting.has(node)) return []
+		visiting.add(node)
+		const out = edges.flatMap((m) => prefixes(m.receiver).map((outer) => mergePath(outer, m.prefix)))
+		visiting.delete(node)
+		return node === exported ? [...out, "/"] : out
+	}
+	return prefixes
+}
+
+/** A registration before its mounts are known: the path its own app gives it, and the builder that app comes from. */
+type Found = Omit<Registration, "paths"> & { builder: ts.Expression; path: string | null }
+
 /** The registration a call is, if it is `<route builder>.handler(…)`. */
-function registrationOf(entry: LoadedEntry, call: ts.CallExpression): Registration | null {
+function registrationOf(entry: LoadedEntry, call: ts.CallExpression): Found | null {
 	const { checker, compiler } = entry
 	if (!compiler.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "handler") return null
 	const receiver = call.expression.expression
@@ -112,27 +260,34 @@ function registrationOf(entry: LoadedEntry, call: ts.CallExpression): Registrati
 	const typed = paramsType
 		?.getProperties()
 		.some((key) => !(checker.getTypeOfSymbol(key).flags & compiler.TypeFlags.String))
-	const file = call.getSourceFile()
-	const line = file.getLineAndCharacterOfPosition(call.getStart(file)).line + 1
-	const paths = literals(path as ts.Type)
 	return {
-		at: `${file.fileName}:${line}`,
+		at: placeOf(call),
+		builder: receiver,
 		ctx: ctx as ts.Type,
 		input: input ? checker.getTypeOfSymbol(input) : null,
 		params: typed === true ? (paramsType as ts.Type) : null,
 		/* `.on()`'s methods are literals by its signature; a path is one only as a single literal */
 		methods: literals(method as ts.Type),
-		path: paths.length === 1 && !(path as ts.Type).isUnion() ? (paths[0] as string) : null,
+		path: literalOf(path as ts.Type),
 	}
 }
 
-/** Every route the program's own files register (not declaration files, not packages), in file order then source order. */
-export function registrations(entry: LoadedEntry): Registration[] {
-	const { compiler } = entry
-	const out: Registration[] = []
+/**
+ * Every route the program's own files register (not declaration files, not packages), in file order then source order,
+ * at the paths the program's mounts serve it at. A mount whose path is no literal is said through `report`.
+ */
+export function registrations(entry: LoadedEntry, report: (message: string) => void): Registration[] {
+	const { appNode, compiler } = entry
+	const origin = appOrigins(entry)
+	const found: Found[] = []
+	const mounts: Mount[] = []
 	const visit = (node: ts.Node): void => {
-		const found = compiler.isCallExpression(node) ? registrationOf(entry, node) : null
-		if (found !== null) out.push(found)
+		if (compiler.isCallExpression(node)) {
+			const registration = registrationOf(entry, node)
+			if (registration !== null) found.push(registration)
+			const mount = registration === null ? mountOf(entry, node, origin, report) : null
+			if (mount !== null) mounts.push(mount)
+		}
 		compiler.forEachChild(node, visit)
 	}
 	const files = entry.project
@@ -141,5 +296,13 @@ export function registrations(entry: LoadedEntry): Registration[] {
 		.filter((file) => !file.isDeclarationFile && !/[\\/]node_modules[\\/]/.test(file.fileName))
 		.sort((a, b) => compareCodeUnits(a.fileName, b.fileName))
 	for (const file of files) visit(file)
-	return out
+	/* the export resolves as any binding of it does: through its name, or as the default export's expression */
+	const prefixes = servedPrefixes(mounts, origin(compiler.isVariableDeclaration(appNode) ? appNode.name : appNode))
+	return found.map(({ builder, path, ...registration }) => ({
+		...registration,
+		paths:
+			path === null
+				? null
+				: [...new Set(prefixes(origin(builder)).map((prefix) => mergePath(prefix, path)))].sort(compareCodeUnits),
+	}))
 }
