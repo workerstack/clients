@@ -51,9 +51,31 @@ const RUNTIME: Readonly<Record<string, string>> = {
 	RequestOptions: "config",
 	ResumableConnection: "realtime",
 	Safe: "result",
+	SseEvent: "events",
 	SyncTransport: "send_sync",
 	TransportOpts: "transport",
 	TypedWebSocket: "ws",
+}
+
+/* where types.py imports each runtime name from, under `._http.`; any other it spells is `collections.abc`'s */
+const TYPES_RUNTIME: Readonly<Record<string, string>> = {
+	FilePart: "body",
+	HttpError: "errors",
+	ResumableConnection: "realtime",
+	SseEventOf: "events",
+	TypedWebSocket: "ws",
+	WsClose: "ws",
+}
+
+/** types.py's imports of the runtime names it spells, a line per module in code-unit order. */
+function typesRuntime(names: ReadonlySet<string>): string[] {
+	const modules = [...new Set([...names].flatMap((name) => TYPES_RUNTIME[name] ?? []))].sort(compareCodeUnits)
+	return modules.flatMap((module) =>
+		importLine(
+			`._http.${module}`,
+			[...names].filter((name) => TYPES_RUNTIME[name] === module),
+		),
+	)
 }
 
 /** A docstring of `lines` at column 0: one line, or the first on the quotes and the closing quotes alone. */
@@ -183,8 +205,15 @@ function emitPython(document: Record<string, unknown>, options: PythonSdkOptions
 			[typesDoc[0] as string],
 			[
 				["from __future__ import annotations"],
-				[...(errorKey === null ? [] : ["from enum import StrEnum"]), ...importLine("typing", at.typing)],
-				importLine("._http.body", env.typesImports),
+				[
+					...importLine(
+						"collections.abc",
+						[...env.typesImports].filter((name) => !(name in TYPES_RUNTIME)),
+					),
+					...(errorKey === null ? [] : ["from enum import StrEnum"]),
+					...importLine("typing", at.typing),
+				],
+				typesRuntime(env.typesImports),
 			],
 			decls.map(([, text]) => text),
 		),

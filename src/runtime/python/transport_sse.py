@@ -2,7 +2,7 @@
 """The SSE adapter: the cursor's id as Last-Event-ID and its token on the query, each event's data a
 message; a send is a POST."""
 
-from .events import EventStream
+from .events import EventStream, SseEvent
 from .transport import (
     Dial,
     TransportConn,
@@ -15,7 +15,7 @@ __all__ = ["SseAdapter"]
 
 
 class SseConn:
-    def __init__(self, stream: EventStream[str], dial: Dial) -> None:
+    def __init__(self, stream: EventStream[SseEvent[str]], dial: Dial) -> None:
         self.stream = stream
         self.dial = dial
 

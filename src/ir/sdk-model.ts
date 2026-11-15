@@ -159,22 +159,34 @@ export const isJsonEventData = (schema: IRSchema, resolve: (schema: IRSchema) =>
 	return resolved.kind !== "unknown" && !isStringSchema(resolved)
 }
 
+/** A message union keyed on one field (D9): the union, the field, and each variant beside its string const there. */
+export type Dispatch = {
+	readonly union: Extract<IRSchema, { kind: "union" }>
+	readonly key: string
+	readonly members: readonly { readonly variant: IRSchema; readonly value: string }[]
+}
+
 /**
- * The field a message union dispatches on (D9): its discriminator's `propertyName` when every variant is an object
- * whose field there is a string const; none for any other schema.
+ * How a message union dispatches (D9): on its discriminator's `propertyName` when every variant is an object whose
+ * field there is a string const; none for any other schema.
  */
-export function dispatchKey(schema: IRSchema, resolve: (schema: IRSchema) => IRSchema): string | undefined {
+export function dispatchOf(schema: IRSchema, resolve: (schema: IRSchema) => IRSchema): Dispatch | undefined {
 	const union = resolve(schema)
 	if (union.kind !== "union" || union.discriminator === undefined) return undefined
 	const key = union.discriminator.propertyName
-	const keyed = union.variants.every((variant) => {
+	const members = union.variants.map((variant) => {
 		const object = resolve(variant)
 		const field = object.kind === "object" ? object.fields.find(({ name }) => name === key) : undefined
 		const value = field === undefined ? undefined : resolve(field.schema)
-		return value?.kind === "const" && typeof value.value === "string"
+		return { value: value?.kind === "const" && typeof value.value === "string" ? value.value : undefined, variant }
 	})
-	return keyed ? key : undefined
+	const keyed = members.every((member): member is Dispatch["members"][number] => member.value !== undefined)
+	return keyed ? { key, members, union } : undefined
 }
+
+/** The field a message union dispatches on (D9); none for a schema that does not dispatch. */
+export const dispatchKey = (schema: IRSchema, resolve: (schema: IRSchema) => IRSchema): string | undefined =>
+	dispatchOf(schema, resolve)?.key
 
 /**
  * The schema an SSE op declares for its events' `data`, when it is not a string: such events are

@@ -2,7 +2,7 @@
 """One operation, as its methods call it."""
 
 from dataclasses import dataclass
-from typing import Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 T = TypeVar("T", covariant=True)
 
@@ -23,3 +23,8 @@ class Operation(Generic[T]):
     invalidates: tuple[str, ...] = ()
     stream: Literal["realtime", "sse", "ws"] | None = None
     headers: tuple[tuple[str, str, HeaderKind, bool], ...] = ()
+    events: tuple[str, ...] | None = None
+    encode: bool = False
+    decode: bool = False
+    dispatch: str | None = None
+    kind: type[Any] | None = None

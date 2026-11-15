@@ -1,7 +1,7 @@
 /**
  * An SSE operation in the Python SDK (contract 34 §2.1, §6.1; Rust's `sse.test.ts` analog), driven on the `sse`
  * registry document (shared/__fixtures__/documents-streams.ts): awaiting the `AsyncSDK` method opens the stream
- * and returns `EventStream[T]`, `T` from the declared event schema, an async iterator of `SseEvent[T]` and an
+ * and returns `EventStream[SseEvent[T]]`, `T` from the declared event schema, an async iterator of `SseEvent[T]` and an
  * async context manager with `aclose()` and `last_event_id`; an error status raises its class before any event,
  * in either mode; the request carries `accept`, `Last-Event-ID` (none for an empty cursor), the merged headers,
  * the declared params, the body and the token; a typed stream ends at an event that does not decode or is not the
@@ -96,7 +96,7 @@ async with aclient() as c:
     async with await c.text.stream() as last:
         note((await anext(last)).data)`
 
-/** What mypy holds of the stream methods: `EventStream[Tick]` and `EventStream[str]`, and what it refuses. */
+/** What mypy holds of the stream methods: `EventStream[SseEvent[Tick]]` and `EventStream[SseEvent[str]]`, and what it refuses. */
 const TYPES = [
 	"from typing import assert_type",
 	"",
@@ -104,7 +104,7 @@ const TYPES = [
 	"",
 	"",
 	"async def run(c: sdk.AsyncSDK) -> None:",
-	'    s: sdk.EventStream[sdk.Tick] = await c.ticks.stream(since=5, last_event_id="7")',
+	'    s: sdk.EventStream[sdk.SseEvent[sdk.Tick]] = await c.ticks.stream(since=5, last_event_id="7")',
 	"    ev = await anext(s)",
 	"    assert_type(ev, sdk.SseEvent[sdk.Tick])",
 	"    assert_type(ev.data, sdk.Tick)",
@@ -113,7 +113,7 @@ const TYPES = [
 	"    async with await c.text.stream() as t:",
 	"        async for e in t:",
 	"            assert_type(e.data, str)",
-	"    wrong: sdk.EventStream[str] = await c.ticks.stream()",
+	"    wrong: sdk.EventStream[sdk.SseEvent[str]] = await c.ticks.stream()",
 	'    await c.ticks.stream(reconnect_token="r")',
 	"    print(wrong)",
 	"",
@@ -140,15 +140,15 @@ describe.skipIf(!PY)("an SSE method: awaiting it opens EventStream[T], an async 
 	})
 
 	// v0: 7e7eeffad8
-	it("types the methods EventStream[Tick] and EventStream[str], refuses a WebSocket cursor, and SDK has none", () => {
+	it("types the methods EventStream[SseEvent[Tick]] and EventStream[SseEvent[str]], refuses a WebSocket cursor, and SDK has none", () => {
 		/* V0BUG: v0's SSEEvent data was an untyped str (ruling G15); G2: streams are AsyncSDK's alone */
 		const findings = checked("sse", `${TYPES.join("\n")}\n`).map((line) =>
 			line.replace(/^[^:]+:(\d+): error: /, "$1: "),
 		)
 		expect(findings).toEqual([
 			at(
-				"    wrong: sdk.EventStream[str] = await c.ticks.stream()",
-				'Incompatible types in assignment (expression has type "EventStream[Tick]", variable has type "EventStream[str]")  [assignment]',
+				"    wrong: sdk.EventStream[sdk.SseEvent[str]] = await c.ticks.stream()",
+				'Incompatible types in assignment (expression has type "EventStream[SseEventOf[str | None, Tick]]", variable has type "EventStream[SseEventOf[str | None, str]]")  [assignment]',
 			),
 			at(
 				'    await c.ticks.stream(reconnect_token="r")',

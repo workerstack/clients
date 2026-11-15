@@ -5,6 +5,7 @@
  * quoted string. Spec text reaches the source only through the shared escape layer.
  */
 import type { IR, IRSchema } from "../../ir/model.ts"
+import type { Dispatch } from "../../ir/sdk-model.ts"
 import { pascalWords, pyClassName } from "../shared/lang.ts"
 import { dictDecl, type DictKey, dictParts, keysOf, type Member, mergedFields } from "./types-dict.ts"
 import { irNames, plainNames } from "./types-names.ts"
@@ -115,11 +116,14 @@ function partsOf(ir: IRSchema, at: At): Part[] {
 	if (ir.kind === "scalar" && ir.enum !== undefined) return ir.enum.map(valuePart)
 	if (ir.kind === "nullable") return [...partsOf(ir.inner, deeper(at)), { type: "None" }]
 	if (ir.kind !== "union") return [{ type: single(ir, at) }]
-	return ir.variants.flatMap((variant, i) =>
-		variant.kind === "object" && variant.fields.length > 0
-			? [{ type: hoist(variant, deeper(at), variantSuffix(variant, i, ir.discriminator)) }]
-			: partsOf(variant, deeper(at)),
-	)
+	return ir.variants.flatMap((variant, i) => variantParts(variant, i, ir, at))
+}
+
+/** The members variant `i` of `union` contributes: an inline object hoisted as `<Parent><Field><Const>`. */
+function variantParts(variant: IRSchema, i: number, union: Of<"union">, at: At): Part[] {
+	return variant.kind === "object" && variant.fields.length > 0
+		? [{ type: hoist(variant, deeper(at), variantSuffix(variant, i, union.discriminator)) }]
+		: partsOf(variant, deeper(at))
 }
 
 /** A type that is never a union by itself. */
@@ -145,6 +149,20 @@ function use(ir: IRSchema, at: At): string {
 /** The Python type of `ir` in use position; what it hoists lands in `at.decls`. */
 export function pyTypeOf(ir: IRSchema, at: PyTypeContext): string {
 	return use(ir, { ...at, declTyping: at.declTyping ?? at.typing, depth: 0 })
+}
+
+/**
+ * Each member of the keyed union `ir` (a ref to it, or it written at `at`) as its value and the type its declaration
+ * names it by, in order: the names the union's own declaration spells, a ref's class or a hoisted
+ * `<Parent><Field><Const>`. Spelled in types.py, so what they hoist imports into `at.typing`.
+ */
+export function pyKeyedMembers(ir: IRSchema, dispatch: Dispatch, at: PyTypeContext): (readonly [string, string])[] {
+	const base: At = { ...at, declTyping: at.typing, depth: 0 }
+	const where = ir.kind === "ref" ? { ...base, fieldName: "", parentName: at.names.ref(ir.name) } : base
+	return dispatch.members.map(({ value, variant }, i) => [
+		value,
+		joined(variantParts(variant, i, dispatch.union, where)).text,
+	])
 }
 
 /** The keys of the TypedDict `name` declares for `fields`, `NotRequired` noted when one is optional. */

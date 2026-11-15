@@ -104,9 +104,9 @@ const consumed = (name: string, replies: readonly Reply[], body: string) =>
 const SURFACE = `from typing import Any
 import http_sdk as sdk
 async def main(a: sdk.AsyncSDK) -> None:
-    rc: sdk.ResumableConnection[sdk.Payload] = await a.feed.live(channel="c")
+    rc: sdk.ResumableConnection[sdk.Payload, object] = await a.feed.live(channel="c")
     first: sdk.Payload | None = await rc.recv()
-    r: sdk.ResumableConnection[Any] = await a.feed.resume(protocols="p", transport=sdk.TransportOpts(last_event_id="5", reconnect_token="rt"))
+    r: sdk.ResumableConnection[Any, object] = await a.feed.resume(protocols="p", transport=sdk.TransportOpts(last_event_id="5", reconnect_token="rt"))
     sdk.SDK().feed
     await a.feed.resume(reconnect_token2="rt")
     await a.feed.live(channel="c", max_reconnect_attempts=3)
@@ -490,8 +490,10 @@ describe("the emitted realtime surface: one transport keyword, the event's kind 
 		const client = generatePythonSdk(FIXTURES.realtime.document()).files["src/http_sdk/client.py"] ?? ""
 		const flat = client.replace(/\s+/g, "").replaceAll(",)", ")")
 		const claimed = { max_reconnect_attempts: "max_reconnect_attempts", reconnect_delay_ms: "reconnect_delay_ms" }
-		const typed = 'Operation[Payload]=Operation("GET","/feed",answer="none",shape="object",stream="realtime")'
-		const untyped = 'Operation[Any]=Operation("GET","/resume",answer="none",stream="realtime")'
+		const typed =
+			'Operation[ResumableConnection[Payload,object]]=Operation("GET","/feed",answer="none",shape="object",stream="realtime")'
+		const untyped =
+			'Operation[ResumableConnection[Any,object]]=Operation("GET","/resume",answer="none",stream="realtime")'
 		const clash = pythonCallPlans(FIXTURES.fixtures.document())["realtime-clash.feed.live"]?.query
 		const seen = [clash, flat.includes(typed), flat.includes(untyped)]
 		expect(seen).toEqual([{ channel: "channel", ...claimed }, true, true])

@@ -347,9 +347,10 @@ describe("the v1 Rust SDK within the budget (bit 13, G13)", () => {
  * 75 + 20% headroom = 90. Each language holds its own ceiling, set from its own measurement. An operation over it is
  * fixed in the schema, never by raising the ceiling; revisit only for a genuinely large, legitimate operation.
  * Plan 9 re-measured it over the backend's refreshed documents (76 surfaces): max 67 (surface/AsyncWsResource.join_room),
- * so 67 + 20% = 81.
+ * so 67 + 20% = 81. Backend plan 10 types the stream answers, so a socket names what it reads and sends: max 72
+ * (surface/AsyncWsResource.join_room, `TypedWebSocket[Out, In]`), so 72 + 20% = 87.
  */
-const PYTHON_SDK_CEILING = ceilingOf([67], HEADROOM)
+const PYTHON_SDK_CEILING = ceilingOf([72], HEADROOM)
 
 const PY_CLIENT = `class UsersResource:
     def get(self, id: str, *, options: RequestOptions | None = None) -> User:
@@ -417,16 +418,16 @@ describe("the v1 Python SDK within the budget (bit 14, G13)", () => {
 			ceiling: PYTHON_SDK_CEILING,
 			over: overCeiling(measured, PYTHON_SDK_CEILING),
 			surfaces: measured.tokens.size,
-		}).toEqual({ ceiling: 81, over: [], surfaces: 76 })
+		}).toEqual({ ceiling: 87, over: [], surfaces: 76 })
 	})
 
 	it("measures its largest surface where its ceiling comes from", () => {
 		const { at, tokens } = peakSurface(measuredSurfaces("python", readPython))
 		expect({ at, ceiling: PYTHON_SDK_CEILING, derived: ceilingOf([tokens], HEADROOM), tokens }).toEqual({
 			at: "surface/AsyncWsResource.join_room",
-			ceiling: 81,
-			derived: 81,
-			tokens: 67,
+			ceiling: 87,
+			derived: 87,
+			tokens: 72,
 		})
 	})
 })
@@ -670,8 +671,15 @@ describe("the Rust runtime within its byte budget (bit 13, G14)", () => {
  * Plan 55, +26 B to 91,008 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
  * Plan 9, -274 B to 90,734 B: realtime.py takes one `transport` and connects on its own copy
  * (`dataclasses.replace`), the flat reconnect and cursor keywords cut.
+ * Backend plan 10, +4,476 B to 95,210 B: typed stream messages. Dead code first: ws.py's SocketEvent is cut, and the
+ * socket's and the connection's handlers share one `Listeners` base (ws.py), not two copies. ws.py +2,487
+ * (`TypedWebSocket[Out, In]`, its `on` overloads, `Listeners`, JSON framing and dispatch, a frame that is no JSON
+ * its DecodeError); realtime.py +1,161 (`ResumableConnection[Out, In]`, `on`, the framing, the subclass the op
+ * names); events.py +590 (`SseEventOf[N, T]`, the `SseEvent` alias, a named-event stream's per-name decode);
+ * operation.py +163 (events, encode, decode, dispatch, kind); send_async.py +34, transport_sse.py +20 and
+ * transport_ws.py +21 (the events passed on, the generic spellings).
  */
-const PYTHON_RUNTIME_BYTES = 90_734
+const PYTHON_RUNTIME_BYTES = 95_210
 
 describe("the Python runtime within its byte budget (bit 14, G14)", () => {
 	it(

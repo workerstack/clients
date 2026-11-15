@@ -89,10 +89,10 @@ const TYPED = [
 	"from typing import assert_type",
 	"import http_sdk as sdk",
 	"async def run(c: sdk.AsyncSDK) -> None:",
-	'    w: sdk.TypedWebSocket = await c.rooms.socket("r", since=3, protocols=["v2"], reconnect_token="t")',
-	'    _: sdk.TypedWebSocket = await c.plain.socket(protocols=("v1",))',
+	'    w: sdk.TypedWebSocket[str | bytes, object] = await c.rooms.socket("r", since=3, protocols=["v2"], reconnect_token="t")',
+	'    _: sdk.TypedWebSocket[str | bytes, object] = await c.plain.socket(protocols=("v1",))',
 	"    async with w as same:",
-	"        assert_type(same, sdk.TypedWebSocket)",
+	"        assert_type(same, sdk.TypedWebSocket[str | bytes, object])",
 	"    assert_type(await w.recv(), str | bytes | None)",
 	"    async for message in w:",
 	"        assert_type(message, str | bytes)",
@@ -108,7 +108,7 @@ const TYPED = [
 ]
 /** The finding mypy gives at `line` of TYPED. */
 const at = (line: string, message: string) => `${TYPED.indexOf(line) + 1}: ${message}`
-const NO_OPEN = `Argument 1 to "on" of "TypedWebSocket" has incompatible type "Literal['open']"; expected "Literal['message', 'close', 'error']"  [arg-type]`
+const NO_OPEN = `No overload variant of "on" of "TypedWebSocket" matches argument types "str", overloaded function  [call-overload]`
 const NO_TOKEN2 = `Unexpected keyword argument "reconnect_token2" for "socket" of "AsyncRoomsResource"; did you mean "reconnect_token"?  [call-arg]`
 
 describe.skipIf(!PY)("a WebSocket method: an awaited TypedWebSocket over httpx2's session", SLOW, () => {

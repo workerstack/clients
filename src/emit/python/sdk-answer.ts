@@ -29,8 +29,11 @@ export function bodyType(op: SdkOp, async: boolean, env: MethodEnv): string | nu
 	return body.kind === "multipart" ? multipartBody(op, body.parts, env) : typeAt(op, "Body", body.schema, env)
 }
 
-/** What a method answers (its `Operation`'s type and its return type), and the transport call it makes. */
-export type Answer = { readonly type: string; readonly returns: string; readonly run: string }
+/**
+ * What a method answers (its `Operation`'s type and its return type), the transport call it makes, and the
+ * socket class the runtime builds for it, when it has its own.
+ */
+export type Answer = { readonly type: string; readonly returns: string; readonly run: string; readonly kind?: string }
 
 /**
  * What a streaming operation's method is: whether a declared param is one its own fields carry (Fd3), those

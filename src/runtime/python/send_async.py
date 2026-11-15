@@ -75,6 +75,7 @@ class AsyncTransport(ClientCore):
                 live,
                 decode=op.answer == "json",
                 shape=op.shape,
+                events=op.events,
                 cancel=x.options.get("cancel"),
             ),
             x.raw,

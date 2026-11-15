@@ -1,6 +1,7 @@
-"""A Python program against an SDK generated from the Kitchen example API: a client, a call and its typed error, the
-same call through ``client.safe`` narrowed by ``match``, and an event stream released through ``async with``.
-Type-checked by mypy --strict in the docs' tests."""
+"""A Python program against an SDK generated from the Kitchen example API and a small typed streaming API beside it: a
+client, a call and its typed error, the same call through ``client.safe`` narrowed by ``match``, an event stream
+released through ``async with``, and the typed streams: named SSE events, a keyed WebSocket and a keyed realtime
+connection. Type-checked by mypy --strict in the docs' tests."""
 
 import asyncio
 import os
@@ -41,6 +42,33 @@ async def first_events(client: AsyncSDK, limit: int) -> list[str]:
             if len(seen) == limit:
                 break
     return seen
+
+
+async def ticks(client: AsyncSDK) -> list[int]:
+    at: list[int] = []
+    async with await client.ticks.stream() as stream:
+        async for event in stream:
+            if event.event == "tick":  # the name narrows the data
+                at.append(event.data["at"])
+            else:
+                print("note", event.data)
+    return at
+
+
+async def chat(client: AsyncSDK) -> None:
+    async with await client.chat.open() as chat:
+        chat.on("said", lambda message: print(message["text"]))
+        chat.on("error", lambda error: print(error, file=sys.stderr))
+        await chat.send({"type": "say", "text": "hi"})
+
+
+async def room(client: AsyncSDK) -> None:
+    async with await client.room.join() as room:
+        room.on("left", lambda _: print("someone left"))
+        await room.send({"type": "say", "text": "hi"})
+        async for message in room:
+            if message["type"] == "said":
+                print(message["text"])
 
 
 async def main() -> None:

@@ -14,7 +14,7 @@ __all__ = ["WsAdapter"]
 
 
 class WsConn:
-    def __init__(self, socket: TypedWebSocket) -> None:
+    def __init__(self, socket: TypedWebSocket[str | bytes, object]) -> None:
         self.socket = socket
 
     async def recv(self) -> TransportMessage | None:

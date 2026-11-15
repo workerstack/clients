@@ -7,7 +7,14 @@
  * shadow one (S3). Spec text reaches the source only through the shared escape layer.
  */
 import type { IRParam } from "../../ir/model.ts"
-import { mediaEssence, type SdkOp, type SdkStream } from "../../ir/sdk-model.ts"
+import {
+	dispatchKey,
+	isJsonEventData,
+	mediaEssence,
+	type SdkOp,
+	type SdkStream,
+	sseEvents,
+} from "../../ir/sdk-model.ts"
 import { pyString } from "../shared/escape.ts"
 import { compareCodeUnits, NameScope, pyIdentifier } from "../shared/lang.ts"
 import { realtimeStream } from "./realtime.ts"
@@ -24,7 +31,7 @@ export type MethodEnv = {
 	readonly constants: NameScope
 	/** the `collections.abc` and runtime names client.py imports */
 	readonly imports: Set<string>
-	/** the runtime names types.py imports (a multipart body's `FilePart`) */
+	/** the runtime names types.py imports (a multipart body's `FilePart`, a named event's `SseEventOf`) */
 	readonly typesImports: Set<string>
 }
 
@@ -129,6 +136,31 @@ function acceptOf(op: SdkOp, kind: string): string | null {
 	return kind === "text" || kind === "binary" ? mediaEssence(op.success.contentType as string) : null
 }
 
+/** The names of the events whose data is JSON, for an SSE op that names its events (D7); null for any other. */
+function jsonEvents(op: SdkOp, env: MethodEnv): string | null {
+	const events = op.stream === "sse" ? sseEvents(op.ir) : undefined
+	if (events === undefined) return null
+	return tuple(
+		events.filter(({ data }) => isJsonEventData(data, env.at.names.resolve)).map(({ name }) => pyString(name)),
+	)
+}
+
+/**
+ * How a WebSocket or realtime op's runtime frames its messages: JSON-encode every send when it declares what the
+ * server receives, parse every frame when it declares what the server sends, and the key that parsed union
+ * dispatches on (D9).
+ */
+function framing(op: SdkOp, env: MethodEnv): [string, string | null][] {
+	const socket = op.stream === "ws" || op.stream === "realtime"
+	const { receive, send } = (socket ? op.ir.messages : undefined) ?? {}
+	const key = send === undefined ? undefined : dispatchKey(send, env.at.names.resolve)
+	return [
+		["encode", receive === undefined ? null : "True"],
+		["decode", send === undefined ? null : "True"],
+		["dispatch", key === undefined ? null : pyString(key)],
+	]
+}
+
 /** The `Operation(…)` keywords that differ from its defaults, in its field order. */
 function namedArgs(parts: Parts, env: MethodEnv): string[] {
 	const { answer, headers, op } = parts
@@ -145,6 +177,9 @@ function namedArgs(parts: Parts, env: MethodEnv): string[] {
 		["invalidates", op.invalidates.length > 0 ? tuple(op.invalidates.map(pyString)) : null],
 		["stream", op.stream === null ? null : pyString(op.stream)],
 		["headers", headers === null ? null : tuple(headers.read)],
+		["events", jsonEvents(op, env)],
+		...framing(op, env),
+		["kind", answer.kind ?? null],
 	]
 	return named.flatMap(([key, value]) => (value === null ? [] : [`${key}=${value}`]))
 }
@@ -212,10 +247,10 @@ function methodLines(parts: Parts, async: boolean, env: MethodEnv, shadowed: Rea
 	]
 }
 
-/** The runtime and `collections.abc` names `op`'s methods spell. */
-function noteImports(op: SdkOp, env: MethodEnv): void {
+/** The runtime and `collections.abc` names `op`'s methods spell: none for a socket of its own class. */
+function noteImports(op: SdkOp, answer: Answer, env: MethodEnv): void {
 	const names = { realtime: "ResumableConnection", sse: "EventStream", ws: "TypedWebSocket" }
-	if (op.stream !== null) env.imports.add(names[op.stream])
+	if (op.stream !== null && answer.kind === undefined) env.imports.add(names[op.stream])
 	if (op.stream === "ws") env.imports.add("Sequence")
 	if (op.stream === "realtime") env.imports.add("TransportOpts")
 }
@@ -228,7 +263,7 @@ export function pyMethod(op: SdkOp, name: string, env: MethodEnv): PyMethod {
 	const answer = op.stream === null ? answerOf(op, env) : STREAMS[op.stream].answer(op, env)
 	const constant = env.constants.claim(`_${pyIdentifier(op.id).toUpperCase()}`)
 	const parts: Parts = { answer, constant, headers: responseHeaders(op, env), keywords, name, op, path }
-	noteImports(op, env)
+	noteImports(op, answer, env)
 	env.imports.add("Operation").add("RequestOptions")
 	const by = (where: Keyword["where"]) =>
 		Object.fromEntries(keywords.filter((k) => k.where === where).map(({ ident, param }) => [param.name, ident]))

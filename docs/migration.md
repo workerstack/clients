@@ -113,6 +113,35 @@ async def health(client: AsyncSDK) -> str:
             return f"answered {response.status}: {error}"
 ```
 
+## The Python SDK's stream classes are generic in what they read and send
+
+`SseEvent`, `TypedWebSocket` and `ResumableConnection` now take the types of what they read and send. A
+spelled-out annotation needs them: write `TypedWebSocket[str | bytes, object]` for a bare `TypedWebSocket`, and
+`ResumableConnection[T, object]` for `ResumableConnection[T]`. `SseEvent[T]` is unchanged; it names
+`SseEventOf[str | None, T]`. An operation the document types now answers its own types:
+
+- An SSE operation with named events yields `<Op>Event`, a union of `SseEventOf[Literal[name], Data]`. Its
+  `event` is never `None`: an unnamed event reads `"message"`. Each JSON event's data is parsed by its name.
+- A WebSocket operation with declared messages answers `TypedWebSocket[Out, In]`, and a realtime one
+  `ResumableConnection[Out, In]`: `recv()` reads `Out | None`, `send` takes `In` and sends every value as JSON,
+  text too. A frame that is not JSON raises `DecodeError` from `recv()`, and the socket stays open; it read as text
+  before.
+- When the server's messages are a union keyed on one field, the answer is `<Op>Socket` or `<Op>Connection`, whose
+  `on("<value>", handler)` takes a handler of that member's type.
+
+```text v0
+async def talk(self, ...) -> TypedWebSocket:                   # recv() -> str | bytes | None; send(data: object)
+async def room(self, ...) -> ResumableConnection[Any]:         # recv() -> Any | None
+async def list(self, ...) -> EventStream[str]:                 # event.event: str | None
+```
+
+```text
+async def talk(self, ...) -> WsTalkSocket:                     # TypedWebSocket[WsTalkSend, WsTalkReceive]
+async def room(self, ...) -> RtRoomConnection:                 # ResumableConnection[RtRoomSend, RtRoomReceive]
+async def list(self, ...) -> EventStream[OutSseListEvent]:     # SseEventOf[Literal["data"], OutSseListData] | ...
+async def echo(self, ...) -> TypedWebSocket[str | bytes, object]:  # an operation without messages
+```
+
 ## The Go SDK's `throwOnError` is gone; its safe mode is `client.Safe()`, answering a `Result`
 
 The Go generator has no `throwOnError` option: delete it. Every

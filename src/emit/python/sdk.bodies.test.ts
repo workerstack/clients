@@ -214,7 +214,7 @@ describe("streams beside calls", () => {
 		}).toEqual({
 			headers: {},
 			signature: [
-				"    async def connect(self, *, transport: TransportOpts | None = None, options: RequestOptions | None = None) -> ResumableConnection[Any]:",
+				"    async def connect(self, *, transport: TransportOpts | None = None, options: RequestOptions | None = None) -> ResumableConnection[Any, object]:",
 			],
 		})
 	})

@@ -421,7 +421,7 @@ describe.skipIf(!PY)("the Python test driver: how a WebSocket read ends", SLOW, 
 	})
 })
 
-describe.skipIf(!PY)("the Python test driver: realtime, ResumableConnection[T]", SLOW, () => {
+describe.skipIf(!PY)("the Python test driver: realtime, ResumableConnection[Out, In]", SLOW, () => {
 	it("opens over WebSocket with the resume cursor, sends the grid's JSON, reads take frames, and traces the settled cursor", async () => {
 		const reply = ws([
 			{ receive: 1 },

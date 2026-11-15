@@ -120,6 +120,43 @@ fn health_blocking(client: &Client) -> Result<(), String> {
                 break
 ```
 
+A stream the document types is typed end to end. An SSE operation with named events yields a union of
+`SseEventOf[Literal[name], Data]`, so checking `event.event` narrows `event.data`, each JSON event parsed by its name;
+an unnamed event reads `event == "message"`. A WebSocket or realtime operation with declared messages sends what the
+server receives and reads what it sends, every send JSON. When those are a union keyed on one field, `on("<value>")`
+takes a handler of that member's type. A socket's frame that is not JSON reaches `on("error")` and raises
+`DecodeError` from `recv()`, and the socket stays open; a realtime connection raises it the same way and reads on. A
+member named like a socket event (`message`, `close`, `error`; on realtime only `message`) is heard only through
+`on("message")`. This excerpt runs against the small streaming API the TypeScript one calls.
+
+```python
+async def ticks(client: AsyncSDK) -> list[int]:
+    at: list[int] = []
+    async with await client.ticks.stream() as stream:
+        async for event in stream:
+            if event.event == "tick":  # the name narrows the data
+                at.append(event.data["at"])
+            else:
+                print("note", event.data)
+    return at
+
+
+async def chat(client: AsyncSDK) -> None:
+    async with await client.chat.open() as chat:
+        chat.on("said", lambda message: print(message["text"]))
+        chat.on("error", lambda error: print(error, file=sys.stderr))
+        await chat.send({"type": "say", "text": "hi"})
+
+
+async def room(client: AsyncSDK) -> None:
+    async with await client.room.join() as room:
+        room.on("left", lambda _: print("someone left"))
+        await room.send({"type": "say", "text": "hi"})
+        async for message in room:
+            if message["type"] == "said":
+                print(message["text"])
+```
+
 ## C#
 
 `await using` disposes a stream, and with it its connection.
