@@ -22,7 +22,7 @@ import sseItemSchema from "../../../ir/__fixtures__/specs/streams/sse-item-schem
 import wsKeyed from "../../../ir/__fixtures__/specs/streams/ws-keyed.json" with { type: "json" }
 import wsMessages from "../../../ir/__fixtures__/specs/streams/ws-messages.json" with { type: "json" }
 import { adversarialCorpus } from "../../shared/__fixtures__/adversarial-corpus.ts"
-import { docsDocument } from "../../shared/__fixtures__/docs-blocks.ts"
+import { docsStreamsDocument } from "../../shared/__fixtures__/docs-blocks.ts"
 import { longNames } from "../../shared/__fixtures__/documents-long.ts"
 import { errors } from "../../shared/__fixtures__/documents-http.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
@@ -87,26 +87,6 @@ function fixtures(): Readonly<Record<string, unknown>> {
 	})
 }
 
-type Spec = { readonly paths: object; readonly components?: { readonly schemas?: object } }
-
-/**
- * The docs' examples' API: the Kitchen e2e app's document, and beside it the typed stream fixtures TypeScript's
- * recipe calls as `Streams` (named SSE events, a keyed WebSocket and a keyed realtime connection), whose paths,
- * operation ids and schemas the Kitchen document does not use.
- */
-function docs(): Readonly<Record<string, unknown>> {
-	const kitchen = docsDocument() as Spec & Record<string, unknown>
-	const added: readonly Spec[] = [sseItemSchema, wsKeyed, realtimeKeyed]
-	return {
-		...kitchen,
-		components: {
-			...kitchen.components,
-			schemas: Object.assign({}, kitchen.components?.schemas, ...added.map((spec) => spec.components?.schemas)),
-		},
-		paths: Object.assign({}, kitchen.paths, ...added.map((spec) => spec.paths)),
-	}
-}
-
 /**
  * The typed streams as one document: an SSE stream with an item schema, a WebSocket and a realtime connection with
  * message schemas, and their keyed unions (`src/ir/__fixtures__/specs/streams/`), each under its own key.
@@ -142,7 +122,7 @@ export const FIXTURES = {
 	},
 	/** the declared error keys (G6/G7): bit 13's `errors` document, shared (contract 29 §4.3) */
 	/** the docs' examples: the Kitchen e2e app's document and the typed streams (docs/sdk-recipes.md, docs/examples/) */
-	docs: { document: docs },
+	docs: { document: docsStreamsDocument },
 	errors: { document: errors },
 	fixtures: { document: fixtures },
 	/** the HTTP runtime's document (contract 29 §4.3): bit 13's `http` and three Python-only paths, both modes */

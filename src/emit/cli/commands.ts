@@ -131,7 +131,8 @@ function streamLines(call: string, stream: NonNullable<GoCallPlan["stream"]>): s
 			"\t\tif err != nil {",
 			"\t\t\treturn failed(err)",
 			"\t\t}",
-			"\t\tif !out.Event(event.Event, event.ID, event.Data) {",
+			"\t\tev := event.Untyped()",
+			"\t\tif !out.Event(ev.Event, ev.ID, ev.Data) {",
 			"\t\t\tbreak",
 			"\t\t}",
 			"\t}",
@@ -143,7 +144,9 @@ function streamLines(call: string, stream: NonNullable<GoCallPlan["stream"]>): s
 		"\tif err != nil {",
 		"\t\treturn failed(err)",
 		"\t}",
-		stream === "realtime" ? "\treturn failed(out.Resume(conn))" : "\treturn out.Converse(conn)",
+		stream === "realtime"
+			? "\treturn failed(cli.Resume(out, conn, conn.Events()))"
+			: "\treturn cli.Converse(out, conn, conn.Read)",
 	]
 }
 

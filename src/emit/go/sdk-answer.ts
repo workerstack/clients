@@ -9,8 +9,16 @@ import type { StreamOpts } from "./sdk-opts.ts"
 /** How a method answers: its return types, the values it fails with, and the statements that send `c` from the `*Client` at `client`. */
 export type Shape = { readonly returns: string; readonly fail: string; readonly tail: (client: string) => string[] }
 
-/** What a streaming operation's method is: how it answers, what its Opts add, and the note its godoc ends on. */
-export type GoStream = { readonly shape: Shape; readonly opts: StreamOpts; readonly doc: string }
+/**
+ * What a streaming operation's method is: how it answers, what its Opts add, the note its godoc ends on, and the
+ * package-level functions declared for it that its body calls, which a path param never shadows.
+ */
+export type GoStream = {
+	readonly shape: Shape
+	readonly opts: StreamOpts
+	readonly doc: string
+	readonly calls: readonly string[]
+}
 
 /** The runtime call's arguments: the ctx, the client's config, the call, each of `extra`, then the per-call options. */
 export const sendArgs = (client: string, ...extra: string[]) =>

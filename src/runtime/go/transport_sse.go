@@ -95,9 +95,9 @@ func checkEventStream(resp *http.Response) error {
 }
 
 type sseResult struct {
-	value any
-	id    string
-	err   error
+	data []byte
+	id   string
+	err  error
 }
 
 type sseConn struct {
@@ -119,7 +119,7 @@ func (c *sseConn) run(ctx context.Context) {
 	for ev, err := range parseSSEStream(ctx, c.resp) {
 		r := sseResult{err: err}
 		if err == nil {
-			r.value, r.id = decodePayload([]byte(ev.Data)), ev.ID
+			r.data, r.id = []byte(ev.Data), ev.ID
 		}
 		select {
 		case c.next <- r:
@@ -141,7 +141,7 @@ func (c *sseConn) finish() {
 	}
 }
 
-func (c *sseConn) Recv(ctx context.Context) (any, error) {
+func (c *sseConn) Recv(ctx context.Context) ([]byte, error) {
 	select {
 	case r, ok := <-c.next:
 		if !ok {
@@ -152,7 +152,7 @@ func (c *sseConn) Recv(ctx context.Context) (any, error) {
 			c.lastID = r.id
 			c.mu.Unlock()
 		}
-		return r.value, r.err
+		return r.data, r.err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}

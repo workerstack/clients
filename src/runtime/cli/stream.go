@@ -149,38 +149,45 @@ func (e *Closed) Error() string {
 	return fmt.Sprintf("the server closed the connection: %d %s", e.Code, e.Reason)
 }
 
-// Feed is a realtime connection as the SDK opens it.
+// Feed is a realtime connection as the SDK opens it, whatever its messages' types.
 type Feed interface {
-	Events() <-chan any
 	Errors() <-chan error
 	Cursor() (lastEventID, reconnectToken string)
 	Close() error
 }
 
-// Resume prints each event a realtime feed delivers until it ends, --take is met or the run is
+// Resume prints each message of events, the feed's, until it ends, --take is met or the run is
 // interrupted; then its cursor, to resume from.
-func (s *Stream) Resume(feed Feed) error {
-	err := s.follow(feed)
+func Resume[T any](s *Stream, feed Feed, events <-chan T) error {
+	err := follow(s, feed, events)
 	feed.Close()
 	s.Cursor(feed.Cursor())
 	return err
 }
 
-func (s *Stream) follow(feed Feed) error {
+// printed is a message as the CLI prints it: bytes or a string as text, any other value as JSON.
+func printed(message any) any {
+	switch v := message.(type) {
+	case []byte:
+		return textOf(v)
+	case string:
+		return textOf([]byte(v))
+	}
+	return message
+}
+
+func follow[T any](s *Stream, feed Feed, events <-chan T) error {
 	for {
 		select {
 		case <-s.c.Context().Done():
 			return nil
 		case err := <-feed.Errors():
 			return err
-		case v, ok := <-feed.Events():
+		case v, ok := <-events:
 			if !ok {
 				return nil
 			}
-			if text, isText := v.(string); isText {
-				v = textOf([]byte(text))
-			}
-			if !s.Write(v) {
+			if !s.Write(printed(v)) {
 				return s.err
 			}
 		}

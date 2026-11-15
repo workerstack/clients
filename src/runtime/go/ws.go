@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -62,20 +63,35 @@ func keepAlive(conn *websocket.Conn, every time.Duration) func() {
 	return stop
 }
 
-// TypedWebSocket is an operation's WebSocket: Send and Read, plus On handlers as the TypeScript
-// client's escape hatch. Its dial runs no OnRequest or OnResponse hook, and a refused handshake's
-// 401 is its error, with no OnAuthExpired refresh.
-type TypedWebSocket struct {
-	conn     *websocket.Conn
-	stop     func()
-	mu       sync.Mutex
-	handlers map[string][]func(data []byte)
-	closed   bool
+// TypedWebSocket is an operation's WebSocket: Send writes what the server receives (Out), Read
+// returns what it sends (In), and OnMessage, OnClose and OnError handlers run beside Read. A typed
+// socket sends every message as JSON and parses every frame; SendText writes a text frame as is.
+// Its dial runs no OnRequest or OnResponse hook, and a refused handshake's 401 is its error, with
+// no OnAuthExpired refresh.
+type TypedWebSocket[In, Out any] struct {
+	conn      *websocket.Conn
+	stop      func()
+	read      func([]byte) (In, error)
+	write     func(Out) (any, error)
+	onMessage handlers[In]
+	onClose   handlers[string]
+	onError   handlers[error]
+	closed    sync.Once
 }
 
-// dialWebSocket opens the call's WebSocket with the client's auth, headers and redirect policy. A
-// refused handshake with an error status is a typed error, as for any other call.
-func dialWebSocket(ctx context.Context, cfg Config, c *call, opts []RequestOption) (*TypedWebSocket, error) {
+// dialWebSocket opens the call's WebSocket with the client's auth, headers and redirect policy,
+// reading each frame by read and writing each message by write. A refused handshake with an
+// error status is a typed error, as for any other call.
+func dialWebSocket[In, Out any](ctx context.Context, cfg Config, c *call, read func([]byte) (In, error), write func(Out) (any, error), opts []RequestOption) (*TypedWebSocket[In, Out], error) {
+	conn, err := dialSocket(ctx, cfg, c, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &TypedWebSocket[In, Out]{conn: conn, stop: keepAlive(conn, cfg.WSKeepalive), read: read, write: write}, nil
+}
+
+// dialSocket opens the call's WebSocket as the client calls; an error status is its *APIError.
+func dialSocket(ctx context.Context, cfg Config, c *call, opts []RequestOption) (*websocket.Conn, error) {
 	rc := newRequestConfig(cfg, opts)
 	u, err := buildURL(rc.baseURL, c.path, c.query)
 	if err != nil {
@@ -98,41 +114,33 @@ func dialWebSocket(ctx context.Context, cfg Config, c *call, opts []RequestOptio
 		return nil, wrapTransportError(ctx, err)
 	}
 	rc.deliver(resp, nil)
-	return newTypedWebSocket(conn, cfg.WSKeepalive), nil
-}
-
-func newTypedWebSocket(conn *websocket.Conn, every time.Duration) *TypedWebSocket {
 	conn.SetReadLimit(defaultWSReadLimit)
-	return &TypedWebSocket{conn: conn, stop: keepAlive(conn, every), handlers: map[string][]func(data []byte){}}
+	return conn, nil
 }
 
 // SetReadLimit sets the largest inbound message, in bytes (default 16 MiB).
-func (w *TypedWebSocket) SetReadLimit(n int64) {
+func (w *TypedWebSocket[In, Out]) SetReadLimit(n int64) {
 	w.conn.SetReadLimit(n)
 }
 
-// Send writes a []byte as a binary frame, a string as a text frame, and anything else as JSON text.
-func (w *TypedWebSocket) Send(ctx context.Context, data any) error {
-	return writeFrame(ctx, w.conn, data)
-}
-
-func writeFrame(ctx context.Context, conn *websocket.Conn, data any) error {
-	switch v := data.(type) {
-	case []byte:
-		return conn.Write(ctx, websocket.MessageBinary, v)
-	case string:
-		return conn.Write(ctx, websocket.MessageText, []byte(v))
-	}
-	encoded, err := json.Marshal(data)
+// Send writes one message: as JSON text on a typed socket; on an untyped one a []byte as a binary
+// frame, a string as a text frame, and anything else as JSON text.
+func (w *TypedWebSocket[In, Out]) Send(ctx context.Context, msg Out) error {
+	data, err := w.write(msg)
 	if err != nil {
 		return err
 	}
-	return conn.Write(ctx, websocket.MessageText, encoded)
+	return writeFrame(ctx, w.conn, data)
+}
+
+// SendText writes text as one text frame, as is.
+func (w *TypedWebSocket[In, Out]) SendText(ctx context.Context, text string) error {
+	return w.conn.Write(ctx, websocket.MessageText, []byte(text))
 }
 
 // Close sends a close frame with code and reason, the reason cut at a rune boundary to fit 123
 // bytes. On a conn already closed it returns nil.
-func (w *TypedWebSocket) Close(code websocket.StatusCode, reason string) error {
+func (w *TypedWebSocket[In, Out]) Close(code websocket.StatusCode, reason string) error {
 	for len(reason) > maxCloseReason {
 		_, size := utf8.DecodeLastRuneInString(reason)
 		reason = reason[:len(reason)-size]
@@ -146,51 +154,139 @@ func (w *TypedWebSocket) Close(code websocket.StatusCode, reason string) error {
 	return err
 }
 
-// Read returns the next message. A close frame fires the "close" handlers with its reason; any
-// other failure fires "error" with the error text.
-func (w *TypedWebSocket) Read(ctx context.Context) ([]byte, error) {
-	_, msg, err := w.conn.Read(ctx)
+// Read returns the next message and hands it to the OnMessage handlers. A frame that does not
+// parse is a *DecodeError, handed to OnError, and the socket stays open. A close frame fires
+// OnClose with its reason (the code is in the error: websocket.CloseStatus(err)); any other
+// failure fires OnError.
+func (w *TypedWebSocket[In, Out]) Read(ctx context.Context) (In, error) {
+	var zero In
+	_, frame, err := w.conn.Read(ctx)
 	if err != nil {
 		w.stop()
 		var ce websocket.CloseError
 		if errors.As(err, &ce) {
 			w.fireClose(ce.Reason)
 		} else {
-			w.fanout("error", []byte(err.Error()))
+			w.onError.call(err)
 		}
-		return nil, err
+		return zero, err
 	}
-	w.fanout("message", msg)
+	msg, err := w.read(frame)
+	if err != nil {
+		err = frameError("WebSocket frame", err)
+		w.onError.call(err)
+		return zero, err
+	}
+	w.onMessage.call(msg)
 	return msg, nil
 }
 
-// On registers a handler for "message", "close" or "error". It receives the raw bytes; prefer a
-// Read loop for typed dispatch. A "close" handler gets the reason; the code is in Read's error:
-// websocket.CloseStatus(err).
-func (w *TypedWebSocket) On(event string, handler func(data []byte)) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.handlers[event] = append(w.handlers[event], handler)
+// OnMessage registers a handler for each message Read returns.
+func (w *TypedWebSocket[In, Out]) OnMessage(handler func(msg In)) { w.onMessage.add(handler) }
+
+// OnClose registers a handler for the close, with its reason; it runs once.
+func (w *TypedWebSocket[In, Out]) OnClose(handler func(reason string)) { w.onClose.add(handler) }
+
+// OnError registers a handler for a frame that does not parse and for a read that fails.
+func (w *TypedWebSocket[In, Out]) OnError(handler func(err error)) { w.onError.add(handler) }
+
+func (w *TypedWebSocket[In, Out]) fireClose(reason string) {
+	w.closed.Do(func() { w.onClose.call(reason) })
 }
 
-func (w *TypedWebSocket) fireClose(reason string) {
-	w.mu.Lock()
-	if w.closed {
-		w.mu.Unlock()
-		return
-	}
-	w.closed = true
-	w.mu.Unlock()
-	w.fanout("close", []byte(reason))
+// handlers is a list of callbacks, registered and called from any goroutine.
+type handlers[T any] struct {
+	mu   sync.Mutex
+	list []func(T)
 }
 
-func (w *TypedWebSocket) fanout(event string, data []byte) {
-	w.mu.Lock()
-	handlers := append([]func([]byte){}, w.handlers[event]...)
-	w.mu.Unlock()
-	for _, h := range handlers {
-		h(data)
+func (h *handlers[T]) add(handler func(T)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.list = append(h.list, handler)
+}
+
+// call runs each handler registered when it starts with v.
+func (h *handlers[T]) call(v T) {
+	h.mu.Lock()
+	calls := append([]func(T){}, h.list...)
+	h.mu.Unlock()
+	for _, handler := range calls {
+		handler(v)
 	}
+}
+
+// frameBytes reads a frame as sent: an untyped socket's messages.
+func frameBytes(data []byte) ([]byte, error) { return data, nil }
+
+// framePayload reads a frame as its JSON value, or its text when it is not JSON: an untyped
+// connection's messages.
+func framePayload(data []byte) (any, error) {
+	var v any
+	if json.Unmarshal(data, &v) != nil {
+		return string(data), nil
+	}
+	return v, nil
+}
+
+// frameJSON reads a frame as JSON decoded into T.
+func frameJSON[T any](data []byte) (T, error) {
+	var msg T
+	err := json.Unmarshal(data, &msg)
+	return msg, err
+}
+
+// frameKey is the string a JSON frame holds at key, "" when it is not an object holding a string
+// there; a frame that is no JSON is its syntax error.
+func frameKey(data []byte, key string) (string, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		var syntax *json.SyntaxError
+		if errors.As(err, &syntax) {
+			return "", err
+		}
+		return "", nil
+	}
+	var value string
+	_ = json.Unmarshal(fields[key], &value) // no string there: no member's value
+	return value, nil
+}
+
+// frameError is a frame, named what, that did not decode: a *DecodeError with no response.
+func frameError(what string, err error) error {
+	var syntax *json.SyntaxError
+	if errors.As(err, &syntax) {
+		return &DecodeError{Err: fmt.Errorf("%s is not valid JSON: %w", what, err)}
+	}
+	return &DecodeError{Err: fmt.Errorf("%s does not decode: %w", what, err)}
+}
+
+// messageAsIs writes an untyped message as given: a []byte as a binary frame, a string as text,
+// anything else as JSON.
+func messageAsIs(msg any) (any, error) { return msg, nil }
+
+// messageJSON writes a typed message as JSON, whatever its Go type.
+func messageJSON[T any](msg T) (any, error) {
+	data, err := json.Marshal(msg)
+	return json.RawMessage(data), err
+}
+
+// writeFrame writes data as one frame: a []byte binary, a string or json.RawMessage text as is,
+// anything else as JSON text.
+func writeFrame(ctx context.Context, conn *websocket.Conn, data any) error {
+	switch v := data.(type) {
+	case []byte:
+		return conn.Write(ctx, websocket.MessageBinary, v)
+	case string:
+		return conn.Write(ctx, websocket.MessageText, []byte(v))
+	case json.RawMessage:
+		return conn.Write(ctx, websocket.MessageText, v)
+	}
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return conn.Write(ctx, websocket.MessageText, encoded)
 }
 
 // toWsURL swaps an http(s) scheme for ws(s); a URL inside the query is untouched.

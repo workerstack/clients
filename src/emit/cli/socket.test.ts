@@ -115,7 +115,7 @@ describe.skipIf(!GO)("a realtime command (phase d)", SLOW, () => {
 	beforeAll(() => void built(), SLOW.timeout)
 
 	it(
-		"prints each event, writes its cursor to stderr at the end, and resumes from it on the next run",
+		"prints each event as its declared type, writes its cursor to stderr at the end, and resumes from it on the next run",
 		HOLD,
 		async () => {
 			const first = await call(["feed", "live", "--take", "2"], [ws([...frames(1, 2), { waitMs: 60_000 }])])
@@ -141,7 +141,8 @@ describe.skipIf(!GO)("a realtime command (phase d)", SLOW, () => {
 				dialed: "/feed?last_event_id=e2&reconnect_token=t2",
 				first: [
 					0,
-					'{"id":"e1","n":1,"reconnect_token":"t1"}\n{"id":"e2","n":2,"reconnect_token":"t2"}\n',
+					/* the event schema declares n only: the cursor fields resume the feed and print no more */
+					'{"n":1}\n{"n":2}\n',
 					{ lastEventId: "e2", reconnectToken: "t2" },
 				],
 				second: [0, { resume: { lastEventId: "e3", reconnectToken: "t3" } }],

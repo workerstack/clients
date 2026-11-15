@@ -57,7 +57,7 @@ type longpollConn struct {
 
 func (c *longpollConn) Kind() TransportKind { return TransportLongpoll }
 
-func (c *longpollConn) Recv(ctx context.Context) (any, error) {
+func (c *longpollConn) Recv(ctx context.Context) ([]byte, error) {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -90,13 +90,12 @@ func (c *longpollConn) Recv(ctx context.Context) (any, error) {
 	if err := raiseForStatus(resp, body); err != nil {
 		return nil, err
 	}
-	v := decodePayload(body)
-	if id, token := payloadCursor(v); id != "" || token != "" {
+	if id, token := payloadCursor(body); id != "" || token != "" {
 		c.mu.Lock()
 		advanceCursor(&c.cursor, id, token)
 		c.mu.Unlock()
 	}
-	return v, nil
+	return body, nil
 }
 
 // advanceCursor moves a resume cursor to the non-empty id and token.

@@ -173,14 +173,20 @@ goDescribe("an SSE method: iter.Seq2[SSEEvent[T], error], T from the declared ev
 	}, 600_000)
 
 	// v0: b857f94d20
-	it("ends a typed stream on data that does not decode: the events before it, then a decode error, never a string", async () => {
+	it("ends a typed stream on data that does not decode: the events before it, then a *DecodeError, never a string", async () => {
 		const reply = sse(['data: {"n":1}\n\n', "data: nope\n\n"])
 		const { run } = await drive(sseSdk(), [reply], [ticks()], { script: {} })
 		const call = run.trace?.calls[0]
 		expect(
 			{ error: call?.error && { sdk: sdkTypes(call.error), text: call.error.text, via: call.error.via } },
 			run.stderr,
-		).toEqual({ error: { sdk: [], text: expect.stringMatching(/^httpsdk: decode sse event:/), via: "stream" } })
+		).toEqual({
+			error: {
+				sdk: ["*sdk.DecodeError"],
+				text: expect.stringMatching(/^httpsdk: decode response: sse event: /),
+				via: "stream",
+			},
+		})
 		expect({ observed: run.observed, stream: call?.stream }).toEqual({
 			observed: [TICKED],
 			stream: { retry: [0], yields: 2 },

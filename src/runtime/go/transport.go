@@ -101,10 +101,11 @@ func (o *TransportOpts) maxMessageBytes() int64 {
 	return o.MaxMessageBytes
 }
 
-// TransportConn is one live transport connection. Recv returns the decoded JSON payload, or the
-// raw text when it is not JSON.
+// TransportConn is one live transport connection. Recv returns one message's bytes, as sent; the
+// connection decodes them. Send writes a []byte, a string or a json.RawMessage as is (a []byte a
+// binary frame on WebSocket) and any other value as JSON.
 type TransportConn interface {
-	Recv(ctx context.Context) (any, error)
+	Recv(ctx context.Context) ([]byte, error)
 	Send(ctx context.Context, data any) error
 	Close() error
 	Kind() TransportKind
@@ -123,16 +124,18 @@ type cursorConn interface {
 	lastEventID() string
 }
 
-// payloadCursor reads a resume cursor from a delivered payload: its reconnect_token, and its
-// last_event_id or id (a string or a number).
-func payloadCursor(v any) (id, token string) {
-	m, ok := v.(map[string]any)
-	if !ok {
+// payloadCursor reads a resume cursor from a delivered message's bytes, a JSON object: its
+// reconnect_token, and its last_event_id or id (a string or a number).
+func payloadCursor(data []byte) (id, token string) {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) != nil {
 		return "", ""
 	}
-	token, _ = m["reconnect_token"].(string)
+	_ = json.Unmarshal(fields["reconnect_token"], &token) // absent or no string: no token
 	for _, key := range []string{"id", "last_event_id"} {
-		switch x := m[key].(type) {
+		var v any
+		_ = json.Unmarshal(fields[key], &v) // absent: nil, no id
+		switch x := v.(type) {
 		case string:
 			id = x
 		case float64:
@@ -162,15 +165,6 @@ func withQuery(u string, opts *TransportOpts, lastIDParam bool) string {
 		sep = "&"
 	}
 	return u + sep + q.Encode()
-}
-
-// decodePayload is the JSON value of data, or its text when it is not JSON.
-func decodePayload(data []byte) any {
-	var v any
-	if json.Unmarshal(data, &v) != nil {
-		return string(data)
-	}
-	return v
 }
 
 // WsTransport is the default WebSocket adapter.
@@ -217,13 +211,13 @@ type wsConn struct {
 
 func (c *wsConn) Kind() TransportKind { return TransportWs }
 
-func (c *wsConn) Recv(ctx context.Context) (any, error) {
+func (c *wsConn) Recv(ctx context.Context) ([]byte, error) {
 	_, data, err := c.conn.Read(ctx)
 	if err != nil {
 		c.stop()
 		return nil, err
 	}
-	return decodePayload(data), nil
+	return data, nil
 }
 
 func (c *wsConn) Send(ctx context.Context, data any) error { return writeFrame(ctx, c.conn, data) }

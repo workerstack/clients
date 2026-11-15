@@ -3,7 +3,7 @@
  * every Go block on a docs page is a verbatim excerpt of it (bit 20).
  */
 import { describe, expect, it } from "vitest"
-import { allBlocks, docsDocument, exampleOf, strayExcerpts } from "../shared/__fixtures__/docs-blocks.ts"
+import { allBlocks, docsStreamsDocument, exampleOf, strayExcerpts } from "../shared/__fixtures__/docs-blocks.ts"
 import { compileGo } from "./__fixtures__/compiled.ts"
 import { withGo } from "./__fixtures__/go-env.ts"
 import { generateGoSdk } from "./sdk.ts"
@@ -24,7 +24,7 @@ describe("the docs' Go example", () => {
 
 	// v0: 2ef25d029e
 	it.skipIf(!GO)("builds and vets against the generated SDK", SLOW, () => {
-		const built = compileGo(generateGoSdk(docsDocument()).files, { main: program })
+		const built = compileGo(generateGoSdk(docsStreamsDocument()).files, { main: program })
 		expect([built.built, built.vet, built.built ? "" : built.stderr]).toEqual([true, [], ""])
 	})
 })

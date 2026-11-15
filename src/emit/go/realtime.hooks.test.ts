@@ -35,7 +35,7 @@ const DOCUMENT = {
 }
 
 const DECLS = `
-func take(rc *sdk.ResumableConnection, n int) string {
+func take[In, Out any](rc *sdk.ResumableConnection[In, Out], n int) string {
 	values := []any{}
 	deadline := time.After(5 * time.Second)
 	for len(values) < n {
@@ -102,7 +102,8 @@ const polled = (n: number): Reply => ({ json: { n }, status: 200 })
 describe.skipIf(!GO)("a Go realtime connection's HTTP dials run the client's hooks (bit 19 e)", () => {
 	it("runs OnRequest and OnResponse once per event-stream dial and reconnect, none for the WebSocket dials", async () => {
 		expect(await run([unavailable, stream(1, "drop"), unavailable, stream(2, "hold")])).toEqual([
-			'[{"n":1,"reconnect_token":"t1"},{"n":2,"reconnect_token":"t2"}]',
+			/* each event typed as the declared {n}: the token it held still resumes the reconnect */
+			'[{"n":1},{"n":2}]',
 			"request /feed",
 			"response 200",
 			"request /feed?reconnect_token=t1",

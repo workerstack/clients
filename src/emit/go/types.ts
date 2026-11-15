@@ -5,12 +5,13 @@
  * the shared escape layer.
  */
 import type { IR, IRField, IRScalarType, IRSchema } from "../../ir/model.ts"
+import type { Dispatch } from "../../ir/sdk-model.ts"
 import { goString } from "../shared/escape.ts"
 import { compareCodeUnits, goExported, NameScope } from "../shared/lang.ts"
 import { irNames, plainNames } from "./types-names.ts"
 import { isNilable } from "./types-codec.ts"
 import { isTagName, type StructField, structDecl } from "./types-struct.ts"
-import { unionDecl } from "./types-union.ts"
+import { unionDecl, variantTypes } from "./types-union.ts"
 
 /** Package-level naming shared by every type one SDK declares. */
 export type GoTypeNames = {
@@ -226,4 +227,17 @@ export function goTopLevel(name: string, ir: IRSchema, at: GoTypeContext): strin
 	}
 	/* a map or an empty struct is a named type; anything else an alias */
 	return `type ${name} ${ir.kind === "object" ? "" : "= "}${use(ir, member(name, at, "Value"))}`
+}
+
+/**
+ * Each member of the keyed union `schema` (D9) as its value beside its Go type: a component's struct names its
+ * members; an inline union, raw JSON in a struct, hoists each inline member into `at` as `<Parent><Field><Value>`.
+ */
+export function goKeyedMembers(schema: IRSchema, dispatch: Dispatch, at: GoTypeContext): (readonly [string, string])[] {
+	const name =
+		schema.kind === "ref" ? at.names.ref(schema.name) : `${goExported(at.parentName)}${goExported(at.fieldName)}`
+	/* a mapping names refs only, whose type is their component's: the key alone names each inline member */
+	const union = { ...dispatch.union, discriminator: { propertyName: dispatch.key } }
+	const types = variantTypes(name, union, at.names, (variant, key, base) => declare(variant, at, key, base))
+	return dispatch.members.map(({ value }, i) => [value, types[i] as string])
 }

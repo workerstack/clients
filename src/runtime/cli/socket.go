@@ -10,17 +10,16 @@ import (
 	"github.com/coder/websocket"
 )
 
-// Socket is a WebSocket connection as the SDK opens it.
+// Socket is a WebSocket connection as the SDK opens it, whatever its messages' types.
 type Socket interface {
-	Send(ctx context.Context, data any) error
-	Read(ctx context.Context) ([]byte, error)
+	SendText(ctx context.Context, text string) error
 	Close(code websocket.StatusCode, reason string) error
 }
 
 // Converse sends each standard-input line as a text frame, reading on after its end, and prints
-// each message as one line until the server closes, --take is met (a close frame 1000) or the run
-// is interrupted (a close frame 1000 "interrupted").
-func (s *Stream) Converse(conn Socket) error {
+// each message read returns as one line (a typed one as its JSON) until the server closes, --take
+// is met (a close frame 1000) or the run is interrupted (a close frame 1000 "interrupted").
+func Converse[T any](s *Stream, conn Socket, read func(context.Context) (T, error)) error {
 	/* reads outlive Ctrl-C, so the close frame goes out and is answered */
 	ctx := context.WithoutCancel(s.c.Context())
 	stop := context.AfterFunc(s.c.Context(), func() { conn.Close(websocket.StatusNormalClosure, "interrupted") })
@@ -28,17 +27,17 @@ func (s *Stream) Converse(conn Socket) error {
 	go func() {
 		lines := bufio.NewScanner(s.c.InOrStdin())
 		for lines.Scan() {
-			if conn.Send(ctx, lines.Text()) != nil {
+			if conn.SendText(ctx, lines.Text()) != nil {
 				return
 			}
 		}
 	}()
 	for {
-		message, err := conn.Read(ctx)
+		message, err := read(ctx)
 		if err != nil {
 			return closedOf(err, s.c.Context().Err() != nil)
 		}
-		if !s.Write(textOf(message)) {
+		if !s.Write(printed(message)) {
 			conn.Close(websocket.StatusNormalClosure, "")
 			return s.err
 		}

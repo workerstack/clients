@@ -128,10 +128,11 @@ func (r *runner) stream(s streamCall) (any, outcome, error) {
 	}
 }
 
-// driveSSE ranges the method's iter.Seq2[SSEEvent[T], error] through a reflect.MakeFunc yield,
-// breaking after take events (absent: to the end). A yielded error is recorded and the yield
-// carries on, so an iterator that does not end after its error shows in yields. A Client.Safe()
-// method's stream is its Result's Data (opened), or its Err the opening's error status.
+// driveSSE ranges the method's iter.Seq2[SSEEvent[T], error], or of a named-event op's sealed
+// interface whose types embed one, through a reflect.MakeFunc yield, breaking after take events
+// (absent: to the end). A yielded error is recorded and the yield carries on, so an iterator that
+// does not end after its error shows in yields. A Client.Safe() method's stream is its Result's
+// Data (opened), or its Err the opening's error status.
 func driveSSE(s streamCall) streamed {
 	out := s.method.CallSlice(s.args)
 	seq := out[0]
@@ -156,13 +157,17 @@ func driveSSE(s streamCall) streamed {
 			failed = firstOf(failed, err)
 			return []reflect.Value{reflect.ValueOf(true)}
 		}
-		event, err := eventOf(in[0])
+		ev := in[0]
+		if ev.Kind() == reflect.Interface {
+			ev = ev.Elem()
+		}
+		event, err := eventOf(ev)
 		if err != nil {
 			broken = err
 			return []reflect.Value{reflect.ValueOf(false)}
 		}
 		events = append(events, event)
-		st.Retry = append(st.Retry, int(in[0].FieldByName("Retry").Int()))
+		st.Retry = append(st.Retry, int(ev.FieldByName("Retry").Int()))
 		return []reflect.Value{reflect.ValueOf(s.j.c.Take == nil || len(events) < *s.j.c.Take)}
 	})
 	seq.Call([]reflect.Value{yield})
@@ -182,7 +187,7 @@ func driveSSE(s streamCall) streamed {
 	return streamed{seen: observedStream("events", events, failed), o: outcome{err: failed, via: "stream", stream: st}}
 }
 
-// eventOf is an SSEEvent[T] as the grid observes it: data as the JSON of Data (a string for
+// eventOf is an SSEEvent[T], or a type embedding one, as the grid observes it: data as the JSON of Data (a string for
 // SSEEvent[string]), event and id only when set.
 func eventOf(ev reflect.Value) (map[string]any, error) {
 	data, err := json.Marshal(ev.FieldByName("Data").Interface())

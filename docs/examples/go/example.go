@@ -1,6 +1,6 @@
 // A Go program against an SDK generated from the Kitchen example API: a client, a call and its typed error,
-// the same kind of call on the safe mirror answering a Result, and an event stream released by breaking out of
-// its loop. Built and vetted by the docs' tests.
+// the same kind of call on the safe mirror answering a Result, an event stream released by breaking out of its
+// loop, and the typed streams of the small streaming API beside it. Built and vetted by the docs' tests.
 package main
 
 import (
@@ -54,12 +54,61 @@ func firstEvents(ctx context.Context, client *sdk.Client, limit int) ([]string, 
 		if err != nil {
 			return seen, err
 		}
-		seen = append(seen, event.Data)
+		seen = append(seen, event.Untyped().Data) // any event's data as text; a type switch reads it typed
 		if len(seen) == limit {
 			break // leaving the loop closes the stream and frees its connection
 		}
 	}
 	return seen, nil
+}
+
+func ticks(ctx context.Context, client *sdk.Client) ([]int64, error) {
+	var at []int64
+	for event, err := range client.Ticks.Stream(ctx, nil) {
+		if err != nil {
+			return at, err
+		}
+		switch e := event.(type) {
+		case sdk.TicksStreamTickEvent: // the name picks the type: Data is a Tick
+			at = append(at, e.Data.At)
+		default:
+			fmt.Println("note", e.Untyped().Data)
+		}
+	}
+	return at, nil
+}
+
+func chat(ctx context.Context, client *sdk.Client) error {
+	chat, err := client.Chat.Open(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer chat.Close(1000, "")
+	chat.OnSaid(func(message sdk.Said) { fmt.Println(message.Text) })
+	chat.OnError(func(err error) { fmt.Fprintln(os.Stderr, err) })
+	if err := chat.Send(ctx, sdk.Say{Type: "say", Text: "hi"}); err != nil {
+		return err
+	}
+	_, err = chat.Read(ctx) // the handlers run as Read reads
+	return err
+}
+
+func room(ctx context.Context, client *sdk.Client) error {
+	room, err := client.Room.Join(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer room.Close()
+	room.OnLeft(func(sdk.RoomLeft) { fmt.Println("someone left") })
+	if err := room.Send(ctx, sdk.RoomSay{Type: "say", Text: "hi"}); err != nil {
+		return err
+	}
+	for message := range room.Events() {
+		if said, ok := message.(sdk.RoomSaid); ok {
+			fmt.Println(said.Text)
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -75,4 +124,7 @@ func main() {
 	fmt.Println(listing(ctx, client))
 	events, err := firstEvents(ctx, client, 2)
 	fmt.Println(events, err)
+	at, err := ticks(ctx, client)
+	fmt.Println(at, err)
+	fmt.Println(chat(ctx, client), room(ctx, client))
 }

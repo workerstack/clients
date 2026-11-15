@@ -65,7 +65,7 @@ type Step = string | { waitMs: number }
 const sse = (steps: readonly Step[], end: "drop" | "hold"): Reply => ({ sse: { end, steps }, status: 200 })
 /** event n of a resumable stream: SSE id n, payload n with reconnect token rt-n */
 const ev = (n: number) => `id: ${n}\ndata: {"n":${n},"reconnect_token":"rt-${n}"}\n\n`
-const frame = (n: number) => ({ n, reconnect_token: `rt-${n}` })
+const frame = (n: number, token = `${n}`) => ({ n, reconnect_token: `rt-${token}` })
 const polled = (n: number, id: string): Reply => ({ json: { id, n, reconnect_token: `rt-${id}` }, status: 200 })
 /** a poll answered only after the test is over: the stage's stop ends the wait */
 const pending: Reply = { delayMs: 5000, json: {}, status: 200 }
@@ -92,13 +92,13 @@ type conn struct {
 func (c *conn) Kind() sdk.TransportKind         { return c.kind }
 func (c *conn) Send(context.Context, any) error { return nil }
 func (c *conn) Close() error                    { return nil }
-func (c *conn) Recv(ctx context.Context) (any, error) {
+func (c *conn) Recv(ctx context.Context) ([]byte, error) {
 	c.mu.Lock()
 	if len(c.values) > 0 {
 		v := c.values[0]
 		c.values = c.values[1:]
 		c.mu.Unlock()
-		return v, nil
+		return json.Marshal(v)
 	}
 	c.mu.Unlock()
 	if c.fail != nil {
@@ -136,10 +136,10 @@ func (chatty) Name() string                          { return "chatty" }
 func (chatty) Kind() sdk.TransportKind               { return sdk.TransportWs }
 func (chatty) Send(context.Context, any) error       { return nil }
 func (chatty) Close() error                          { return nil }
-func (chatty) Recv(ctx context.Context) (any, error) { return 1, ctx.Err() }
+func (chatty) Recv(ctx context.Context) ([]byte, error) { return []byte("1"), ctx.Err() }
 func (chatty) Connect(context.Context, string, *sdk.TransportOpts) (sdk.TransportConn, error) { return chatty{}, nil }
 
-func take(rc *sdk.ResumableConnection, n int) string {
+func take[In, Out any](rc *sdk.ResumableConnection[In, Out], n int) string {
 	values := []any{}
 	deadline := time.After(5 * time.Second)
 	for len(values) < n {
@@ -158,9 +158,9 @@ func take(rc *sdk.ResumableConnection, n int) string {
 
 func js(v any) string { b, _ := json.Marshal(v); return string(b) }
 
-func cursor(rc *sdk.ResumableConnection) string { id, token := rc.Cursor(); return id + "/" + token }
+func cursor[In, Out any](rc *sdk.ResumableConnection[In, Out]) string { id, token := rc.Cursor(); return id + "/" + token }
 
-func proven(rc *sdk.ResumableConnection) string { kind, ok := rc.ProvenTransport(); return fmt.Sprint(kind, " ", ok) }`
+func proven[In, Out any](rc *sdk.ResumableConnection[In, Out]) string { kind, ok := rc.ProvenTransport(); return fmt.Sprint(kind, " ", ok) }`
 
 /** RT's SDK with the consumer `body` and DECLS (plus `decls`) beside it, run with `base` on stdin. */
 function program(body: string, p: { base?: string; decls?: string; imports?: string[]; race?: true } = {}) {
@@ -176,7 +176,8 @@ goDescribe("a realtime method returns its connection open, its ctx bounding the 
 	it("falls back from a refused upgrade and a refused event stream to long-poll, polling with the advanced cursor", async () => {
 		const { hops, run } = await drive(rtSdk(), POLLED, [live({ take: 2 })], QUICK)
 		expect({ observed: run.observed, stream: run.trace?.calls[0]?.stream }, run.stderr).toEqual({
-			observed: [{ frames: [polled(1, "7").json, polled(2, "8").json], kind: "frames" }],
+			/* each poll typed as Payload, its undeclared id dropped: the cursor still reads it off the bytes */
+			observed: [{ frames: [frame(1, "7"), frame(2, "8")], kind: "frames" }],
 			stream: {
 				realtime: { cursor: { lastEventId: "8", reconnectToken: "rt-8" }, errors: [], proven: "longpoll" },
 				yields: 2,
@@ -321,7 +322,7 @@ goDescribe("one resume pair on the wire: the Opts' one Transport carries a decla
 				main: [
 					"FeedLiveOpts Channel XTenant Transport",
 					"FeedResumeOpts Protocols Transport",
-					"func(context.Context, *sdk.FeedLiveOpts, ...sdk.RequestOption) (*sdk.ResumableConnection, error)",
+					"func(context.Context, *sdk.FeedLiveOpts, ...sdk.RequestOption) (*sdk.ResumableConnection[example.com/realtime.Payload,interface {}], error)",
 				],
 			},
 			vet: [],
@@ -440,10 +441,10 @@ goDescribe("the default transport adapters", () => {
 	note(sdk.TransportWs, sdk.TransportSse, sdk.TransportLongpoll)
 	stream, err := sse.Connect(ctx, input.Base+"/feed", &sdk.TransportOpts{})
 	if note(err); stream != nil {
-		note(js(must(stream.Recv(ctx))), stream.Close())
+		note(string(must(stream.Recv(ctx))), stream.Close())
 	}
 	poll := must(lp.Connect(ctx, input.Base+"/feed", &sdk.TransportOpts{}))
-	note(js(must(poll.Recv(ctx))), poll.Close())`
+	note(string(must(poll.Recv(ctx))), poll.Close())`
 			const decls =
 				"\nvar _, _, _ sdk.Transport = (*sdk.WsTransport)(nil), (*sdk.SseTransport)(nil), (*sdk.LongpollTransport)(nil)"
 			return [await program(body, { base: server.url, decls }), [...server.hops]] as const
@@ -484,7 +485,7 @@ goDescribe("ResumableConnection under the race detector", () => {
 	stream := must((&sdk.SseTransport{}).Connect(open, input.Base+"/feed", &sdk.TransportOpts{}))
 	cancel()
 	if stream != nil {
-		note(js(must(stream.Recv(ctx))), stream.Close())
+		note(string(must(stream.Recv(ctx))), stream.Close())
 	}
 	section("close race")
 	closed := 0

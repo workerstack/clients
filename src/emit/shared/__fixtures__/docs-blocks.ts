@@ -5,6 +5,9 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
+import realtimeKeyed from "../../../ir/__fixtures__/specs/streams/realtime-keyed.json" with { type: "json" }
+import sseItemSchema from "../../../ir/__fixtures__/specs/streams/sse-item-schema.json" with { type: "json" }
+import wsKeyed from "../../../ir/__fixtures__/specs/streams/ws-keyed.json" with { type: "json" }
 
 export const REPO = /* @__PURE__ */ resolve(import.meta.dirname, "../../../..")
 export const DOCS = /* @__PURE__ */ join(REPO, "docs")
@@ -66,3 +69,23 @@ export const docsDocument = (): Record<string, unknown> =>
 	JSON.parse(
 		readFileSync(new URL("../../../../tests/fixtures/apps/kitchen.openapi.json", import.meta.url), "utf8"),
 	) as Record<string, unknown>
+
+type Spec = { readonly paths: object; readonly components?: { readonly schemas?: object } }
+
+/**
+ * The API the docs' typed stream examples call: the Kitchen document, and beside it the typed stream fixtures
+ * TypeScript's recipe calls as `Streams` (named SSE events, a keyed WebSocket and a keyed realtime connection),
+ * whose paths, operation ids and schemas the Kitchen document does not use.
+ */
+export function docsStreamsDocument(): Record<string, unknown> {
+	const kitchen = docsDocument() as Spec & Record<string, unknown>
+	const added: readonly Spec[] = [sseItemSchema, wsKeyed, realtimeKeyed]
+	return {
+		...kitchen,
+		components: {
+			...kitchen.components,
+			schemas: Object.assign({}, kitchen.components?.schemas, ...added.map((spec) => spec.components?.schemas)),
+		},
+		paths: Object.assign({}, kitchen.paths, ...added.map((spec) => spec.paths)),
+	}
+}

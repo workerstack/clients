@@ -85,8 +85,10 @@ const REPO = resolve(import.meta.dirname, "..")
  *   values and its Last-Event-ID header (+164), +35 of comments.
  * A change raises it only by the bytes of a named feature, dead code cut first.
  * Plan 55, +18 B to 55,573 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
+ * Backend plan 11, +323 B to 55,896 B: the SDK's typed streams; `Converse` and `Resume` take the op's own read and
+ *   events (generic over the message type), and `printed` prints a typed message as its JSON, text as text.
  */
-const CLI_RUNTIME_BYTES = 55573
+const CLI_RUNTIME_BYTES = 55896
 
 describe("the CLI runtime within its byte budget (bit 17, the G14 analog)", () => {
 	it(
@@ -189,8 +191,11 @@ describe.skipIf(!GO)("the CLI's tokens within each app's ceilings (bit 17 phase 
  * ceilingOf(measured, 0.02). A raise names its cause (a new module dependency, a Go release, a runtime feature).
  * Bit 19 j1: 9,953,440 B (+20,480 B), carry-in #7's two stream commands (/api/events, /api/events-live) in the
  * cutover's v1-generated kitchen document.
+ * Backend plan 11: 10,170,528 B (+217,088 B since bit 19 j1, +49,152 B over its parent, 10,121,376 B), the typed
+ * streams runtime feature: a type per declared SSE event with its `Untyped` method, the per-interface stream code,
+ * and the realtime chain split into one plain loop beside its typed edges.
  */
-const KITCHEN_STRIPPED = 9953440
+const KITCHEN_STRIPPED = 10170528
 const SIZE_HEADROOM = 0.02
 
 describe.skipIf(!GO)("the CLI binary within its size (bit 17 phase i)", SLOW, () => {

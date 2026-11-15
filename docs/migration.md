@@ -196,6 +196,42 @@ func listing(ctx context.Context, client *sdk.Client) string {
 }
 ```
 
+## The Go SDK's stream types are generic in what they read and send
+
+`TypedWebSocket` and `ResumableConnection` now take the types of what they read and send. A spelled-out type needs
+them: write `*sdk.TypedWebSocket[[]byte, any]` for a bare `*sdk.TypedWebSocket`, and
+`*sdk.ResumableConnection[any, any]` for `*sdk.ResumableConnection`, which `NewResumableConnection` returns.
+`SSEEvent[T]` is unchanged. An operation the document types now answers its own types:
+
+- An SSE operation with named events yields `iter.Seq2[<Op>Event, error]`: a sealed interface with one type per event
+  name, each holding `SSEEvent[Data]`, and `<Op>OtherEvent` for a name it does not declare. A type switch reads `Data`
+  typed; `Untyped()` reads any event's data as text. An unnamed event is `"message"`. Data that does not decode is a
+  `*sdk.DecodeError` (it was a plain `httpsdk: decode sse event: …` error).
+- A WebSocket operation with declared messages answers `TypedWebSocket[In, Out]`: `Read` returns `In`, `Send` takes
+  `Out` and sends it as JSON, and `SendText` sends text as is. A frame that is not JSON is a `*sdk.DecodeError` from
+  `Read`, handed to `OnError`, and the socket stays open. `On(event, func([]byte))` is gone: use `OnMessage`,
+  `OnClose(func(reason string))` and `OnError(func(err error))`.
+- A realtime operation answers `ResumableConnection[In, Out]`: `Events()` gives `In`, `Send` takes `Out`, `SendText`
+  sends text, and `OnMessage` runs before `Events()` gets each message. A message that does not decode is a
+  `*sdk.DecodeError` on `Errors()`, and the connection reads on. A custom `Transport`'s `Recv` returns the message's
+  bytes, `([]byte, error)`.
+- When the server's messages are a union keyed on one field, the answer is `<Op>Socket` or `<Op>Connection`, whose
+  `On<Value>(handler)` takes a handler of that member's type; a value the operation does not declare reads as
+  `<Op>OtherMessage`, its `Raw` as sent.
+
+```text v0
+func (r *WsResource) Talk(ctx, opts, ...) (*TypedWebSocket, error)       // Read -> []byte; Send(data any)
+func (r *RtResource) Room(ctx, opts, ...) (*ResumableConnection, error)  // Events() <-chan any
+func (r *OutSseResource) List(ctx, opts, ...) iter.Seq2[SSEEvent[string], error]
+```
+
+```text
+func (r *WsResource) Talk(ctx, opts, ...) (*WsTalkSocket, error)         // TypedWebSocket[WsTalkInbound, WsTalkOutbound]
+func (r *RtResource) Room(ctx, opts, ...) (*RtRoomConnection, error)     // ResumableConnection[RtRoomInbound, RtRoomOutbound]
+func (r *OutSseResource) List(ctx, opts, ...) iter.Seq2[OutSseListEvent, error]
+func (r *WsResource) Echo(ctx, opts, ...) (*TypedWebSocket[[]byte, any], error)  // an operation without messages
+```
+
 ## The Rust SDK's `throwOnError` is gone; its safe mode is `client.safe()`, answering an `Answer`
 
 The Rust generator has no `throwOnError` option: delete it. Every

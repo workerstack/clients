@@ -144,7 +144,9 @@ describe("the TS SDK within its own budget (bit 21 i1, G13)", () => {
  * operation over it is fixed in the schema, never by raising the ceiling; revisit only for a genuinely large,
  * legitimate operation.
  * Plan 9 re-measured it over the backend's refreshed documents (76 surfaces): max 107
- * (kitchen/RealtimeChatResource.Connect), so 107 + 20% = 129.
+ * (kitchen/RealtimeChatResource.Connect), so 107 + 20% = 129. Backend plan 11 types the stream answers, so a
+ * connection names what it reads and sends: max 115 (kitchen/RealtimeChatResource.Connect,
+ * `ResumableConnection[any, any]` in the signature and the twin's field), under 129, which stays.
  */
 const GO_SDK_CEILING = ceilingOf([107], HEADROOM)
 
@@ -225,8 +227,8 @@ describe("the v1 Go SDK within the budget (bit 12, G13)", () => {
 		expect({ at, ceiling: GO_SDK_CEILING, derived: ceilingOf([tokens], HEADROOM), tokens }).toEqual({
 			at: "kitchen/RealtimeChatResource.Connect",
 			ceiling: 129,
-			derived: 129,
-			tokens: 107,
+			derived: 138,
+			tokens: 115,
 		})
 	})
 })
@@ -586,8 +588,16 @@ describe("runtimeBytes", () => {
  * send through doRequest, call.sent: the POST, a string as text and any other value as JSON; Send's doc),
  * transport.go +423 (TransportOpts.send, posted), transport_sse.go +64, transport_longpoll.go +49 (each conn's send).
  * Plan 55, +91 B to 99,331 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
+ * Backend plan 11, +8,103 B to 107,434 B: typed event streams, sockets and realtime connections. Dead code first: the
+ *   socket's `On(event, func([]byte))` and fanout, sendAny, sendJSON, decodePayload and streamJSON are cut, and a scan
+ *   finds no runtime function without a caller. ws.go +3,614 (`TypedWebSocket[In, Out]`: the typed Send and Read,
+ *   SendText, OnMessage, OnClose and OnError over locked handler lists, the frame codecs and their DecodeError, the
+ *   dial split from the typed socket), realtime.go +3,552 (`ResumableConnection[In, Out]`, its typed edges over the
+ *   plain `resumable` loop, deliver, SendText, the dial split from the typed connection), stream.go +355
+ *   (streamEvents, sseData), sse.go +340 (`SSEEvent.Untyped`), result.go +102 (the DecodeError doc), transport.go +99
+ *   (`Recv` returns bytes, payloadCursor), realtime_loop.go +72, transport_longpoll.go -17, transport_sse.go -14.
  */
-const GO_RUNTIME_BYTES = 99_331
+const GO_RUNTIME_BYTES = 107_434
 
 describe("the Go runtime within its byte budget (bit 12, G14)", () => {
 	it(`ships every runtime file it holds, their bytes exactly ${GO_RUNTIME_BYTES}`, { timeout: SPAWN_TIMEOUT }, () => {

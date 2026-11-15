@@ -71,7 +71,7 @@ const BODY = `	refreshed := false
 	note(take(rc, 1))`
 
 const DECLS = `
-func take(rc *sdk.ResumableConnection, n int) string {
+func take[In, Out any](rc *sdk.ResumableConnection[In, Out], n int) string {
 	values := []any{}
 	deadline := time.After(5 * time.Second)
 	for len(values) < n {

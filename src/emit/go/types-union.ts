@@ -8,7 +8,7 @@ import { goString, lineComment } from "../shared/escape.ts"
 import { goExported, NameScope } from "../shared/lang.ts"
 import type { GoTypeNames } from "./types.ts"
 
-type Union = Extract<IRSchema, { kind: "union" }> & { discriminator: IRDiscriminator }
+export type Union = Extract<IRSchema, { kind: "union" }> & { discriminator: IRDiscriminator }
 
 /** Declares an inline variant once under `names.hoist(key, base)`; its name. */
 export type DeclareVariant = (schema: IRSchema, key: string, base: string) => string
@@ -81,6 +81,10 @@ function marshal(name: string, variants: readonly Variant[]): string[] {
 		"}",
 	]
 }
+
+/** The Go type of each ref or inline-object variant of `union`, in order; inline ones declared through `declare`. */
+export const variantTypes = (name: string, union: Union, names: GoTypeNames, declare: DeclareVariant): string[] =>
+	variantsOf(name, union, names, declare).map(({ type }) => type)
 
 /** The union's struct and its (un)marshal methods; inline object variants are declared through `declare`. */
 export function unionDecl(name: string, union: Union, names: GoTypeNames, declare: DeclareVariant): string {

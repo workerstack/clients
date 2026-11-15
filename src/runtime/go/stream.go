@@ -9,6 +9,7 @@ import (
 	"io"
 	"iter"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -75,19 +76,19 @@ func streamText(ctx context.Context, cfg Config, c *call, opts []RequestOption) 
 	}
 }
 
-// streamJSON yields the call's server-sent events with Data decoded from JSON into T. An event
-// that does not decode yields an error and ends the stream.
-func streamJSON[T any](ctx context.Context, cfg Config, c *call, opts []RequestOption) iter.Seq2[SSEEvent[T], error] {
+// streamEvents yields the call's server-sent events, each read by decode. An event that does not
+// decode yields its error and ends the stream.
+func streamEvents[E any](ctx context.Context, cfg Config, c *call, decode func(SSEEvent[string]) (E, error), opts []RequestOption) iter.Seq2[E, error] {
 	text := streamText(ctx, cfg, c, opts)
-	return func(yield func(SSEEvent[T], error) bool) {
+	return func(yield func(E, error) bool) {
+		var zero E
 		for raw, err := range text {
-			if err != nil {
-				yield(SSEEvent[T]{}, err)
-				return
+			var ev E
+			if err == nil {
+				ev, err = decode(raw)
 			}
-			ev := SSEEvent[T]{Event: raw.Event, ID: raw.ID, Retry: raw.Retry}
-			if err := json.Unmarshal([]byte(raw.Data), &ev.Data); err != nil {
-				yield(SSEEvent[T]{}, fmt.Errorf("httpsdk: decode sse event: %w", err))
+			if err != nil {
+				yield(zero, err)
 				return
 			}
 			if !yield(ev, nil) {
@@ -97,9 +98,24 @@ func streamJSON[T any](ctx context.Context, cfg Config, c *call, opts []RequestO
 	}
 }
 
+// sseData is raw with its Data decoded from JSON into T; data that does not decode is a
+// *DecodeError naming the event.
+func sseData[T any](raw SSEEvent[string]) (SSEEvent[T], error) {
+	ev := SSEEvent[T]{Event: raw.Event, ID: raw.ID, Retry: raw.Retry}
+	if err := json.Unmarshal([]byte(raw.Data), &ev.Data); err != nil {
+		what := "sse event"
+		if raw.Event != "" {
+			what += " " + strconv.Quote(raw.Event)
+		}
+		return SSEEvent[T]{}, &DecodeError{Err: fmt.Errorf("%s: %w", what, err)}
+	}
+	return ev, nil
+}
+
 // sseFail is a stream that yields err and ends, for a call that fails before it opens.
-func sseFail[T any](err error) iter.Seq2[SSEEvent[T], error] {
-	return func(yield func(SSEEvent[T], error) bool) {
-		yield(SSEEvent[T]{}, err)
+func sseFail[E any](err error) iter.Seq2[E, error] {
+	return func(yield func(E, error) bool) {
+		var zero E
+		yield(zero, err)
 	}
 }

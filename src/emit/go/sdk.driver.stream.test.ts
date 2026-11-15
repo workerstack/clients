@@ -155,7 +155,7 @@ goDescribe("the Go test driver: SSE errors and string data", () => {
 			status: status?.error?.status,
 			streams: [decode?.stream, status?.stream],
 		}).toEqual({
-			decode: expect.stringMatching(/^httpsdk: decode sse event:/),
+			decode: expect.stringMatching(/^httpsdk: decode response: sse event: /),
 			status: 404,
 			streams: [{ retry: [0], yields: 2 }, { yields: 1 }],
 		})
@@ -163,7 +163,7 @@ goDescribe("the Go test driver: SSE errors and string data", () => {
 		const bare = await served(replies.slice(0, 1), (server) => sdk.runCalls({ calls: [ticks()] }, server))
 		expect({ status: bare.status, stderr: bare.stderr }).toEqual({
 			status: 1,
-			stderr: expect.stringMatching(/httpsdk: decode sse event/),
+			stderr: expect.stringMatching(/httpsdk: decode response: sse event: /),
 		})
 	}, 600_000)
 	it("observes a string stream's data as sent, a path failing before the stream as no events, and asks isErrors", async () => {
@@ -283,7 +283,7 @@ goDescribe("the Go test driver: how a WebSocket read ends", () => {
 	}, 600_000)
 })
 
-goDescribe("the Go test driver: realtime, (*ResumableConnection, error)", () => {
+goDescribe("the Go test driver: realtime, (*ResumableConnection[Tick, any], error), frames decoded as Tick", () => {
 	it("opens over WebSocket with the resume cursor, sends, reads take frames, and traces the settled cursor", async () => {
 		const reply = ws([
 			{ receive: 1 },
@@ -295,10 +295,7 @@ goDescribe("the Go test driver: realtime, (*ResumableConnection, error)", () => 
 		expect({ observed: run.observed, stream: run.trace?.calls[0]?.stream }, run.stderr).toEqual({
 			observed: [
 				{
-					frames: [
-						{ id: "1", n: 1, reconnect_token: "rt-1" },
-						{ id: "2", n: 2, reconnect_token: "rt-2" },
-					],
+					frames: [{ n: 1 }, { n: 2 }],
 					kind: "frames",
 				},
 			],
@@ -323,14 +320,14 @@ goDescribe("the Go test driver: realtime, (*ResumableConnection, error)", () => 
 		const script: Script = { calls: [{ realtime: { reconnectDelayMs: 10 } }] }
 		const { hops, run } = await drive(sdk, replies, [feed({ take: 1 })], script)
 		expect({ observed: run.observed, realtime: run.trace?.calls[0]?.stream?.realtime }, run.stderr).toEqual({
-			observed: [{ frames: [{ n: 3, reconnect_token: "rt-3" }], kind: "frames" }],
+			observed: [{ frames: [{ n: 3 }], kind: "frames" }],
 			realtime: { cursor: { lastEventId: "3", reconnectToken: "rt-3" }, errors: [], proven: "sse" },
 		})
 		expect(hops.map((hop) => hop.headers.accept)).toEqual([undefined, "text/event-stream"])
 		const polled = { json: { id: "7", n: 1, reconnect_token: "rt-7" }, status: 200 }
 		const chain = await drive(sdk, [refused, { status: 503, text: "" }, polled], [feed({ take: 1 })], script)
 		expect({ observed: chain.run.observed, proven: chain.run.trace?.calls[0]?.stream?.realtime?.proven }).toEqual({
-			observed: [{ frames: [{ id: "7", n: 1, reconnect_token: "rt-7" }], kind: "frames" }],
+			observed: [{ frames: [{ n: 1 }], kind: "frames" }],
 			proven: "longpoll",
 		})
 		expect(chain.hops.slice(0, 3).map((hop) => hop.url)).toEqual([
@@ -427,7 +424,7 @@ func (c *closing) Name() string                   { return "closing" }
 func (c *closing) Kind() sdk.TransportKind         { return sdk.TransportWs }
 func (c *closing) Send(context.Context, any) error { return nil }
 func (c *closing) Close() error                    { c.atClose = fmt.Sprint(c.read.Err()); return nil }
-func (c *closing) Recv(ctx context.Context) (any, error) {
+func (c *closing) Recv(ctx context.Context) ([]byte, error) {
 	c.read = ctx
 	close(c.entered)
 	<-ctx.Done()

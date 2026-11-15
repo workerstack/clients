@@ -96,12 +96,20 @@ type handlers struct {
 	runs []handlerTrace
 }
 
-// on is the handler recording event.
-func (h *handlers) on(event string) func([]byte) {
-	return func(data []byte) {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		h.runs = append(h.runs, handlerTrace{Event: event, Data: string(data)})
+// record appends one handler run.
+func (h *handlers) record(event, data string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.runs = append(h.runs, handlerTrace{Event: event, Data: data})
+}
+
+// steps registers the recording handlers: OnMessage with the frame, OnClose with the reason and
+// OnError with the error's text.
+func (h *handlers) steps() [][]any {
+	return [][]any{
+		{"OnMessage", func(data []byte) { h.record("message", string(data)) }},
+		{"OnClose", func(reason string) { h.record("close", reason) }},
+		{"OnError", func(err error) { h.record("error", err.Error()) }},
 	}
 }
 
@@ -120,9 +128,7 @@ func driveSocket(s streamCall) streamed {
 	}
 	steps := [][]any{}
 	if script.On {
-		for _, event := range []string{"message", "close", "error"} {
-			steps = append(steps, []any{"On", event, h.on(event)})
-		}
+		steps = append(steps, h.steps()...)
 	}
 	if script.ReadLimit != nil {
 		steps = append(steps, []any{"SetReadLimit", *script.ReadLimit})

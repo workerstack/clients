@@ -68,6 +68,7 @@ export type Receiver = { readonly type: string; readonly client: string }
 const METHOD_LOCALS = [
 	"c",
 	"call",
+	"conn",
 	"ctx",
 	"data",
 	"decodeJSON",
@@ -94,8 +95,9 @@ const METHOD_LOCALS = [
 	"result",
 	"setHeaderValue",
 	"setIdempotencyKey",
+	"sseData",
 	"sseFail",
-	"streamJSON",
+	"streamEvents",
 	"streamText",
 	"textField",
 	"topts",
@@ -131,15 +133,21 @@ function methodDoc(op: SdkOp, name: string, stream: GoStream | null): string[] {
 	return lineComment(text.join("\n\n"), "//")
 }
 
-/** How the method of `op` answers, and its stream: null for an operation that answers once. */
-function answering(op: SdkOp, env: MethodEnv): { readonly shape: Shape; readonly stream: GoStream | null } {
+/**
+ * How the method of `op` answers, its stream (null for an operation that answers once), and the method's locals: the
+ * runtime's names, and the stream's own.
+ */
+function answering(
+	op: SdkOp,
+	env: MethodEnv,
+): { readonly shape: Shape; readonly stream: GoStream | null; readonly locals: NameScope } {
 	if (op.stream !== null) {
-		const stream = op.stream === "sse" ? sseStream(op, env.at) : socketStream(op.stream)
-		return { shape: stream.shape, stream }
+		const stream = op.stream === "sse" ? sseStream(op, env.at) : socketStream(op, op.stream, env.at)
+		return { locals: new NameScope([...METHOD_LOCALS, ...stream.calls]), shape: stream.shape, stream }
 	}
 	const schema = op.success.schema
 	const result = schema && goTypeOf(schema, { ...env.at, fieldName: "Response", parentName: op.id }).replace(/^\*/, "")
-	return { shape: shapeOf({ kind: op.success.kind, result }), stream: null }
+	return { locals: new NameScope(METHOD_LOCALS), shape: shapeOf({ kind: op.success.kind, result }), stream: null }
 }
 
 /** The statements expanding the path, and the expression the call sends as its path. */
@@ -208,11 +216,10 @@ function twinOf(op: SdkOp, returns: string, params: readonly string[]): Twin {
 /** The method of `op` named `name` on `receiver`, and its `<Op>Opts` and `<Op>Headers`. */
 export function goMethod(op: SdkOp, name: string, receiver: Receiver, env: MethodEnv): GoMethod {
 	const opts = env.at.names.claimConst(`${goExported(op.id)}Opts`)
-	const locals = new NameScope(METHOD_LOCALS)
+	const { locals, shape, stream } = answering(op, env)
 	const bodyLocal = op.body && locals.claim("body")
 	const body = op.body && goBody(op, op.body, { at: env.at, local: bodyLocal as string })
 	const pathLocals = pathParamsOf(op).map((param): [IRParam, string] => [param, locals.claim(goLocal(param.name))])
-	const { shape, stream } = answering(op, env)
 	const streamOpts = stream?.opts ?? null
 	const fields = optsFields(op, opts, env.at, streamOpts)
 	const path = pathLines(op, pathLocals, shape.fail)

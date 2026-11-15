@@ -14,7 +14,7 @@ import (
 // resume cursor. The first that opens becomes the connection and the proven transport. Once ctx
 // ends it tries no further transport: one that opens lazily (long-poll) would otherwise succeed.
 // The chain fails with its last transient failure, else its most specific refusal; a 401 restarts it once.
-func (r *ResumableConnection) openChain(ctx context.Context) error {
+func (r *resumable) openChain(ctx context.Context) error {
 	r.mu.Lock()
 	proven := r.provenIdx
 	opts := r.opts
@@ -64,10 +64,10 @@ func (r *ResumableConnection) openChain(ctx context.Context) error {
 	return refusal
 }
 
-// advance moves the resume cursor past a delivered value: the connection's own event ID when it
-// tracks one (SSE), else the payload's id or last_event_id, and the payload's reconnect_token.
-func (r *ResumableConnection) advance(conn TransportConn, v any) {
-	id, token := payloadCursor(v)
+// advance moves the resume cursor past a delivered message: the connection's own event ID when it
+// tracks one (SSE), else the message's id or last_event_id, and its reconnect_token.
+func (r *resumable) advance(conn TransportConn, data []byte) {
+	id, token := payloadCursor(data)
 	if cc, ok := conn.(cursorConn); ok {
 		if sid := cc.lastEventID(); sid != "" {
 			id = sid
@@ -78,7 +78,7 @@ func (r *ResumableConnection) advance(conn TransportConn, v any) {
 	r.mu.Unlock()
 }
 
-func (r *ResumableConnection) maxAttempts() int {
+func (r *resumable) maxAttempts() int {
 	switch {
 	case r.opts.MaxReconnectAttempts < 0:
 		return -1
@@ -90,7 +90,7 @@ func (r *ResumableConnection) maxAttempts() int {
 
 // backoff is the delay before reconnect attempt n (1-based): exponential from the base delay,
 // capped, with jitter so clients do not reconnect in lockstep.
-func (r *ResumableConnection) backoff(n int) time.Duration {
+func (r *resumable) backoff(n int) time.Duration {
 	d := defaultReconnectDelay
 	if r.opts.ReconnectDelayMs > 0 {
 		d = time.Duration(r.opts.ReconnectDelayMs) * time.Millisecond
@@ -103,17 +103,18 @@ func (r *ResumableConnection) backoff(n int) time.Duration {
 	return half + time.Duration(rand.Int64N(int64(half)+1))
 }
 
-func (r *ResumableConnection) fail(err error) {
+func (r *resumable) fail(err error) {
 	select {
 	case r.errs <- err:
 	default:
 	}
 }
 
-// readLoop pumps Recv into Events. A transport error reconnects through the whole chain (the
-// proven transport is forgotten) with backoff; exhaustion is sent on Errors and ends the loop.
-// Close cuts every wait short.
-func (r *ResumableConnection) readLoop(done chan struct{}) {
+// readLoop delivers each Recv; a message that does not decode is a *DecodeError on Errors, and the
+// loop reads on. A transport error
+// reconnects through the whole chain (the proven transport is forgotten) with backoff; exhaustion
+// is sent on Errors and ends the loop. Close cuts every wait short.
+func (r *resumable) readLoop(done chan struct{}) {
 	defer func() {
 		r.mu.Lock()
 		conn := r.conn
@@ -132,14 +133,16 @@ func (r *ResumableConnection) readLoop(done chan struct{}) {
 		if conn == nil {
 			return
 		}
-		v, err := conn.Recv(r.ctx)
+		data, err := conn.Recv(r.ctx)
 		if err == nil {
-			select {
-			case r.events <- v:
-				r.advance(conn, v)
+			switch err := r.deliver(data); {
+			case err == nil:
+				r.advance(conn, data)
 				attempts = 0
-			case <-r.ctx.Done():
+			case r.ctx.Err() != nil:
 				return
+			default:
+				r.fail(err)
 			}
 			continue
 		}
@@ -152,7 +155,7 @@ func (r *ResumableConnection) readLoop(done chan struct{}) {
 // reconnect drops the failed connection and reopens the chain with backoff, counting into
 // attempts; it reports false when attempts ran out or the connection closed (Close ends the
 // transport before its ctx, so a read can fail first).
-func (r *ResumableConnection) reconnect(failed TransportConn, err error, attempts *int) bool {
+func (r *resumable) reconnect(failed TransportConn, err error, attempts *int) bool {
 	if refused(err) {
 		_ = failed.Close()
 		r.fail(err)

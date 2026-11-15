@@ -86,15 +86,20 @@ async function drive(replies: readonly Reply[], calls: readonly Call[], options:
 /** The method's signature, TypedWebSocket's method set and the WSStatus codes, as a consumer compiles and prints them. */
 const surface = once(() =>
 	consumer(`	c := sdk.NewClient(sdk.Config{BaseURL: "http://127.0.0.1:1"})
-	var socket func(context.Context, string, *sdk.RoomsSocketOpts, ...sdk.RequestOption) (*sdk.TypedWebSocket, error) = c.Rooms.Socket
-	var bare func(context.Context, *sdk.PlainSocketOpts, ...sdk.RequestOption) (*sdk.TypedWebSocket, error) = c.Plain.Socket
-	use := func(w *sdk.TypedWebSocket) error {
-		w.On("message", func([]byte) {})
+	var socket func(context.Context, string, *sdk.RoomsSocketOpts, ...sdk.RequestOption) (*sdk.TypedWebSocket[[]byte, any], error) = c.Rooms.Socket
+	var bare func(context.Context, *sdk.PlainSocketOpts, ...sdk.RequestOption) (*sdk.TypedWebSocket[[]byte, any], error) = c.Plain.Socket
+	use := func(w *sdk.TypedWebSocket[[]byte, any]) error {
+		w.OnMessage(func([]byte) {})
+		w.OnClose(func(string) {})
+		w.OnError(func(error) {})
 		w.SetReadLimit(1 << 20)
 		if _, err := w.Read(ctx); err != nil {
 			return err
 		}
 		if err := w.Send(ctx, map[string]int{"n": 1}); err != nil {
+			return err
+		}
+		if err := w.SendText(ctx, "raw"); err != nil {
 			return err
 		}
 		return w.Close(sdk.WSStatusGoingAway, "bye")
@@ -106,24 +111,27 @@ const surface = once(() =>
 `),
 )
 
-goDescribe("a WebSocket operation's method: (*TypedWebSocket, error), dialing the operation's path", () => {
-	// v0: 11520ddd49
-	it("compiles with that signature, and dials the escaped path as an upgrade, reading a JSON frame", async () => {
-		expect(seen(surface()), surface().stderr).toEqual({ built: true, out: ["compiled"], vet: [] })
-		const call = rooms({ params: { room: "a b/c" }, take: 1 })
-		const { hops, run, streams } = await drive([ws([{ json: { n: 1 } }])], [call], { script: {} })
-		expect({ observed: run.observed, stream: run.trace?.calls[0]?.stream }, run.stderr).toEqual({
-			observed: [{ frames: [{ n: 1 }], kind: "frames" }],
-			stream: { yields: 1 },
-		})
-		expect({ hops: hops.length, received: streams[0]?.received }).toEqual({ hops: 1, received: [closed(1000)] })
-		expect(hops[0]).toMatchObject({
-			headers: { connection: expect.stringMatching(/upgrade/i), "sec-websocket-version": "13", upgrade: "websocket" },
-			method: "GET",
-			url: "/rooms/a%20b%2Fc",
-		})
-	}, 600_000)
-})
+goDescribe(
+	"a WebSocket operation's method: (*TypedWebSocket[[]byte, any], error), dialing the operation's path",
+	() => {
+		// v0: 11520ddd49
+		it("compiles with that signature, and dials the escaped path as an upgrade, reading a JSON frame", async () => {
+			expect(seen(surface()), surface().stderr).toEqual({ built: true, out: ["compiled"], vet: [] })
+			const call = rooms({ params: { room: "a b/c" }, take: 1 })
+			const { hops, run, streams } = await drive([ws([{ json: { n: 1 } }])], [call], { script: {} })
+			expect({ observed: run.observed, stream: run.trace?.calls[0]?.stream }, run.stderr).toEqual({
+				observed: [{ frames: [{ n: 1 }], kind: "frames" }],
+				stream: { yields: 1 },
+			})
+			expect({ hops: hops.length, received: streams[0]?.received }).toEqual({ hops: 1, received: [closed(1000)] })
+			expect(hops[0]).toMatchObject({
+				headers: { connection: expect.stringMatching(/upgrade/i), "sec-websocket-version": "13", upgrade: "websocket" },
+				method: "GET",
+				url: "/rooms/a%20b%2Fc",
+			})
+		}, 600_000)
+	},
+)
 
 goDescribe("the WebSocket dial's headers: the auth credential, config and call headers, a request id", () => {
 	// v0: 1f8936180b
@@ -209,7 +217,7 @@ goDescribe("Opts.Protocols: the subprotocols offered as Sec-WebSocket-Protocol",
 	}, 600_000)
 })
 
-goDescribe("TypedWebSocket: Send, Read, On and Close round-trip", () => {
+goDescribe("TypedWebSocket: Send, Read, its handlers and Close round-trip", () => {
 	// v0: 9b47c082c4
 	it("sends text, JSON and binary frames in order, reads the server's JSON, fires message then close, closes 1000", async () => {
 		const script: Script = {

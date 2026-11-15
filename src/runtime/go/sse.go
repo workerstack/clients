@@ -5,6 +5,7 @@ package sdk
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"iter"
@@ -22,6 +23,16 @@ type SSEEvent[T any] struct {
 	Event string
 	ID    string
 	Retry int
+}
+
+// Untyped is the event with Data as text: as sent for SSEEvent[string], else its JSON.
+func (e SSEEvent[T]) Untyped() SSEEvent[string] {
+	data, ok := any(e.Data).(string)
+	if !ok {
+		text, _ := json.Marshal(e.Data)
+		data = string(text)
+	}
+	return SSEEvent[string]{Data: data, Event: e.Event, ID: e.ID, Retry: e.Retry}
 }
 
 // sseMaxLine caps one line, and sseMaxEvent the data of one event.

@@ -75,11 +75,73 @@ Breaking out of a `range` over a stream closes it; a context ends it quietly.
 		if err != nil {
 			return seen, err
 		}
-		seen = append(seen, event.Data)
+		seen = append(seen, event.Untyped().Data) // any event's data as text; a type switch reads it typed
 		if len(seen) == limit {
 			break // leaving the loop closes the stream and frees its connection
 		}
 	}
+```
+
+A stream the document types is typed end to end. An SSE operation with named events yields `<Op>Event`, a sealed
+interface with one type per name, each holding `SSEEvent[Data]`, so a type switch reads `Data` typed, each JSON event
+parsed by its name; a name the operation does not declare is `<Op>OtherEvent`, and `Untyped()` reads any event's data
+as text. A WebSocket or realtime operation with declared messages sends what the server receives and reads what it
+sends, every `Send` JSON, and `SendText` sends text as is. When those are a union keyed on one field, the read side is
+a sealed interface too, `On<Value>` takes a handler of that member's type, and a value the operation does not declare
+reads as `<Op>OtherMessage`. A socket's frame that is not JSON is a `*DecodeError` from `Read`, handed to `OnError`,
+and the socket stays open; a realtime connection sends it to `Errors()` and reads on. A member named like a socket
+handler (`message`, `close`, `error`; on realtime only `message`) is heard only through `OnMessage`. This excerpt runs
+against the small streaming API the TypeScript one calls.
+
+```go
+func ticks(ctx context.Context, client *sdk.Client) ([]int64, error) {
+	var at []int64
+	for event, err := range client.Ticks.Stream(ctx, nil) {
+		if err != nil {
+			return at, err
+		}
+		switch e := event.(type) {
+		case sdk.TicksStreamTickEvent: // the name picks the type: Data is a Tick
+			at = append(at, e.Data.At)
+		default:
+			fmt.Println("note", e.Untyped().Data)
+		}
+	}
+	return at, nil
+}
+
+func chat(ctx context.Context, client *sdk.Client) error {
+	chat, err := client.Chat.Open(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer chat.Close(1000, "")
+	chat.OnSaid(func(message sdk.Said) { fmt.Println(message.Text) })
+	chat.OnError(func(err error) { fmt.Fprintln(os.Stderr, err) })
+	if err := chat.Send(ctx, sdk.Say{Type: "say", Text: "hi"}); err != nil {
+		return err
+	}
+	_, err = chat.Read(ctx) // the handlers run as Read reads
+	return err
+}
+
+func room(ctx context.Context, client *sdk.Client) error {
+	room, err := client.Room.Join(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer room.Close()
+	room.OnLeft(func(sdk.RoomLeft) { fmt.Println("someone left") })
+	if err := room.Send(ctx, sdk.RoomSay{Type: "say", Text: "hi"}); err != nil {
+		return err
+	}
+	for message := range room.Events() {
+		if said, ok := message.(sdk.RoomSaid); ok {
+			fmt.Println(said.Text)
+		}
+	}
+	return nil
+}
 ```
 
 ## Rust

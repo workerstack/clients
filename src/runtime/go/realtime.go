@@ -48,19 +48,32 @@ const (
 var ErrConnectionClosed = errors.New("httpsdk: ResumableConnection closed")
 
 // ResumableConnection runs a chain of Transports: the last one that worked is tried first, then
-// the whole chain in order. Events arrive on Events() and a terminal error on Errors(); Close stops
-// the read goroutine and then closes both channels.
+// the whole chain in order. Send writes what the server receives (Out) and Events() gives what it
+// sends (In), each message also handed to the OnMessage handlers first; a typed connection sends
+// every message as JSON and decodes every one it reads, and SendText sends text as is. Errors()
+// gives a terminal error, and each message that did not decode while the connection reads on.
+// Close stops the read goroutine and then closes both channels.
 //
 // Each delivered event advances the resume cursor (LastEventID and ReconnectToken), so a reconnect
 // resumes after the last event delivered. Reconnects back off exponentially from ReconnectDelayMs
 // (default 1s, capped at 30s, with jitter) for up to MaxReconnectAttempts (default 5; negative
 // means unlimited); exhaustion is reported on Errors().
-type ResumableConnection struct {
+type ResumableConnection[In, Out any] struct {
+	/* the chain, the loop and the cursor, one copy for every message type */
+	r         *resumable
+	read      func([]byte) (In, error)
+	write     func(Out) (any, error)
+	onMessage handlers[In]
+	events    chan In
+}
+
+// resumable is a connection's chain, read loop and cursor; it hands each message's bytes to deliver.
+type resumable struct {
 	url        string
 	transports []Transport
+	deliver    func([]byte) error /* nil once delivered; a *DecodeError, or the ctx's error once closed */
 
-	events chan any
-	errs   chan error
+	errs chan error
 	/* ctx is canceled by Close; every wait in the read loop selects on it */
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -75,9 +88,21 @@ type ResumableConnection struct {
 	loopDone  chan struct{}
 }
 
-// NewResumableConnection builds a connection over transports; opts is copied (nil means
-// defaults). It panics when transports is empty, a programming error.
-func NewResumableConnection(baseURL string, transports []Transport, opts *TransportOpts) *ResumableConnection {
+// NewResumableConnection builds an untyped connection over transports: it reads each message as
+// its JSON value, or its text when it is not JSON, and sends a value as TransportConn.Send does.
+// opts is copied (nil means defaults). It panics when transports is empty, a programming error.
+func NewResumableConnection(baseURL string, transports []Transport, opts *TransportOpts) *ResumableConnection[any, any] {
+	return newConnection(baseURL, transports, opts, framePayload, messageAsIs)
+}
+
+// newConnection builds a connection reading each message by read and writing each by write.
+func newConnection[In, Out any](baseURL string, transports []Transport, opts *TransportOpts, read func([]byte) (In, error), write func(Out) (any, error)) *ResumableConnection[In, Out] {
+	c := &ResumableConnection[In, Out]{r: newResumable(baseURL, transports, opts), read: read, write: write, events: make(chan In, 16)}
+	c.r.deliver = c.deliver
+	return c
+}
+
+func newResumable(baseURL string, transports []Transport, opts *TransportOpts) *resumable {
 	if len(transports) == 0 {
 		panic("httpsdk: NewResumableConnection requires at least one transport")
 	}
@@ -86,21 +111,34 @@ func NewResumableConnection(baseURL string, transports []Transport, opts *Transp
 		o = *opts
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &ResumableConnection{
-		url: baseURL, transports: transports, opts: o,
-		events: make(chan any, 16), errs: make(chan error, 4),
+	return &resumable{
+		url: baseURL, transports: transports, opts: o, errs: make(chan error, 4),
 		ctx: ctx, cancel: cancel, state: StateDisconnected, provenIdx: -1,
 	}
 }
 
 // newRealtime connects the call's connection over the default WebSocket, SSE and long-poll chain,
-// with the client's auth (its current token at each dial), headers and redirect policy; ctx bounds
-// the open. The headers hold no X-Request-Id unless the caller set one: each dial mints its own.
-func newRealtime(ctx context.Context, cfg Config, c *call, topts TransportOpts, opts []RequestOption) (*ResumableConnection, error) {
+// with the client's auth (its current token at each dial), headers and redirect policy, reading
+// each message by read and writing each by write; ctx bounds the open. The headers hold no
+// X-Request-Id unless the caller set one: each dial mints its own.
+func newRealtime[In, Out any](ctx context.Context, cfg Config, c *call, topts TransportOpts, read func([]byte) (In, error), write func(Out) (any, error), opts []RequestOption) (*ResumableConnection[In, Out], error) {
+	u, err := realtimeDial(cfg, c, &topts, opts)
+	if err != nil {
+		return nil, err
+	}
+	conn := newConnection(u, []Transport{&WsTransport{}, &SseTransport{}, &LongpollTransport{}}, &topts, read, write)
+	if err := conn.r.connect(ctx); err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+// realtimeDial is the call's URL, and topts set to dial it as the client calls.
+func realtimeDial(cfg Config, c *call, topts *TransportOpts, opts []RequestOption) (string, error) {
 	rc := newRequestConfig(cfg, opts)
 	u, err := buildURL(rc.baseURL, c.path, c.query)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	topts.HTTPClient = streamClient(cfg)
 	if topts.KeepAlive == 0 {
@@ -118,35 +156,88 @@ func newRealtime(ctx context.Context, cfg Config, c *call, topts TransportOpts, 
 			return err == nil
 		}
 	}
-	r := NewResumableConnection(u, []Transport{&WsTransport{}, &SseTransport{}, &LongpollTransport{}}, &topts)
-	if err := r.Connect(ctx); err != nil {
-		return nil, err
-	}
-	return r, nil
+	return u, nil
 }
 
-// Events returns the decoded payloads.
-func (r *ResumableConnection) Events() <-chan any { return r.events }
+// deliver decodes one message, hands it to the OnMessage handlers and then to Events.
+func (c *ResumableConnection[In, Out]) deliver(data []byte) error {
+	msg, err := c.read(data)
+	if err != nil {
+		return frameError("realtime message", err)
+	}
+	c.onMessage.call(msg)
+	select {
+	case c.events <- msg:
+		return nil
+	case <-c.r.ctx.Done():
+		return c.r.ctx.Err()
+	}
+}
 
-// Errors returns the terminal transport errors.
-func (r *ResumableConnection) Errors() <-chan error { return r.errs }
+// Events returns the messages, decoded.
+func (c *ResumableConnection[In, Out]) Events() <-chan In { return c.events }
+
+// Errors returns the terminal transport error, and each message that did not decode as a
+// *DecodeError.
+func (c *ResumableConnection[In, Out]) Errors() <-chan error { return c.r.errs }
+
+// OnMessage registers a handler for each message, run on the read goroutine before Events gets it.
+func (c *ResumableConnection[In, Out]) OnMessage(handler func(msg In)) { c.onMessage.add(handler) }
 
 // State reports the lifecycle state.
-func (r *ResumableConnection) State() ConnectionState {
+func (c *ResumableConnection[In, Out]) State() ConnectionState { return c.r.lifecycle() }
+
+// Cursor reports the resume cursor: the last delivered event ID and reconnect token.
+func (c *ResumableConnection[In, Out]) Cursor() (lastEventID, reconnectToken string) {
+	return c.r.cursor()
+}
+
+// ProvenTransport reports the kind of the last transport that opened, if any.
+func (c *ResumableConnection[In, Out]) ProvenTransport() (TransportKind, bool) { return c.r.proven() }
+
+// Connect opens the chain and starts the read goroutine. ctx bounds the open only; the stream
+// lives until Close. It returns once a transport opened, or the last transport error. It is a
+// no-op while connected or connecting; after the read goroutine gave up, it starts over.
+func (c *ResumableConnection[In, Out]) Connect(ctx context.Context) error { return c.r.connect(ctx) }
+
+// Close stops the read goroutine, closes the active transport, then closes Events and Errors. It
+// is safe to call more than once and concurrently with reads; Connect afterwards fails.
+func (c *ResumableConnection[In, Out]) Close() error {
+	if c.r.close() {
+		close(c.events)
+	}
+	return nil
+}
+
+// Send writes one message on the active transport: a WebSocket frame, else a POST answered as a
+// call is (a 2xx past MaxResponseBytes a *DecodeError). A typed connection sends it as JSON; an
+// untyped one sends it as TransportConn.Send does.
+func (c *ResumableConnection[In, Out]) Send(ctx context.Context, msg Out) error {
+	data, err := c.write(msg)
+	if err != nil {
+		return err
+	}
+	return c.r.send(ctx, data)
+}
+
+// SendText writes text as is: a text frame on WebSocket, else a text/plain POST.
+func (c *ResumableConnection[In, Out]) SendText(ctx context.Context, text string) error {
+	return c.r.send(ctx, text)
+}
+
+func (r *resumable) lifecycle() ConnectionState {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.state
 }
 
-// Cursor reports the resume cursor: the last delivered event ID and reconnect token.
-func (r *ResumableConnection) Cursor() (lastEventID, reconnectToken string) {
+func (r *resumable) cursor() (lastEventID, reconnectToken string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.opts.LastEventID, r.opts.ReconnectToken
 }
 
-// ProvenTransport reports the kind of the last transport that opened, if any.
-func (r *ResumableConnection) ProvenTransport() (TransportKind, bool) {
+func (r *resumable) proven() (TransportKind, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.provenIdx < 0 || r.provenIdx >= len(r.transports) {
@@ -155,10 +246,7 @@ func (r *ResumableConnection) ProvenTransport() (TransportKind, bool) {
 	return r.transports[r.provenIdx].Kind(), true
 }
 
-// Connect opens the chain and starts the read goroutine. ctx bounds the open only; the stream
-// lives until Close. It returns once a transport opened, or the last transport error. It is a
-// no-op while connected or connecting; after the read goroutine gave up, it starts over.
-func (r *ResumableConnection) Connect(ctx context.Context) error {
+func (r *resumable) connect(ctx context.Context) error {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -189,13 +277,12 @@ func (r *ResumableConnection) Connect(ctx context.Context) error {
 	return nil
 }
 
-// Close stops the read goroutine, closes the active transport, then closes Events and Errors. It
-// is safe to call more than once and concurrently with reads; Connect afterwards fails.
-func (r *ResumableConnection) Close() error {
+// close stops the loop and closes the transport, then Errors; whether this call closed it.
+func (r *resumable) close() bool {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
-		return nil
+		return false
 	}
 	r.closed = true
 	conn := r.conn
@@ -211,14 +298,11 @@ func (r *ResumableConnection) Close() error {
 	if done != nil {
 		<-done
 	}
-	close(r.events)
 	close(r.errs)
-	return nil
+	return true
 }
 
-// Send writes data on the active transport: a WebSocket frame, else a POST answered as a call is
-// (a 2xx past MaxResponseBytes a *DecodeError).
-func (r *ResumableConnection) Send(ctx context.Context, data any) error {
+func (r *resumable) send(ctx context.Context, data any) error {
 	r.mu.Lock()
 	conn := r.conn
 	r.mu.Unlock()

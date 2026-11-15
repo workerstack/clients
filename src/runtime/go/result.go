@@ -23,7 +23,8 @@ type Result[T any] struct {
 func (r Result[T]) Ok() bool { return r.Err == nil }
 
 // DecodeError is a 2xx whose body did not decode, or ran past Config.MaxResponseBytes (Err is
-// then ErrResponseTooLarge, the Body empty).
+// then ErrResponseTooLarge, the Body empty); or a server-sent event, WebSocket frame or realtime
+// message that did not decode, its Response nil.
 type DecodeError struct {
 	Response *http.Response
 	Err      error
