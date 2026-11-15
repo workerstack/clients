@@ -3,12 +3,20 @@
 // line. Each package is packed from a staged copy: prepack builds dist/ in the copy, so the checkout never gets one.
 // The build reads the checkout's `clients-source` condition, but the tarball ships no src/, so the manifest npm packs
 // drops every `clients-source` key: a process that sets the condition would otherwise resolve an install to a missing
-// file. release.yml's pack job packs here (bit 19 i).
+// file. It drops devDependencies too, which no consumer installs and whose vendored `file:` pins name a tarball no
+// install can reach, and refuses a `file:`, `link:` or git spec in a field a consumer does install. release.yml's
+// pack job packs here (bit 19 i).
 import { spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
-type Manifest = { name: string; version: string; exports?: unknown; imports?: unknown }
+/** The fields an install of the package reads; a spec in one must name a registry version. */
+const INSTALLED = ["dependencies", "optionalDependencies", "peerDependencies"] as const
+const NON_REGISTRY = /^(?:file|link|git(?:\+[a-z]+)?|github):/
+
+type Manifest = { name: string; version: string; exports?: unknown; imports?: unknown } & Partial<
+	Record<(typeof INSTALLED)[number] | "devDependencies", Record<string, string>>
+>
 
 const UNSTAGED = new Set(["coverage", "dist", "node_modules", "tests"])
 
@@ -17,6 +25,18 @@ const read = (dir: string): Manifest => JSON.parse(readFileSync(join(dir, "packa
 /** The manifest npm publishes: the package's own, which pins exact versions (no catalog, no workspace). */
 function published(dir: string): Manifest {
 	return read(dir)
+}
+
+/** `manifest` as npm publishes it: no devDependencies, and every installed spec a registry version, or it throws. */
+function shippedManifest(manifest: Manifest): Manifest {
+	const { devDependencies: _dev, ...shipped } = manifest
+	for (const field of INSTALLED)
+		for (const [name, spec] of Object.entries(manifest[field] ?? {}))
+			if (NON_REGISTRY.test(spec))
+				throw new Error(
+					`pack: ${manifest.name} ${field}.${name} is "${spec}"; a published manifest names only registry versions`,
+				)
+	return { ...shipped, exports: withoutSource(manifest.exports), imports: withoutSource(manifest.imports) }
 }
 
 /** `entry` (an `exports` or `imports` value) without its `clients-source` conditions, at any depth. */
@@ -29,8 +49,10 @@ function withoutSource(entry: unknown): unknown {
 }
 
 /** The tarball of the package at `dir`, packed into `out` from a copy staged inside the package. */
-function pack(dir: string, out: string): string {
+export function pack(dir: string, out: string): string {
 	const manifest = published(dir)
+	/* checked before the build, so a refused spec fails in a second, not after prepack */
+	const shipped = shippedManifest(manifest)
 	const stage = mkdtempSync(join(dir, ".tmp-pack-"))
 	try {
 		for (const entry of readdirSync(dir)) {
@@ -41,7 +63,6 @@ function pack(dir: string, out: string): string {
 		/* prepack's log and npm's tarball name go to stderr, so stdout carries only the path */
 		const built = spawnSync("npm", ["run", "prepack", "--if-present"], { cwd: stage, stdio: ["ignore", 2, 2] })
 		if (built.status !== 0) throw new Error(`pack: prepack of ${manifest.name} failed (${built.status})`)
-		const shipped = { ...manifest, exports: withoutSource(manifest.exports), imports: withoutSource(manifest.imports) }
 		writeFileSync(join(stage, "package.json"), `${JSON.stringify(shipped, null, "\t")}\n`)
 		const packed = spawnSync("npm", ["pack", "--ignore-scripts", "--pack-destination", out], {
 			cwd: stage,
