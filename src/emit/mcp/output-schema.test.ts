@@ -1,7 +1,8 @@
 /**
  * A tool's outputSchema (bit 18 phase d, D1): an object answer as it is, any other JSON answer wrapped `{result}`, an
  * answer with declared response headers wrapped `{result, headers}` (Q11), each header a string under its lower-case
- * name, and no outputSchema without a JSON success schema.
+ * name, and no outputSchema without a JSON success schema. An event stream's collect types each event: by its name when
+ * the stream names its events (D7, D12), each JSON event's data its own member and every text event the string one.
  */
 import { describe, expect, it } from "vitest"
 import { type OpenApiDocument, toIR } from "../../ir/build.ts"
@@ -82,5 +83,82 @@ describe("a tool's outputSchema (phase d)", () => {
 			output({ 200: { content: { "application/json": {} }, description: "ok" } }),
 			output({ 204: { description: "none" } }),
 		]).toEqual([undefined, undefined, undefined, undefined])
+	})
+})
+
+/** A stream event named `name` whose `data` is `data`, as core declares one in an `itemSchema`. */
+const event = (name: string, data: unknown) => ({
+	properties: { data, event: { const: name } },
+	required: ["event", "data"],
+	type: "object",
+})
+
+/** A JSON event's `data`: a string carrying `schema` as JSON, as core declares it (D7). */
+const json = (schema: unknown) => ({ contentMediaType: "application/json", contentSchema: schema, type: "string" })
+
+/** The events a collect of an event stream answering `content` lists: its outputSchema's `events` items. */
+function itemsOf(content: Record<string, unknown>, components: Record<string, unknown> = {}) {
+	const out = output({ 200: { content: { "text/event-stream": content }, description: "events" } }, components)
+	const schema = out?.outputSchema as { properties: { events: { items: unknown } }; required: string[] }
+	return [schema.properties.events.items, schema.required, Object.keys(schema.properties)]
+}
+
+const COLLECT = ["events", "last_event_id", "ended"]
+
+describe("an event stream's collect (phase e, D12)", () => {
+	it("types an unnamed stream's events by its one data schema, their name and id optional", () => {
+		const tick = { properties: { n: { type: "number" } }, type: "object" }
+		expect([itemsOf({ schema: tick }), itemsOf({ schema: STR })]).toEqual(
+			[tick, STR].map((data) => [
+				{ properties: { data, event: STR, id: STR }, required: ["data"], type: "object" },
+				COLLECT,
+				COLLECT,
+			]),
+		)
+	})
+
+	it("names a stream's text events as examples of `event`, each event's name required beside its data", () => {
+		const items = { oneOf: [event("batch", STR), event("complete", STR), event("batch", STR)] }
+		expect(itemsOf({ itemSchema: items })).toEqual([
+			{
+				properties: { data: STR, event: { examples: ["batch", "complete"], type: "string" }, id: STR },
+				required: ["data", "event"],
+				type: "object",
+			},
+			COLLECT,
+			COLLECT,
+		])
+	})
+
+	it("types each JSON event's data by its name, names sharing a schema as one enum, a name once, the rest a string", () => {
+		const n = { properties: { n: { type: "number" } }, required: ["n"], type: "object" }
+		const items = {
+			anyOf: [
+				event("tick", json({ $ref: "#/components/schemas/N" })),
+				{ $ref: "#/components/schemas/Beat" },
+				event("tock", json({ $ref: "#/components/schemas/N" })),
+				event("done", json({ type: "boolean" })),
+				{ properties: { data: {} }, type: "object" },
+				event("tick", json({ $ref: "#/components/schemas/N" })),
+			],
+		}
+		const components = { Beat: event("heartbeat", STR), N: n }
+		expect(itemsOf({ itemSchema: items }, components)).toEqual([
+			{
+				anyOf: [
+					{ properties: { data: n, event: { enum: ["tick", "tock"] } } },
+					{ properties: { data: { type: "boolean" }, event: { const: "done" } } },
+					{ properties: { data: STR } },
+				],
+				properties: {
+					event: { examples: ["tick", "heartbeat", "tock", "done", "message"], type: "string" },
+					id: STR,
+				},
+				required: ["data", "event"],
+				type: "object",
+			},
+			COLLECT,
+			COLLECT,
+		])
 	})
 })

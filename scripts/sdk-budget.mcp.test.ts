@@ -153,6 +153,12 @@ type Tools = { readonly total: number; readonly largest: number }
  * - bit 21 g, remote files: no standalone tool changes. A mounted tool's file argument shows the URL value in place of
  *   the path (97 tokens, one fewer), or, on a mount without urlFiles, the FileInput alone (64, 34 fewer); so no mounted
  *   tool costs more than its standalone one (Acme's extract_once 393 -> 392 mounted, 359 without urlFiles).
+ * - Backend plan 16, each SSE event typed by its name (D7, D12): a stream that names its events requires `event`, lists
+ *   its names as examples, and gives each JSON event's data an `anyOf` member, the text events one string member.
+ *   Re-measured on the plan 9 fixtures as tools/list shows each tool, legacy era (the modern adds 16 to each total):
+ *   kitchen 1,048 -> 1,062 total, its largest 186 -> 194 (events_live_list); mcp 1,509 -> 1,529, 355 -> 365
+ *   (extract_stream); surface 2,294 -> 2,351, 205 -> 237 (out_sse_list, its `data` event's object typed where it was a
+ *   string). Each is within its ceiling, so no pin below moves.
  */
 const MEASURED: Readonly<Record<string, Tools>> = {
 	compose: { largest: 72, total: 363 },

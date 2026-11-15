@@ -573,6 +573,29 @@ or GitLab repository. Where a hosted server runs is yours, so it lists no `remot
 }
 ```
 
+An event stream is one bounded collect: `max_events` (1 to 100, 20 by default) and `last_event_id` in, and
+`{ events, last_event_id, ended }` out. When the stream names its events, each event's `event` is required and the
+declared names are its `examples`. Each JSON event's `data` is typed by its name in an `anyOf` member, and any other
+event, declared or not, has its `data` as a string. A stream of `tick` JSON events and `heartbeat` text events lists
+its events as:
+
+```json
+{
+	"type": "object",
+	"properties": { "event": { "type": "string", "examples": ["tick", "heartbeat"] }, "id": { "type": "string" } },
+	"required": ["data", "event"],
+	"anyOf": [
+		{
+			"properties": {
+				"event": { "const": "tick" },
+				"data": { "type": "object", "properties": { "n": { "type": "number" } } }
+			}
+		},
+		{ "properties": { "data": { "type": "string" } } }
+	]
+}
+```
+
 The server reads its configuration from the environment, under the `--mcp-env-prefix` (or the document's title,
 upper-cased):
 
