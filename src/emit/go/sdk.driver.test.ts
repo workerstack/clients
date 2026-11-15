@@ -128,6 +128,7 @@ describe("goCallPlans: each operation's call plan, in the emitter's own names", 
 				response: "json",
 				responseHeaders: null,
 				returns: "(*Note, error)",
+				sends: null,
 				stream: null,
 			},
 		})

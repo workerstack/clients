@@ -16,7 +16,7 @@ import type { IRSchema } from "../../ir/model.ts"
 import { type Dispatch, dispatchOf, isJsonEventData, type SdkOp } from "../../ir/sdk-model.ts"
 import { goString, lineComment } from "../shared/escape.ts"
 import { goExported, NameScope } from "../shared/lang.ts"
-import { type GoStream, sendArgs } from "./sdk-answer.ts"
+import { type GoSends, type GoStream, sendArgs } from "./sdk-answer.ts"
 import type { OptsField, StreamField, StreamOpts } from "./sdk-opts.ts"
 import { isLastEventIdHeader } from "./sse.ts"
 import { type GoTypeContext, goKeyedMembers, goTypeOf } from "./types.ts"
@@ -145,22 +145,39 @@ function keyedInbound(op: SdkOp, send: IRSchema, dispatch: Dispatch, at: GoTypeC
 	return { codec: decode, decode, key: dispatch.key, members, type: iface }
 }
 
+/** A write side, and what the server receives as the CLI checks a line against it; none for an untyped one. */
+type Outbound = Side & { readonly sends?: GoSends }
+
 /* a send of an op that declares none: as given */
-const UNTYPED_OUT: Side = { codec: "messageAsIs", type: "any" }
+const UNTYPED_OUT: Outbound = { codec: "messageAsIs", type: "any" }
+
+/** The fields `schema` requires at its top level: an object's, none for any other schema. */
+function requiredOf(schema: IRSchema, at: GoTypeContext): string[] {
+	const resolved = at.names.resolve(schema)
+	return resolved.kind === "object" ? resolved.fields.filter((field) => field.required).map((field) => field.name) : []
+}
 
 /** The write side of `op`'s socket from what the server receives (`receive`): `<Op>Outbound` when keyed, else its Go type, written as JSON; `any` when it declares none. */
-function outbound(op: SdkOp, receive: IRSchema | undefined, at: GoTypeContext): Side {
+function outbound(op: SdkOp, receive: IRSchema | undefined, at: GoTypeContext): Outbound {
 	if (receive === undefined) return UNTYPED_OUT
 	const here = { ...at, fieldName: "Receive", parentName: op.id }
 	const dispatch = dispatchOf(receive, at.names.resolve)
 	if (dispatch === undefined) {
 		const type = goTypeOf(receive, here).replace(/^\*/, "")
-		return { codec: `messageJSON[${type}]`, type }
+		return { codec: `messageJSON[${type}]`, sends: { key: null, required: requiredOf(receive, at), type }, type }
 	}
 	const members = goKeyedMembers(receive, dispatch, here)
 	const iface = at.names.claimConst(`${goExported(op.id)}Outbound`)
 	at.decls.set(iface, sealed(op, members, iface, "the server receives").join("\n"))
-	return { codec: `messageJSON[${iface}]`, type: iface }
+	const sends: GoSends = {
+		key: dispatch.key,
+		members: members.map(([value, type], i) => ({
+			required: requiredOf(dispatch.members[i]?.variant as IRSchema, at),
+			type,
+			value,
+		})),
+	}
+	return { codec: `messageJSON[${iface}]`, sends, type: iface }
 }
 
 /** `<Op><suffix>` around `base`, an On<Value> per member whose method no handler names, declared in `at`; null when none is left. */
@@ -204,16 +221,22 @@ function socketType(
 }
 
 /** What a socket or connection reads and what it writes. */
-type Sides = { readonly read: Side | Keyed; readonly write: Side }
+type Sides = { readonly read: Side | Keyed; readonly write: Outbound }
 
-/** `op`'s answer of `kind`: its runtime type of both sides, or its own type around it; the call that opens it. */
-function answerOf(op: SdkOp, kind: Kind, { read, write }: Sides, at: GoTypeContext): Pick<GoStream, "calls" | "shape"> {
+/** `op`'s answer of `kind`: its runtime type of both sides, or its own type around it; the call that opens it; what it sends, typed. */
+function answerOf(
+	op: SdkOp,
+	kind: Kind,
+	{ read, write }: Sides,
+	at: GoTypeContext,
+): Pick<GoStream, "calls" | "sends" | "shape"> {
 	const base = `${kind.base}[${read.type}, ${write.type}]`
 	const call = (client: string) => kind.open(client, read.codec, write.codec)
 	const keyed = "decode" in read ? read : undefined
 	const own = keyed && socketType(op, kind, { base, read: keyed }, at)
 	return {
 		calls: keyed ? [keyed.decode] : [],
+		...(write.sends === undefined ? {} : { sends: write.sends }),
 		shape: own
 			? {
 					fail: FAIL,

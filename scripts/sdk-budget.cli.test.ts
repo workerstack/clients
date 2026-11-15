@@ -87,8 +87,12 @@ const REPO = resolve(import.meta.dirname, "..")
  * Plan 55, +18 B to 55,573 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
  * Backend plan 11, +323 B to 55,896 B: the SDK's typed streams; `Converse` and `Resume` take the op's own read and
  *   events (generic over the message type), and `printed` prints a typed message as its JSON, text as text.
+ * Backend plan 15, +2,999 B to 58,895 B, all socket.go, nothing dead to cut: a WebSocket command checks each input line
+ *   against what the server receives (`LineCheck`, `JSONLine` decoding a line as the type with its required fields,
+ *   `Keyed` by the member its key names), a refused line not sent and reported on stderr, the run reading on and
+ *   ending a usage error; a blank line skipped; a message that does not decode (`Undecoded`) ending the run, close 1007.
  */
-const CLI_RUNTIME_BYTES = 55896
+const CLI_RUNTIME_BYTES = 58895
 
 describe("the CLI runtime within its byte budget (bit 17, the G14 analog)", () => {
 	it(

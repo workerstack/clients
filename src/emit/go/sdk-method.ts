@@ -8,7 +8,7 @@ import type { IRParam } from "../../ir/model.ts"
 import { mediaEssence, type SdkBody, type SdkOp, type SdkResponseKind, type SdkStream } from "../../ir/sdk-model.ts"
 import { goString, lineComment } from "../shared/escape.ts"
 import { goExported, goLocal, NameScope } from "../shared/lang.ts"
-import { type GoStream, type Shape, shapeOf } from "./sdk-answer.ts"
+import { type GoSends, type GoStream, type Shape, shapeOf } from "./sdk-answer.ts"
 import { type GoBody, type GoPart, goBody } from "./sdk-body.ts"
 import { type GoResponseHeaders, type OptsField, optsDecl, optsFields, optsLines, responseHeaders } from "./sdk-opts.ts"
 import { sseStream } from "./sse.ts"
@@ -45,6 +45,8 @@ export type GoMethodCall = {
 	readonly opts: string
 	/** a multipart body's parts by their `<Op>Body` fields; null for any other body */
 	readonly parts: readonly GoPart[] | null
+	/** what a socket's server receives, typed: the CLI checks each input line against it; null when untyped or no socket */
+	readonly sends: GoSends | null
 }
 
 /**
@@ -224,10 +226,11 @@ export function goMethod(op: SdkOp, name: string, receiver: Receiver, env: Metho
 	const fields = optsFields(op, opts, env.at, streamOpts)
 	const path = pathLines(op, pathLocals, shape.fail)
 	const headers = responseHeaders(op, env.at)
+	const bodyTypes = body ? [body.type] : []
 	const params = [
 		"ctx context.Context",
 		...pathLocals.map(([, local]) => `${local} string`),
-		...(body ? [`${bodyLocal} ${body.type}`] : []),
+		...bodyTypes.map((type) => `${bodyLocal} ${type}`),
 		`opts *${opts}`,
 		"reqOpts ...RequestOption",
 	]
@@ -245,13 +248,14 @@ export function goMethod(op: SdkOp, name: string, receiver: Receiver, env: Metho
 	if (headers) decls.push([headers.plan.type, headers.decl])
 	const call = {
 		...callOf(op, name, pathLocals, fields),
-		bodyType: body ? body.type : null,
+		bodyType: bodyTypes[0] ?? null,
 		opts,
 		parts: body?.parts ?? null,
 		responseHeaders: headers?.plan ?? null,
 		returns: shape.returns,
+		sends: stream?.sends ?? null,
 	}
-	const types = ["context.Context", ...pathLocals.map(() => "string"), ...(body ? [body.type] : []), `*${opts}`]
+	const types = ["context.Context", ...pathLocals.map(() => "string"), ...bodyTypes, `*${opts}`]
 	const twin = twinOf(op, shape.returns, types)
 	return { call, decls, lines, twin }
 }

@@ -5,7 +5,13 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+	"sync/atomic"
 
 	"github.com/coder/websocket"
 )
@@ -16,30 +22,119 @@ type Socket interface {
 	Close(code websocket.StatusCode, reason string) error
 }
 
+// LineCheck refuses an input line that is no message the server receives.
+type LineCheck func(line string) error
+
+// JSONLine checks that a line decodes as T and holds each field of required.
+func JSONLine[T any](required ...string) LineCheck {
+	return func(line string) error {
+		var msg T
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			var syntax *json.SyntaxError
+			if errors.As(err, &syntax) {
+				return fmt.Errorf("not valid JSON: %w", err)
+			}
+			return err
+		}
+		var fields map[string]json.RawMessage
+		_ = json.Unmarshal([]byte(line), &fields) // T decoded: a missing field is all left to find
+		for _, name := range required {
+			if _, ok := fields[name]; !ok {
+				return fmt.Errorf("missing %q", name)
+			}
+		}
+		return nil
+	}
+}
+
+// Keyed checks a line by the member its key names, one of members.
+func Keyed(key string, members map[string]LineCheck) LineCheck {
+	values := make([]string, 0, len(members))
+	for value := range members {
+		values = append(values, strconv.Quote(value))
+	}
+	sort.Strings(values)
+	want := fmt.Errorf("want an object whose %q is one of %s", key, strings.Join(values, ", "))
+	return func(line string) error {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(line), &fields); err != nil {
+			var syntax *json.SyntaxError
+			if errors.As(err, &syntax) {
+				return fmt.Errorf("not valid JSON: %w", err)
+			}
+			return want
+		}
+		var value string
+		_ = json.Unmarshal(fields[key], &value) // no string there: no member's value
+		if check, ok := members[value]; ok {
+			return check(line)
+		}
+		return want
+	}
+}
+
+// checked is check's verdict on line; none without a check.
+func checked(check LineCheck, line string) error {
+	if check == nil {
+		return nil
+	}
+	return check(line)
+}
+
+// Undecoded reports whether err is an E, the SDK's error for a message that does not decode.
+func Undecoded[E error](err error) bool {
+	var undecoded E
+	return errors.As(err, &undecoded)
+}
+
 // Converse sends each standard-input line as a text frame, reading on after its end, and prints
 // each message read returns as one line (a typed one as its JSON) until the server closes, --take
-// is met (a close frame 1000) or the run is interrupted (a close frame 1000 "interrupted").
-func Converse[T any](s *Stream, conn Socket, read func(context.Context) (T, error)) error {
+// is met (a close frame 1000) or the run is interrupted (a close frame 1000 "interrupted"). With a
+// check, a blank line is skipped and a line it refuses is not sent: the refusal goes to stderr as
+// an error does, the run reads on, and its end is a usage error counting the lines not sent. A
+// message that does not decode, as undecoded tells, ends the run with its error after a close
+// frame 1007.
+func Converse[T any](s *Stream, conn Socket, read func(context.Context) (T, error), check LineCheck, undecoded func(error) bool) error {
 	/* reads outlive Ctrl-C, so the close frame goes out and is answered */
 	ctx := context.WithoutCancel(s.c.Context())
 	stop := context.AfterFunc(s.c.Context(), func() { conn.Close(websocket.StatusNormalClosure, "interrupted") })
 	defer stop()
+	var refused atomic.Int64
 	go func() {
 		lines := bufio.NewScanner(s.c.InOrStdin())
-		for lines.Scan() {
-			if conn.SendText(ctx, lines.Text()) != nil {
+		for n := 1; lines.Scan(); n++ {
+			line := lines.Text()
+			if check != nil && strings.TrimSpace(line) == "" {
+				continue
+			}
+			if err := checked(check, line); err != nil {
+				refused.Add(1)
+				report(s.c, Usage("input line %d not sent: %v", n, err), false)
+				continue
+			}
+			if conn.SendText(ctx, line) != nil {
 				return
 			}
 		}
 	}()
+	ended := func(err error) error {
+		if n := refused.Load(); err == nil && n > 0 && s.c.Context().Err() == nil {
+			return Usage("input lines not sent: %d", n)
+		}
+		return err
+	}
 	for {
 		message, err := read(ctx)
-		if err != nil {
-			return closedOf(err, s.c.Context().Err() != nil)
+		switch {
+		case err != nil && undecoded(err):
+			conn.Close(websocket.StatusInvalidFramePayloadData, "a message did not decode")
+			return err
+		case err != nil:
+			return ended(closedOf(err, s.c.Context().Err() != nil))
 		}
 		if !s.Write(printed(message)) {
 			conn.Close(websocket.StatusNormalClosure, "")
-			return s.err
+			return ended(s.err)
 		}
 	}
 }

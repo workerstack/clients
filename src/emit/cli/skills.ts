@@ -31,7 +31,11 @@ export function skillFile(bin: string, title: string, prefix: string, ops: reado
 					"",
 					"## Streams",
 					`A stream command (${streams.join(", ")}) prints one JSON line per event; \`--take N\` ends it after N.`,
-					...(streams.includes("ws") ? ["A ws command sends each stdin line as a text frame."] : []),
+					...(streams.includes("ws")
+						? [
+								"A ws command sends each stdin line as a text frame; where its messages are typed, a line that is not one is refused on stderr, not sent, and the run exits 4.",
+							]
+						: []),
 					...(streams.includes("realtime")
 						? [
 								"A realtime feed writes its resume cursor to stderr when it ends; pass it back with `--reconnect-token` and `--last-event-id`.",

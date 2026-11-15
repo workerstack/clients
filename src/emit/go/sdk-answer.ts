@@ -18,7 +18,20 @@ export type GoStream = {
 	readonly opts: StreamOpts
 	readonly doc: string
 	readonly calls: readonly string[]
+	/** what a socket's server receives, typed; absent for an SSE op and a socket that declares no `receive` */
+	readonly sends?: GoSends
 }
+
+/** A message type the server receives: its Go type, and the fields it requires at its top level. */
+export type GoMessageType = { readonly type: string; readonly required: readonly string[] }
+
+/**
+ * What a socket's server receives, as the CLI checks an input line against it: one message type,
+ * or a union keyed on `key` (D9), each member by its value.
+ */
+export type GoSends =
+	| (GoMessageType & { readonly key: null })
+	| { readonly key: string; readonly members: readonly (GoMessageType & { readonly value: string })[] }
 
 /** The runtime call's arguments: the ctx, the client's config, the call, each of `extra`, then the per-call options. */
 export const sendArgs = (client: string, ...extra: string[]) =>

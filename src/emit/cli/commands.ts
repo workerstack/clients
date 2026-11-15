@@ -8,6 +8,7 @@
  */
 import type { IR } from "../../ir/model.ts"
 import type { SdkOp } from "../../ir/sdk-model.ts"
+import type { GoMessageType, GoSends } from "../go/sdk-answer.ts"
 import type { GoCallPlan } from "../go/sdk-client.ts"
 import { goString, lineComment } from "../shared/escape.ts"
 import { compareCodeUnits, NameScope, pascalWords } from "../shared/lang.ts"
@@ -121,8 +122,26 @@ function bodyLines(op: SdkOp, plan: GoCallPlan, flags: CommandFlags): [string[],
 	}
 }
 
-/** A stream's call: its stream opened first (its output flags checked), then each event printed as it comes. */
-function streamLines(call: string, stream: NonNullable<GoCallPlan["stream"]>): string[] {
+/** The check of one message type: an input line decoded as it, holding each field it requires. */
+const lineCheck = ({ required, type }: GoMessageType) =>
+	`cli.JSONLine[${qualified(type)}](${required.map(goString).join(", ")})`
+
+/** The check a WebSocket command runs on each input line: by what the server receives; nil when it is untyped. */
+function linesChecked(sends: GoSends | null): string {
+	if (sends === null) return "nil"
+	if (sends.key === null) return lineCheck(sends)
+	const members = [...sends.members]
+		.sort((a, b) => compareCodeUnits(a.value, b.value))
+		.map((member) => `${goString(member.value)}: ${lineCheck(member)}`)
+	return `cli.Keyed(${goString(sends.key)}, map[string]cli.LineCheck{${members.join(", ")}})`
+}
+
+/**
+ * A stream's call: its stream opened first (its output flags checked), then each event printed as it comes. A
+ * WebSocket's input lines are checked against what the server receives, and a message that does not decode, the
+ * SDK's `*DecodeError`, ends the conversation.
+ */
+function streamLines(call: string, stream: NonNullable<GoCallPlan["stream"]>, sends: GoSends | null): string[] {
 	const open = ["\tout, err := cli.OpenStream(c)", "\tif err != nil {", "\t\treturn err", "\t}", "\tdefer out.Close()"]
 	if (stream === "sse")
 		return [
@@ -146,7 +165,7 @@ function streamLines(call: string, stream: NonNullable<GoCallPlan["stream"]>): s
 		"\t}",
 		stream === "realtime"
 			? "\treturn failed(cli.Resume(out, conn, conn.Events()))"
-			: "\treturn cli.Converse(out, conn, conn.Read)",
+			: `\treturn cli.Converse(out, conn, conn.Read, ${linesChecked(sends)}, cli.Undecoded[*sdk.DecodeError])`,
 	]
 }
 
@@ -199,7 +218,7 @@ function opFunc(node: CommandNode, path: readonly string[], ir: IR): string[] {
 		"\t}",
 		...(plan.stream === null
 			? callLines(`${method}(c.Context()${args}${bodyArg}, opts, sdk.WithResponseInto(&resp))`, plan)
-			: streamLines(`${method}(c.Context()${args}${bodyArg}, opts)`, plan.stream)),
+			: streamLines(`${method}(c.Context()${args}${bodyArg}, opts)`, plan.stream, plan.sends)),
 	]
 	return [
 		...lineComment(`${node.fn} is \`${[...path, node.name].join(" ")}\`: ${op.method} ${op.path}.`, "//"),
