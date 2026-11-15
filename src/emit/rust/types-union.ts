@@ -73,6 +73,17 @@ function variantsOf(name: string, union: Of<"union"> & { discriminator: IRDiscri
 	})
 }
 
+/** Each value a keyed union selects a variant by, beside that variant's name and payload type, in declared order. */
+export function unionVariants(
+	name: string,
+	union: Of<"union"> & { discriminator: IRDiscriminator },
+	scope: UnionScope,
+): { value: string; variant: string; type: string }[] {
+	return variantsOf(name, union, scope).flatMap(({ type, values, variant }) =>
+		values.map((value) => ({ type, value, variant })),
+	)
+}
+
 /** `Serialize` as the payload of whichever variant holds it. */
 const serializeImpl = (name: string, variants: readonly Variant[]) => [
 	`impl serde::Serialize for ${name} {`,

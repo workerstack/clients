@@ -8,7 +8,7 @@ use crate::transport::{
     Dial, Transport, TransportConn, TransportFuture, TransportKind, TransportMessage,
     TransportOpts, with_cursor,
 };
-use crate::ws::{TypedWebSocket, WS_STATUS_NORMAL_CLOSURE, connect};
+use crate::ws::{TypedWebSocket, WS_STATUS_NORMAL_CLOSURE, connect, frame_bytes};
 
 /// The default WebSocket adapter: dials with a client's auth, headers and credential.
 #[derive(Clone)]
@@ -39,7 +39,8 @@ impl Transport for WsTransport {
             let (mut spec, mut ov) = self.0.spec("GET", url);
             self.0.hold(&mut ov).await;
             with_cursor(&mut spec, opts);
-            let (socket, raw) = connect(&self.0.inner, &spec, &ov, &opts.protocols).await?;
+            let (socket, raw): (TypedWebSocket, _) =
+                connect(&self.0.inner, &spec, &ov, &opts.protocols, frame_bytes).await?;
             self.0.opened(raw);
             Ok(Box::new(socket) as Box<dyn TransportConn>)
         })

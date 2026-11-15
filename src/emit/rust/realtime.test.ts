@@ -1,5 +1,5 @@
 /**
- * The realtime answer (contract 20 §2.3/§5.5): a method resolves with its `ResumableConnection<E>` open over
+ * The realtime answer (contract 20 §2.3/§5.5): a method resolves with its `ResumableConnection<In, Out>` open over
  * WebSocket, else SSE, else long-poll, `cancel_on` bounding that open and ending an open connection (Fd1, Fd6);
  * `recv` reconnects after a drop and resumes from the cursor it advanced past each delivered message, on
  * every transport (G12); the backoff from the delay or an SSE `retry`, and a give-up returning the real error
@@ -396,7 +396,7 @@ rustDescribe("send on a degraded connection POSTs the JSON to the endpoint throu
 	}, 600_000)
 })
 
-rustDescribe("the realtime surface: ResumableConnection<E>, three states and the folded Opts (Fd3, Fd9)", () => {
+rustDescribe("the realtime surface: ResumableConnection<In, Out>, three states and the folded Opts (Fd3, Fd9)", () => {
 	// v0: 475b19a883
 	it("types each Call by its event schema and folds a declared resume param into the stream fields", async () => {
 		/* V0BUG: v0 emitted reconnect_token2 beside reconnect_token and sent both pairs. The struct literal

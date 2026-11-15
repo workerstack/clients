@@ -5,11 +5,12 @@
  * only through the shared escape layer.
  */
 import type { IR, IRSchema } from "../../ir/model.ts"
+import type { Dispatch } from "../../ir/sdk-model.ts"
 import { pascalWords, rustTypeIdent } from "../shared/lang.ts"
 import { integerValues, intEnumDecl, stringEnumDecl, stringValues } from "./types-enum.ts"
 import { irNames, plainNames } from "./types-names.ts"
 import { allOfDecl, DERIVE, type Member, objectDecl, unboxed } from "./types-struct.ts"
-import { unionDecl } from "./types-union.ts"
+import { type UnionScope, unionDecl, unionVariants } from "./types-union.ts"
 
 /** How component and hoisted names are claimed, and which components sit on a value cycle. */
 export type RustTypeNames = {
@@ -58,7 +59,7 @@ export function rustTypeContext(ir?: IR): RustTypeContext {
 }
 
 /** `ir` declared once as `names.hoist(key, base)` into `at.decls`; its name. */
-function declare(ir: IRSchema, at: RustTypeContext, key: string, base: string): string {
+export function rustHoisted(ir: IRSchema, at: RustTypeContext, key: string, base: string): string {
 	const name = at.names.hoist(key, base)
 	if (!at.decls.has(name)) {
 		/* claimed before its body: what the body hoists in turn comes after it */
@@ -70,7 +71,7 @@ function declare(ir: IRSchema, at: RustTypeContext, key: string, base: string): 
 
 /** `ir` hoisted as `<Parent><Field>`. */
 const hoist = (ir: IRSchema, at: At) =>
-	declare(ir, at, `${at.parentName}.${at.fieldName}`, `${rustTypeIdent(at.parentName)}${pascalWords(at.fieldName)}`)
+	rustHoisted(ir, at, `${at.parentName}.${at.fieldName}`, `${rustTypeIdent(at.parentName)}${pascalWords(at.fieldName)}`)
 
 const deeper = (at: At, fieldName = at.fieldName): At => ({ ...at, depth: at.depth + 1, fieldName })
 
@@ -139,6 +140,17 @@ const memberOf =
 	(schema, fieldName) =>
 		use(schema, { ...at, depth: 0, fieldName, parentName: name, self: name })
 
+/** What the union declared as `name` reaches: its members' use positions and the hoist of its inline variants. */
+const unionScope = (name: string, at: RustTypeContext): UnionScope => ({
+	declare: (schema, key, base) => rustHoisted(schema, at, key, base),
+	member: memberOf(name, at),
+	names: at.names,
+})
+
+/** Each value the keyed union `union`, declared as `name`, selects a variant by, with that variant and its payload type. */
+export const rustUnionVariants = (name: string, union: Dispatch["union"], at: RustTypeContext) =>
+	unionVariants(name, union, unionScope(name, at))
+
 /** The top-level declaration of the type `name` (a Rust identifier already) for `ir`. */
 export function rustTopLevel(name: string, ir: IRSchema, at: RustTypeContext): string {
 	const member = memberOf(name, at)
@@ -150,9 +162,6 @@ export function rustTopLevel(name: string, ir: IRSchema, at: RustTypeContext): s
 	if (ir.kind === "allOf") return allOfDecl(name, ir, member, at.names.ref)
 	/* a closed object without fields is a struct too: `{}` on the wire, where a map alias would admit any key */
 	if (ir.kind === "object" && (ir.fields.length > 0 || ir.additional === false)) return objectDecl(name, ir, member)
-	if (ir.kind === "union" && ir.variants.length > 0) {
-		const variant = (schema: IRSchema, key: string, base: string) => declare(schema, at, key, base)
-		return unionDecl(name, ir, { declare: variant, member, names: at.names })
-	}
+	if (ir.kind === "union" && ir.variants.length > 0) return unionDecl(name, ir, unionScope(name, at))
 	return `pub type ${name} = ${member(ir, "Value")};`
 }

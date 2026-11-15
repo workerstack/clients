@@ -19,7 +19,7 @@ import { longNames } from "../../shared/__fixtures__/documents-long.ts"
 import { merged } from "../../shared/__fixtures__/merge.ts"
 import type { RustSdkOptions } from "../sdk.ts"
 import { errors, http, httpExtraPaths } from "../../shared/__fixtures__/documents-http.ts"
-import { relative, surface, types } from "./documents-specs.ts"
+import { relative, surface, typedStreams, types } from "./documents-specs.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
 
 /**
@@ -105,6 +105,8 @@ export const FIXTURES = {
 	sse: { document: streams.sse },
 	/** every compile rewrites the lock's root (`acme-rs`) and runs it under `--locked` */
 	surface: { document: surface, options: { crateName: "acme-rs" } },
+	/** the stream operations with declared events and messages (D7, D9), the typed tests' one crate */
+	typed: { document: typedStreams },
 	types: { document: types },
 	/** the WebSockets (contract 20 §4.3): a WebSocket-only crate, no realtime files */
 	ws: { document: streams.ws },

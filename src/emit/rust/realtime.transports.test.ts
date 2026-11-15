@@ -195,7 +195,7 @@ const TRANSPORTS = sections({
     let mut rc: sdk::ResumableConnection =
         sdk::ResumableConnection::connect("http://rt.test/feed", opts, vec![Box::new(failing.clone())]).await?;
     n.note(take(&mut rc, 2).await);
-    n.note(format!("{} {:?} {:?}", failing.got(), rc.state(), rc.send(&1).await.map_err(|e| err(&e))));`,
+    n.note(format!("{} {:?} {:?}", failing.got(), rc.state(), rc.send(&json!(1)).await.map_err(|e| err(&e))));`,
 })
 
 /** Consumer `transports`, built and run once against a server it never dials: its run and the hops it saw. */

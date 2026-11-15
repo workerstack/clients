@@ -117,7 +117,7 @@ pub struct RealtimeScript {
     pub reconnect_delay_ms: Option<u64>,
 }
 
-/// A WebSocket past the grid's send and take: recording `on` handlers, more messages sent, and the
+/// A WebSocket past the grid's send and take: recording handlers, more messages sent, and the
 /// close the call ends with (1000 and no reason by default). `readLimit` is Go's alone.
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -130,7 +130,7 @@ pub struct WsScript {
     pub read_limit: Option<Value>,
 }
 
-/// One scripted send: a JSON value (`send_json`), text (`send_text`), or that many bytes `i & 0xff`
+/// One scripted send: a JSON value (`send`), text (`send_text`), or that many bytes `i & 0xff`
 /// (`send_binary`); exactly one of them.
 #[derive(Deserialize)]
 #[serde(rename_all = "lowercase")]

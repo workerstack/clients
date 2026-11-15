@@ -6,6 +6,7 @@
 import { compareCodeUnits } from "../emit/shared/lang.ts"
 import {
 	type IR,
+	type IRDiscriminator,
 	type IRMultipartPart,
 	type IROperation,
 	type IRParam,
@@ -161,7 +162,7 @@ export const isJsonEventData = (schema: IRSchema, resolve: (schema: IRSchema) =>
 
 /** A message union keyed on one field (D9): the union, the field, and each variant beside its string const there. */
 export type Dispatch = {
-	readonly union: Extract<IRSchema, { kind: "union" }>
+	readonly union: Extract<IRSchema, { kind: "union" }> & { readonly discriminator: IRDiscriminator }
 	readonly key: string
 	readonly members: readonly { readonly variant: IRSchema; readonly value: string }[]
 }
@@ -173,7 +174,8 @@ export type Dispatch = {
 export function dispatchOf(schema: IRSchema, resolve: (schema: IRSchema) => IRSchema): Dispatch | undefined {
 	const union = resolve(schema)
 	if (union.kind !== "union" || union.discriminator === undefined) return undefined
-	const key = union.discriminator.propertyName
+	const { discriminator } = union
+	const key = discriminator.propertyName
 	const members = union.variants.map((variant) => {
 		const object = resolve(variant)
 		const field = object.kind === "object" ? object.fields.find(({ name }) => name === key) : undefined
@@ -181,7 +183,7 @@ export function dispatchOf(schema: IRSchema, resolve: (schema: IRSchema) => IRSc
 		return { value: value?.kind === "const" && typeof value.value === "string" ? value.value : undefined, variant }
 	})
 	const keyed = members.every((member): member is Dispatch["members"][number] => member.value !== undefined)
-	return keyed ? { key, members, union } : undefined
+	return keyed ? { key, members, union: { ...union, discriminator } } : undefined
 }
 
 /** The field a message union dispatches on (D9); none for a schema that does not dispatch. */

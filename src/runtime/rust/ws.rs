@@ -3,14 +3,18 @@
 //! credential, its offered subprotocols, and a 16 MiB message cap. The call's `cancel_on` bounds the
 //! handshake and ends an open socket's reads quietly; dropping it closes the connection. Its dial
 //! runs no `on_request` or `on_response` hook, and a refused handshake's 401 is its error, with no
-//! `on_auth_expired` refresh.
+//! `on_auth_expired` refresh. A socket typed by the operation's messages sends each value as JSON
+//! and reads each frame as its message type.
 
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::header::HeaderValue;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tokio::io::AsyncReadExt;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
@@ -44,15 +48,6 @@ pub const WS_STATUS_PROTOCOL_ERROR: u16 = 1002;
 type Socket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-/// What an `on` handler is called for: each message read, the close (with its reason), or the error
-/// the socket ended on (with its text). The socket's end fires one of the two, once.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum WsEvent {
-    Message,
-    Close,
-    Error,
-}
-
 /// The close frame the server ended the socket with.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WsClose {
@@ -60,17 +55,25 @@ pub struct WsClose {
     pub reason: String,
 }
 
-type Handler = Box<dyn FnMut(&[u8]) + Send>;
+pub(crate) type Handler<T> = Box<dyn FnMut(&T) + Send>;
 
-/// An open WebSocket: messages in and out, JSON on top. Reading `None` means it closed: `closed_by`
-/// holds the server's close frame, if it sent one.
-pub struct TypedWebSocket {
+/// How a socket reads one frame's bytes into `In`.
+pub(crate) type Read<In> = fn(&[u8]) -> Result<In, Error>;
+
+/// An open WebSocket: it reads `In`, what the server sends, and sends `Out`, what it receives, as
+/// JSON. Untyped, it reads each frame's bytes and sends any JSON value. Reading `None` means it
+/// closed: `closed_by` holds the server's close frame, if it sent one.
+pub struct TypedWebSocket<In = Vec<u8>, Out = serde_json::Value> {
     socket: Socket,
-    handlers: Vec<(WsEvent, Handler)>,
+    read: Read<In>,
+    on_message: Vec<Handler<In>>,
+    on_close: Vec<Handler<str>>,
+    on_error: Vec<Handler<Error>>,
     closed_by: Option<WsClose>,
     ended: bool,
     cancel: Option<Signal>,
     keepalive: Option<Keepalive>,
+    sends: PhantomData<fn(&Out)>,
 }
 
 /// Resolves once `signal` fires; never without one.
@@ -96,24 +99,60 @@ fn transport(e: tungstenite::Error) -> Error {
     }
 }
 
-impl TypedWebSocket {
-    /// Calls `handler` on each `event` (TypeScript parity); a read loop is the typed way in.
-    pub fn on(&mut self, event: WsEvent, handler: impl FnMut(&[u8]) + Send + 'static) {
-        self.handlers.push((event, Box::new(handler)));
+/// A frame as its bytes, as sent.
+pub(crate) fn frame_bytes(data: &[u8]) -> Result<Vec<u8>, Error> {
+    Ok(data.to_vec())
+}
+
+/// A frame as the JSON message `In`: a frame that is no JSON, or does not fit `In`, is `Error::Decode`.
+#[allow(dead_code)] // an SDK reads the message types its operations declare
+pub(crate) fn frame_json<In: DeserializeOwned>(data: &[u8]) -> Result<In, Error> {
+    serde_json::from_slice(data).map_err(|e| {
+        let what = if e.is_data() {
+            "does not decode"
+        } else {
+            "is not valid JSON"
+        };
+        Error::decode(format!("WebSocket frame {what}: {e}"))
+    })
+}
+
+impl<In, Out> TypedWebSocket<In, Out> {
+    /// Calls `handler` on each message read, before `recv` returns it.
+    pub fn on_message(&mut self, handler: impl FnMut(&In) + Send + 'static) {
+        self.on_message.push(Box::new(handler));
     }
 
-    fn fire(&mut self, event: WsEvent, data: &[u8]) {
-        for (on, handler) in &mut self.handlers {
-            if *on == event {
-                handler(data);
+    /// Calls `handler` once the socket closes, with the close's reason.
+    pub fn on_close(&mut self, handler: impl FnMut(&str) + Send + 'static) {
+        self.on_close.push(Box::new(handler));
+    }
+
+    /// Calls `handler` on each error `recv` returns: one the socket ended on, or a frame that does
+    /// not decode, after which it reads on.
+    pub fn on_error(&mut self, handler: impl FnMut(&Error) + Send + 'static) {
+        self.on_error.push(Box::new(handler));
+    }
+
+    fn failed(&mut self, e: &Error) {
+        for handler in &mut self.on_error {
+            handler(e);
+        }
+    }
+
+    /// Marks the socket ended, firing `on_close` once.
+    fn closed(&mut self, reason: &str) {
+        if !std::mem::replace(&mut self.ended, true) {
+            for handler in &mut self.on_close {
+                handler(reason);
             }
         }
     }
 
-    /// Marks the socket ended, firing `event` once.
-    fn end(&mut self, event: WsEvent, data: &[u8]) {
+    /// Marks the socket ended on `e`, firing `on_error` once.
+    fn broke(&mut self, e: &Error) {
         if !std::mem::replace(&mut self.ended, true) {
-            self.fire(event, data);
+            self.failed(e);
         }
     }
 
@@ -136,17 +175,17 @@ impl TypedWebSocket {
     }
 
     /// Sends `value` as JSON in one text frame.
-    pub async fn send_json<T: serde::Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Error> {
+    pub async fn send(&mut self, value: &Out) -> Result<(), Error>
+    where
+        Out: Serialize,
+    {
         let text = serde_json::to_string(value).map_err(Error::decode)?;
         self.send_text(text).await
     }
 
-    /// The next message's bytes (text or binary); `None` once the socket closed, failed or the
-    /// call's `cancel_on` fired.
-    pub async fn recv(&mut self) -> Option<Result<Vec<u8>, Error>> {
+    /// The next message (a text or binary frame) as `In`; `None` once the socket closed, failed or
+    /// the call's `cancel_on` fired. A frame that does not decode is its error, and the socket reads on.
+    pub async fn recv(&mut self) -> Option<Result<In, Error>> {
         while !self.ended {
             let signal = self.cancel.clone();
             let at = self.keepalive.as_ref().map(|k| k.due);
@@ -171,15 +210,15 @@ impl TypedWebSocket {
                 k.pinged = false;
             }
             match read {
-                Some(Ok(Message::Text(t))) => return Some(Ok(self.message(t.as_bytes()))),
-                Some(Ok(Message::Binary(b))) => return Some(Ok(self.message(&b))),
+                Some(Ok(Message::Text(t))) => return Some(self.message(t.as_bytes())),
+                Some(Ok(Message::Binary(b))) => return Some(self.message(&b)),
                 Some(Ok(Message::Close(frame))) => {
                     let (code, reason) = frame.map_or((1005, String::new()), |f| {
                         (f.code.into(), f.reason.as_str().to_owned())
                     });
                     /* send the close echo tungstenite queued, completing the handshake */
                     let _ = self.socket.flush().await;
-                    self.end(WsEvent::Close, reason.as_bytes());
+                    self.closed(&reason);
                     self.closed_by = Some(WsClose { code, reason });
                 }
                 Some(Ok(_)) => {}
@@ -199,10 +238,10 @@ impl TypedWebSocket {
                         let _ = tokio::time::timeout(CLOSE_WAIT, drain).await;
                     }
                     let e = transport(e);
-                    self.end(WsEvent::Error, e.to_string().as_bytes());
+                    self.broke(&e);
                     return Some(Err(e));
                 }
-                None => self.end(WsEvent::Close, b""),
+                None => self.closed(""),
             }
         }
         None
@@ -220,13 +259,24 @@ impl TypedWebSocket {
             ping.await.map_err(transport)
         };
         let e = sent.err()?;
-        self.end(WsEvent::Error, e.to_string().as_bytes());
+        self.broke(&e);
         Some(e)
     }
 
-    fn message(&mut self, data: &[u8]) -> Vec<u8> {
-        self.fire(WsEvent::Message, data);
-        data.to_vec()
+    /// A frame read as `In`, handed to `on_message`, or its decode error to `on_error`.
+    fn message(&mut self, data: &[u8]) -> Result<In, Error> {
+        match (self.read)(data) {
+            Ok(m) => {
+                for handler in &mut self.on_message {
+                    handler(&m);
+                }
+                Ok(m)
+            }
+            Err(e) => {
+                self.failed(&e);
+                Err(e)
+            }
+        }
     }
 
     /// The close frame the server sent, once `recv` read it.
@@ -250,7 +300,7 @@ impl TypedWebSocket {
             reason: reason[..cut].into(),
         };
         let sent = self.socket.close(Some(frame)).await;
-        self.end(WsEvent::Close, &reason.as_bytes()[..cut]);
+        self.closed(&reason[..cut]);
         let echo = async { while let Some(Ok(_)) = self.socket.next().await {} };
         let _ = tokio::time::timeout(CLOSE_WAIT, echo).await;
         sent.map_err(transport)
@@ -258,13 +308,14 @@ impl TypedWebSocket {
 }
 
 /// Dials the socket of `spec`: its URL with a ws(s) scheme, the call's headers and credential (a fresh
-/// `X-Request-Id` unless one is set), and `protocols` offered.
-pub(crate) async fn connect(
+/// `X-Request-Id` unless one is set), and `protocols` offered; its frames read by `read`.
+pub(crate) async fn connect<In, Out>(
     inner: &Inner,
     spec: &RequestSpec,
     ov: &Overrides,
     protocols: &[String],
-) -> Result<(TypedWebSocket, RawResponse), Error> {
+    read: Read<In>,
+) -> Result<(TypedWebSocket<In, Out>, RawResponse), Error> {
     let mut url = url_of(inner, spec, ov)?;
     let scheme = if url.scheme() == "https" { "wss" } else { "ws" };
     url.set_scheme(scheme)
@@ -293,7 +344,10 @@ pub(crate) async fn connect(
     };
     let socket = TypedWebSocket {
         socket,
-        handlers: Vec::new(),
+        read,
+        on_message: Vec::new(),
+        on_close: Vec::new(),
+        on_error: Vec::new(),
         closed_by: None,
         ended: false,
         cancel: ov.cancel.clone(),
@@ -302,20 +356,38 @@ pub(crate) async fn connect(
             due: tokio::time::Instant::now() + every,
             pinged: false,
         }),
+        sends: PhantomData,
     };
     Ok((socket, raw))
 }
 
-/// A WebSocket operation: dials offering `protocols`.
+/// A WebSocket operation that declares no message it reads: dials offering `protocols`, its frames
+/// read as bytes.
 #[allow(dead_code)] // a realtime-only SDK dials through its transports
-pub(crate) fn dial(protocols: Vec<String>) -> Run<TypedWebSocket> {
+pub(crate) fn dial<Out: 'static>(protocols: Vec<String>) -> Run<TypedWebSocket<Vec<u8>, Out>> {
+    opened(protocols, frame_bytes)
+}
+
+/// A WebSocket operation with messages: dials offering `protocols`, its frames read as JSON `In`.
+#[allow(dead_code)] // an SDK dials the message types its operations declare
+pub(crate) fn typed<In: DeserializeOwned + Send + 'static, Out: 'static>(
+    protocols: Vec<String>,
+) -> Run<TypedWebSocket<In, Out>> {
+    opened(protocols, frame_json::<In>)
+}
+
+#[allow(dead_code)] // a realtime-only SDK dials through its transports
+fn opened<In: Send + 'static, Out: 'static>(
+    protocols: Vec<String>,
+    read: Read<In>,
+) -> Run<TypedWebSocket<In, Out>> {
     Box::new(
         move |inner: Arc<Inner>, mut spec: RequestSpec, ov: Overrides| {
             Box::pin(async move {
                 if let Some(e) = spec.take_failure() {
                     return Err(e.into());
                 }
-                Ok(connect(&inner, &spec, &ov, &protocols).await?)
+                Ok(connect(&inner, &spec, &ov, &protocols, read).await?)
             })
         },
     )

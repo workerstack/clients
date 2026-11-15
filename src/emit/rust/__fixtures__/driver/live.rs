@@ -1,4 +1,4 @@
-//! A realtime call's reads (contract 20 §4.2): `ResumableConnection<E>`, opened by the method across
+//! A realtime call's reads (contract 20 §4.2): `ResumableConnection<In, Out>`, opened by the method across
 //! its transport chain. dispatch.rs declares this file only for an SDK with a realtime operation.
 
 use serde::Serialize;
@@ -11,19 +11,20 @@ use crate::protocol::{Call, Observed};
 use crate::stream::streamed;
 use crate::trace::rust_error;
 
-/// The method's open connection: each grid `send` as its JSON value (else as raw text, send_text), so the
+/// The method's open connection: each grid `send` as the `Out` its JSON decodes to (else as raw text, send_text), so the
 /// wire carries the text; then `take` values read (protocol.rs refuses a realtime call without one),
 /// each as its JSON. The first send or read error is traced via "stream" and ends the reads, a read
 /// error also kept in `realtime.errors`; a connection that ends first (closed or canceled) ends them
 /// quietly. A send's error is observed as a call's (observe.rs `failed`, its status the send's
 /// answer's, which the status hook saw). Then `close`, and the trace: the frames read, the settled resume cursor (`""` when
 /// unset), the proven transport and the read errors, with `close`'s error.
-pub async fn observe_live<E>(
-    p: Prepared<sdk::ResumableConnection<E>, sdk::Throw, ()>,
+pub async fn observe_live<In, Out>(
+    p: Prepared<sdk::ResumableConnection<In, Out>, sdk::Throw, ()>,
     call: &Call,
 ) -> Result<Outcome, String>
 where
-    E: Serialize + DeserializeOwned + Send + 'static,
+    In: Serialize + DeserializeOwned + Send + 'static,
+    Out: Serialize + DeserializeOwned + Send + 'static,
 {
     let Prepared { call: c, how } = p;
     let mut rc = match c.with_response().await {
@@ -32,7 +33,7 @@ where
     };
     let (mut frames, mut errors, mut failure, mut unsent) = (Vec::new(), Vec::new(), None, false);
     for text in call.send.iter().flatten() {
-        let sent = match serde_json::from_str::<Value>(text) {
+        let sent = match serde_json::from_str::<Out>(text) {
             Ok(message) => rc.send(&message).await,
             Err(_) => rc.send_text(text).await,
         };
@@ -84,7 +85,9 @@ where
             Ok(outcome)
         }
         /* a connection whose first read failed, refused before any frame, ends in its open's error: the grid's error or timeout */
-        Some(e @ (sdk::Error::Api(_) | sdk::Error::Timeout)) if frames.is_empty() && !errors.is_empty() => {
+        Some(e @ (sdk::Error::Api(_) | sdk::Error::Timeout))
+            if frames.is_empty() && !errors.is_empty() =>
+        {
             let mut outcome = failed(e, &how, "stream")?;
             outcome.stream = Some(Value::Object(st));
             Ok(outcome)

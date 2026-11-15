@@ -27,7 +27,7 @@ impl SseTransport {
 struct SseConn {
     dial: Dial,
     url: String,
-    events: EventStream<String>,
+    events: EventStream,
 }
 
 impl Transport for SseTransport {

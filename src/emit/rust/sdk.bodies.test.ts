@@ -59,7 +59,7 @@ const BODIES = sections({
     let _: (&Option<sdk::Filter>, &Option<sdk::Window>, &Option<String>) = (&o.filter, &o.window, &o.cursor);
     n.note("typed");`,
 	ticks: `    let opts = sdk::TicksStreamOpts { last_event_id: Some("7".into()), x_tenant: None };
-    let _: fn(&sdk::Client, &sdk::TicksStreamOpts) -> sdk::Call<sdk::EventStream<sdk::Tick>> = |c, o| c.ticks().stream(o);
+    let _: fn(&sdk::Client, &sdk::TicksStreamOpts) -> sdk::Call<sdk::EventStream<sdk::SseEvent<sdk::Tick>>> = |c, o| c.ticks().stream(o);
     n.note(format!("typed {:?}", opts.last_event_id));`,
 })
 
@@ -218,7 +218,7 @@ describe.skipIf(!RUST)("the Opts and stream types a method takes", () => {
 	)
 
 	it(
-		"answers a JSON event stream as EventStream<T>, its Last-Event-ID header the stream's own field",
+		"answers a JSON event stream as EventStream<SseEvent<T>>, its Last-Event-ID header the stream's own field",
 		async () => {
 			const { observed, stderr } = await section("ticks")
 			expect(observed, stderr).toEqual({ built: true, out: ['typed Some("7")'], sent: [] })

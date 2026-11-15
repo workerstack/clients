@@ -13,7 +13,7 @@ use crate::script::{Directives, WsMessage, WsScript};
 use crate::stream::streamed;
 use crate::trace::rust_error;
 
-/// The `on` handlers' runs in firing order, each `{event, data}`.
+/// The handlers' runs in firing order, each `{event, data}`.
 type Runs = Arc<Mutex<Vec<Value>>>;
 
 fn lock(runs: &Runs) -> MutexGuard<'_, Vec<Value>> {
@@ -21,15 +21,24 @@ fn lock(runs: &Runs) -> MutexGuard<'_, Vec<Value>> {
     runs.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The handler recording each run of `event` into `runs`, its data as text.
-fn recording(event: &'static str, runs: &Runs) -> impl FnMut(&[u8]) + Send + 'static {
-    let runs = Arc::clone(runs);
-    move |data: &[u8]| {
-        lock(&runs).push(json!({"data": String::from_utf8_lossy(data), "event": event}))
-    }
+/// Records a run of `event` into `runs`, with `data` as text.
+fn record(runs: &Runs, event: &'static str, data: String) {
+    lock(runs).push(json!({"data": data, "event": event}));
 }
 
-/// The method's open socket: a recording handler per `WsEvent` under `ws.on`; the grid's `send` as
+/// A recording `on_message`, `on_close` and `on_error` on `ws`, each run into `runs`.
+fn recording(ws: &mut sdk::TypedWebSocket, runs: &Runs) {
+    let r = Arc::clone(runs);
+    ws.on_message(move |data: &Vec<u8>| {
+        record(&r, "message", String::from_utf8_lossy(data).into_owned())
+    });
+    let r = Arc::clone(runs);
+    ws.on_close(move |reason: &str| record(&r, "close", reason.to_owned()));
+    let r = Arc::clone(runs);
+    ws.on_error(move |e: &sdk::Error| record(&r, "error", e.to_string()));
+}
+
+/// The method's open socket: a recording handler for each event under `ws.on`; the grid's `send` as
 /// text, then the script's messages; `recv` until `take` frames (absent: until `None`), each its JSON,
 /// else its text; then `close` with the script's code and reason (1000 and none by default). A failed
 /// send ends the sends, not the reads: what the server sent first (its close frame, say) still waits
@@ -49,9 +58,7 @@ pub async fn observe_frames(
     let script = d.ws.as_ref().unwrap_or(&none);
     let runs = Runs::default();
     if script.on {
-        ws.on(sdk::WsEvent::Message, recording("message", &runs));
-        ws.on(sdk::WsEvent::Close, recording("close", &runs));
-        ws.on(sdk::WsEvent::Error, recording("error", &runs));
+        recording(&mut ws, &runs);
     }
     let mut frames = Vec::new();
     let unsent = sent(&mut ws, call, script).await.err();
@@ -91,7 +98,7 @@ async fn sent(
     }
     for message in &script.send {
         match message {
-            WsMessage::Json(value) => ws.send_json(value).await?,
+            WsMessage::Json(value) => ws.send(value).await?,
             WsMessage::Text(text) => ws.send_text(text.clone()).await?,
             WsMessage::Bytes(n) => {
                 let data: Vec<u8> = (0..*n).map(|i| (i & 0xff) as u8).collect();

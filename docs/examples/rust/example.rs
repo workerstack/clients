@@ -1,8 +1,10 @@
-// A Rust program against an SDK generated from the Kitchen example API: a client, a call and its typed error, the
-// same kind of call on the safe mirror answering an `Answer`, an event stream released by dropping it, and the async
-// SDK called from blocking code. Built by the docs' tests.
+// A Rust program against an SDK generated from the Kitchen example API and a small streaming one beside it: a
+// client, a call and its typed error, the same kind of call on the safe mirror answering an `Answer`, an event stream
+// released by dropping it, typed SSE events, WebSocket and realtime messages, and the async SDK called from blocking
+// code. Built by the docs' tests.
 use sdk::{Answer, Client, ClientConfig, Error, SafeError};
-use sdk::{EventsListOpts, HealthCheckOpts, RootListOpts};
+use sdk::{ChatIn, ChatOut, EventsListEvent, RoomIn, RoomOut, RoomSay, Say, TicksStreamEvent};
+use sdk::{ChatOpenOpts, EventsListOpts, HealthCheckOpts, RoomJoinOpts, RootListOpts, TicksStreamOpts};
 
 fn new_client() -> Result<Client, Error> {
     Client::new(ClientConfig {
@@ -40,12 +42,49 @@ async fn first_events(client: &Client, limit: usize) -> Result<Vec<String>, Erro
     let mut stream = client.events().list(&EventsListOpts::default()).await?;
     let mut seen = Vec::new();
     while let Some(event) = stream.next().await {
-        seen.push(event?.data);
+        seen.push(match event? {
+            EventsListEvent::Message(e) | EventsListEvent::Unknown(e) => e.data, // each name's data as text
+        });
         if seen.len() == limit {
             break;
         }
     }
     Ok(seen) // dropping the stream closes its connection
+}
+
+async fn ticks(client: &Client) -> Result<Vec<i64>, Error> {
+    let mut stream = client.ticks().stream(&TicksStreamOpts::default()).await?;
+    let mut at = Vec::new();
+    while let Some(event) = stream.next().await {
+        match event? {
+            TicksStreamEvent::Tick(e) => at.push(e.data.at), // the name picks the type: data is a Tick
+            TicksStreamEvent::Message(e) | TicksStreamEvent::Unknown(e) => println!("note {}", e.data),
+        }
+    }
+    Ok(at)
+}
+
+async fn chat(client: &Client) -> Result<(), Error> {
+    let mut chat = client.chat().open(&ChatOpenOpts::default()).await?;
+    chat.on_said(|message| println!("{}", message.text));
+    chat.on_error(|error| eprintln!("{error}"));
+    chat.send(&ChatIn::Say(Say { r#type: "say".into(), text: "hi".into() })).await?;
+    if let Some(Ok(ChatOut::Unknown(other))) = chat.recv().await {
+        println!("undeclared {other}"); // the handlers ran as recv read it
+    }
+    Ok(())
+}
+
+async fn room(client: &Client) -> Result<(), Error> {
+    let mut room = client.room().join(&RoomJoinOpts::default()).await?;
+    room.on_left(|_| println!("someone left"));
+    room.send(&RoomIn::Say(RoomSay { r#type: "say".into(), text: "hi".into() })).await?;
+    while let Some(message) = room.recv().await {
+        if let RoomOut::Said(said) = message? {
+            println!("{}", said.text);
+        }
+    }
+    Ok(())
 }
 
 /// The SDK is async; blocking code drives it with a runtime of its own: one per thread, never inside async code.
@@ -66,4 +105,6 @@ fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("a runtime");
     println!("{}", runtime.block_on(listing(&client)));
     println!("{:?}", runtime.block_on(first_events(&client, 2)).map_err(|error| error.to_string()));
+    println!("{:?}", runtime.block_on(ticks(&client)).map_err(|error| error.to_string()));
+    println!("{:?} {:?}", runtime.block_on(chat(&client)).is_ok(), runtime.block_on(room(&client)).is_ok());
 }

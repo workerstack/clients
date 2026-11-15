@@ -332,7 +332,7 @@ rustDescribe("streaming upload", () => {
 rustDescribe("WebSocket", () => {
 	// v0: 4a79ee6333
 	it("connects, sends JSON and receives the echo, then closes cleanly", async () => {
-		/* port shape: v0's ws.send(&Value) is send_json, so the echo is the JSON text "\"hello\"" */
+		/* port shape: v0's ws.send(&Value) is send on an untyped socket, so the echo is the JSON text "\"hello\"" */
 		const run = await scripted(
 			{ calls: [wsEcho({ take: 1 })] },
 			{ calls: [{ ws: { close: { code: 1000, reason: "done" }, on: true, send: [{ json: "hello" }] } }] },

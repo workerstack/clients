@@ -1,6 +1,6 @@
 /**
  * An SSE operation in the Rust SDK (contract 20 §2.1, §5.1; the Go `sse.test.ts` analog), driven on the `sse`
- * registry document (documents-streams.ts): the method is a `Call<EventStream<T>, S[, <Op>Headers]>`, `T` from the
+ * registry document (documents-streams.ts): the method is a `Call<EventStream<SseEvent<T>>, S[, <Op>Headers]>`, `T` from the
  * declared event schema, and the stream a `futures_util::Stream` of `Result<SseEvent<T>, Error>`; an error status
  * is `Err(Error::Api)` before any event, on `client.safe()` an `Answer::Err` with its response (bit 21 i4); the
  * request carries `accept`, `Last-Event-ID` (none for
@@ -97,10 +97,10 @@ const errorOf = (e: RustError | undefined) =>
  */
 const TYPED = sections({
 	typed: `    let c = client(base)?;
-    let call: sdk::Call<sdk::EventStream<sdk::Tick>, sdk::Throw, sdk::TicksStreamHeaders> = c.ticks().stream(&sdk::TicksStreamOpts::default());
-    let _: sdk::Call<sdk::EventStream<sdk::Tick>, sdk::Safe, sdk::TicksStreamHeaders> = c.safe().ticks().stream(&sdk::TicksStreamOpts::default());
-    let _: sdk::Call<sdk::EventStream<String>> = c.text().stream(&sdk::TextStreamOpts::default());
-    let mut s: sdk::EventStream<sdk::Tick> = call.await?;
+    let call: sdk::Call<sdk::EventStream<sdk::SseEvent<sdk::Tick>>, sdk::Throw, sdk::TicksStreamHeaders> = c.ticks().stream(&sdk::TicksStreamOpts::default());
+    let _: sdk::Call<sdk::EventStream<sdk::SseEvent<sdk::Tick>>, sdk::Safe, sdk::TicksStreamHeaders> = c.safe().ticks().stream(&sdk::TicksStreamOpts::default());
+    let _: sdk::Call<sdk::EventStream> = c.text().stream(&sdk::TextStreamOpts::default());
+    let mut s: sdk::EventStream<sdk::SseEvent<sdk::Tick>> = call.await?;
     let first: Option<Result<sdk::SseEvent<sdk::Tick>, sdk::Error>> = futures_util::StreamExt::next(&mut s).await;
     let ev = first.expect("one event")?;
     n.note(format!("{} {} {}", ev.data.n, ev.id, s.last_event_id()));
@@ -114,67 +114,70 @@ const REFUSED = `fn no_ws_cursor() -> sdk::TicksStreamOpts {
     sdk::TicksStreamOpts { reconnect_token: None, ..Default::default() }
 }
 
-fn typed_is_not_text(c: &sdk::Client) -> sdk::Call<sdk::EventStream<String>, sdk::Throw, sdk::TicksStreamHeaders> {
+fn typed_is_not_text(c: &sdk::Client) -> sdk::Call<sdk::EventStream, sdk::Throw, sdk::TicksStreamHeaders> {
     c.ticks().stream(&sdk::TicksStreamOpts::default())
 }`
 
-describe.skipIf(!RUST)("an SSE method: Call<EventStream<T>, S>, a Stream of Result<SseEvent<T>, Error>", () => {
-	// v0: fd79926b03
-	it(
-		"holds EventStream<Tick> with its typed headers and EventStream<String>, and reads one as a boxed Stream with its cursor",
-		async () => {
-			const run = await served([sse(['id: 7\ndata: {"n":1}\n\n'])], (server) =>
-				consume("sse", "typed_stream", { base: server.url, body: TYPED.body, decls: `${TYPED.decls}\n\n${STORED}` }),
-			)
-			expect(seen(run, "typed"), run.stderr).toEqual({ built: true, out: ["1 7 7"] })
-		},
-		CARGO,
-	)
+describe.skipIf(!RUST)(
+	"an SSE method: Call<EventStream<SseEvent<T>>, S>, a Stream of Result<SseEvent<T>, Error>",
+	() => {
+		// v0: fd79926b03
+		it(
+			"holds EventStream<SseEvent<Tick>> with its typed headers and EventStream, and reads one as a boxed Stream with its cursor",
+			async () => {
+				const run = await served([sse(['id: 7\ndata: {"n":1}\n\n'])], (server) =>
+					consume("sse", "typed_stream", { base: server.url, body: TYPED.body, decls: `${TYPED.decls}\n\n${STORED}` }),
+				)
+				expect(seen(run, "typed"), run.stderr).toEqual({ built: true, out: ["1 7 7"] })
+			},
+			CARGO,
+		)
 
-	// v0: fd79926b03
-	it(
-		"refuses a WebSocket cursor on the SSE Opts and a typed stream held as a text one, at compile time",
-		async () => {
-			const run = await consume("sse", "sse_refused", { body: 'n.note("built");', decls: REFUSED })
-			expect(
-				{
-					built: run.built,
-					cursor: /error\[E0560\]: struct `TicksStreamOpts` has no field named `reconnect_token`/.test(run.stderr),
-					typed: /error\[E0308\]: mismatched types/.test(run.stderr),
-				},
-				run.stderr,
-			).toEqual({ built: false, cursor: true, typed: true })
-		},
-		CARGO,
-	)
+		// v0: fd79926b03
+		it(
+			"refuses a WebSocket cursor on the SSE Opts and a typed stream held as a text one, at compile time",
+			async () => {
+				const run = await consume("sse", "sse_refused", { body: 'n.note("built");', decls: REFUSED })
+				expect(
+					{
+						built: run.built,
+						cursor: /error\[E0560\]: struct `TicksStreamOpts` has no field named `reconnect_token`/.test(run.stderr),
+						typed: /error\[E0308\]: mismatched types/.test(run.stderr),
+					},
+					run.stderr,
+				).toEqual({ built: false, cursor: true, typed: true })
+			},
+			CARGO,
+		)
 
-	// v0: fd79926b03
-	it("decodes each event's data into T with its event and id, and keeps a string stream's data as sent", async () => {
-		const replies = [sse([tick(1), tick(2), tick(3)]), sse(['data: {"a":1}\n\n'])]
-		const { run } = await drive(replies, [ticks({ take: 3 }), text()])
-		expect(run.observed, run.stderr).toEqual([
-			{ events: [1, 2, 3].map((n) => ({ data: { n }, event: "tick", id: String(n) })), kind: "events" },
-			strings('{"a":1}'),
-		] satisfies Observed[])
-	}, 600_000)
+		// v0: fd79926b03
+		it("decodes each event's data into T with its event and id, and keeps a string stream's data as sent", async () => {
+			const replies = [sse([tick(1), tick(2), tick(3)]), sse(['data: {"a":1}\n\n'])]
+			const { run } = await drive(replies, [ticks({ take: 3 }), text()])
+			expect(run.observed, run.stderr).toEqual([
+				{ events: [1, 2, 3].map((n) => ({ data: { n }, event: "tick", id: String(n) })), kind: "events" },
+				strings('{"a":1}'),
+			] satisfies Observed[])
+		}, 600_000)
 
-	// v0: fd79926b03
-	it("ends a typed stream at an event that does not decode: the events before it, one Decode error, nothing after", async () => {
-		/* a committed-code defect (contract 20, the defects at HEAD, 3): HEAD's EventStream yields the error and reads on (yields 3) */
-		const reply = sse(['data: {"n":1}\n\n', "data: nope\n\n", 'data: {"n":3}\n\n'])
-		const { run } = await drive([reply], [ticks()], { script: {} })
-		const call = run.trace?.calls[0]
-		expect({ observed: run.observed, stream: call?.stream }, run.stderr).toEqual({
-			observed: [TICKED],
-			stream: { retry: [null], yields: 2 },
-		})
-		expect({ text: call?.error?.text, variant: call?.error?.variant, via: call?.error?.via }).toEqual({
-			text: expect.stringMatching(/^decode: /),
-			variant: "Decode",
-			via: "stream",
-		})
-	}, 600_000)
-})
+		// v0: fd79926b03
+		it("ends a typed stream at an event that does not decode: the events before it, one Decode error, nothing after", async () => {
+			/* a committed-code defect (contract 20, the defects at HEAD, 3): HEAD's EventStream yields the error and reads on (yields 3) */
+			const reply = sse(['data: {"n":1}\n\n', "data: nope\n\n", 'data: {"n":3}\n\n'])
+			const { run } = await drive([reply], [ticks()], { script: {} })
+			const call = run.trace?.calls[0]
+			expect({ observed: run.observed, stream: call?.stream }, run.stderr).toEqual({
+				observed: [TICKED],
+				stream: { retry: [null], yields: 2 },
+			})
+			expect({ text: call?.error?.text, variant: call?.error?.variant, via: call?.error?.via }).toEqual({
+				text: expect.stringMatching(/^decode: /),
+				variant: "Decode",
+				via: "stream",
+			})
+		}, 600_000)
+	},
+)
 
 /** The two error statuses an open answers, and what each call observes and traces on the client. */
 const FAILED_OPENS: Reply[] = [

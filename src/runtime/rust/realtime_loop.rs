@@ -9,13 +9,12 @@ use std::sync::{Arc, PoisonError};
 use std::time::Duration;
 
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 
 use crate::call::{Overrides, Run};
 use crate::config::Inner;
 use crate::errors::Error;
 use crate::exchange::url_of;
-use crate::realtime::{ConnectionState, ResumableConnection};
+use crate::realtime::{ConnectionState, Parse, ResumableConnection, lenient, strict};
 use crate::request::RequestSpec;
 use crate::transport::{
     Dial, Route, Transport, TransportMessage, TransportOpts, advance, payload_cursor,
@@ -43,7 +42,7 @@ fn weight(e: &Error) -> u8 {
     }
 }
 
-impl<E: DeserializeOwned> ResumableConnection<E> {
+impl<In: DeserializeOwned, Out> ResumableConnection<In, Out> {
     /// Opens the chain, the proven transport first, once more after a refreshed 401; else the heaviest failure.
     pub(crate) async fn open(&mut self) -> Result<(), Error> {
         let proven = self.proven;
@@ -82,15 +81,22 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
             .unwrap_or(Err(Error::Timeout))
     }
 
-    /// A delivered message as `E`, the cursor advanced past it (its SSE id, else the payload's), an
-    /// SSE `retry` kept as the next reconnect's delay.
-    pub(crate) fn deliver(&mut self, message: TransportMessage) -> Result<E, Error> {
+    /// A delivered message as `In`, parsed once, the cursor advanced past it (its SSE id, else the
+    /// payload's) even when it is no `In`, an SSE `retry` kept as the next reconnect's delay.
+    pub(crate) fn deliver(&mut self, message: TransportMessage) -> Result<In, Error> {
         self.attempts = 0;
-        let value = serde_json::from_str(&message.text).unwrap_or(Value::String(message.text));
+        self.retry = message.retry.or(self.retry);
+        let value = match (self.parse)(message.text) {
+            Ok(value) => value,
+            Err(e) => {
+                advance(&mut self.opts, message.id, None);
+                return Err(e);
+            }
+        };
         let (id, token) = payload_cursor(&value);
         advance(&mut self.opts, message.id.or(id), token);
-        self.retry = message.retry.or(self.retry);
-        serde_json::from_value(value).map_err(Error::decode)
+        serde_json::from_value(value)
+            .map_err(|e| Error::decode(format!("realtime message does not decode: {e}")))
     }
 
     /// The open transport failed or ended with `e`: drop it, and reconnect the whole chain next.
@@ -132,12 +138,29 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
     }
 }
 
+/// A realtime operation without messages: `opened`, each message JSON else text.
+#[allow(dead_code)] // an SDK opens the message types its operations declare
+pub(crate) fn connect<In: DeserializeOwned + Send + 'static, Out: 'static>(
+    opts: TransportOpts,
+) -> Run<ResumableConnection<In, Out>> {
+    opened(opts, lenient)
+}
+
+/// A realtime operation with messages: `opened`, a message that is no JSON an error.
+#[allow(dead_code)] // an SDK opens the message types its operations declare
+pub(crate) fn typed<In: DeserializeOwned + Send + 'static, Out: 'static>(
+    opts: TransportOpts,
+) -> Run<ResumableConnection<In, Out>> {
+    opened(opts, strict)
+}
+
 /// A realtime operation: opens the connection over the default chain before the call resolves,
 /// each dial sending the call's path, query and headers with its overrides (and its own
 /// `X-Request-Id` unless one is set); its answer is the one the opening transport dialed.
-pub(crate) fn connect<E: DeserializeOwned + Send + 'static>(
+fn opened<In: DeserializeOwned + Send + 'static, Out: 'static>(
     opts: TransportOpts,
-) -> Run<ResumableConnection<E>> {
+    parse: Parse,
+) -> Run<ResumableConnection<In, Out>> {
     Box::new(
         move |inner: Arc<Inner>, mut spec: RequestSpec, mut ov: Overrides| {
             Box::pin(async move {
@@ -166,7 +189,9 @@ pub(crate) fn connect<E: DeserializeOwned + Send + 'static>(
                     Box::new(SseTransport(dial.clone())),
                     Box::new(LongpollTransport(dial)),
                 ];
-                let mut rc = ResumableConnection::connect(url.as_str(), opts, chain).await?;
+                let mut rc =
+                    ResumableConnection::open_with(url.as_str().to_owned(), opts, chain, parse)
+                        .await?;
                 rc.cancel = cancel;
                 /* each default transport keeps the answer it opened with */
                 let raw = opened.lock().unwrap_or_else(PoisonError::into_inner).take();

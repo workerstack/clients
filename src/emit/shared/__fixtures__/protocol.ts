@@ -58,7 +58,7 @@ export type CallScript = {
 	readonly ws?: {
 		/** Close's code and reason, in place of 1000 and none */
 		readonly close?: { readonly code: number; readonly reason: string }
-		/** register a recording On handler for message, close and error */
+		/** register a recording handler for message, close and error (Go OnMessage, OnClose, OnError; Rust on_message, on_close, on_error) */
 		readonly on?: true
 		/** SetReadLimit before the reads (Go only: a Rust or Python socket caps a message at 16 MiB, and refuses it) */
 		readonly readLimit?: number

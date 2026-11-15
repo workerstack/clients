@@ -1,9 +1,9 @@
 /**
  * A WebSocket operation's emitted Rust (contract 20 §2.2, §5.4; Fd2, Fd5, Fd6): the method's
- * `Call<TypedWebSocket>`, dialing the escaped path as an upgrade with the credential, config and call
+ * `Call<TypedWebSocket>` of an operation without messages, dialing the escaped path as an upgrade with the credential, config and call
  * headers and a fresh `X-Request-Id`, and no hooks or log; the Opts stream fields (`reconnect_token`, one
- * pair on the wire, none when empty; `protocols`); the non-generic `TypedWebSocket` (`send_text`,
- * `send_json`, `send_binary`, `recv` bytes, `on` handlers, `closed_by`, `close` and the `WS_STATUS_*`
+ * pair on the wire, none when empty; `protocols`); the untyped `TypedWebSocket` (`send_text`,
+ * `send` of any JSON value, `send_binary`, `recv` bytes, the handlers, `closed_by`, `close` and the `WS_STATUS_*`
  * codes); how a read ends (the server's close frame, its echo flushed; a drop; the 16 MiB cap); what fails
  * before or at the handshake (a `..` path param, an error status); and `cancel_on`, which bounds the open
  * and ends an open socket. Driven on the `ws` registry document; types and Opts field sets are consumers.
@@ -90,12 +90,12 @@ const surface = once(() =>
     let call: sdk::Call<sdk::TypedWebSocket> = c.rooms().socket("r", &o);
     let _: sdk::Call<sdk::TypedWebSocket> = c.plain().socket(&sdk::PlainSocketOpts::default());
     let mut w: sdk::TypedWebSocket = call.await?;
-    w.on(sdk::WsEvent::Message, |data: &[u8]| { let _ = data.len(); });
-    w.on(sdk::WsEvent::Close, |_: &[u8]| {});
-    w.on(sdk::WsEvent::Error, |_: &[u8]| {});
+    w.on_message(|data: &Vec<u8>| { let _ = data.len(); });
+    w.on_close(|_: &str| {});
+    w.on_error(|_: &sdk::Error| {});
     w.send_text("t").await?;
     w.send_binary(vec![0u8, 1, 2]).await?;
-    w.send_json(&serde_json::json!({"n": 1})).await?;
+    w.send(&serde_json::json!({"n": 1})).await?;
     let read: Option<Result<Vec<u8>, sdk::Error>> = w.recv().await;
     let by: Option<&sdk::WsClose> = w.closed_by();
     if let Some(sdk::WsClose { code, reason }) = by {
@@ -247,7 +247,7 @@ rustDescribe("Opts.protocols: the subprotocols offered as Sec-WebSocket-Protocol
 	})
 })
 
-rustDescribe("TypedWebSocket: send_text, send_json, send_binary, recv and on round-trip", () => {
+rustDescribe("TypedWebSocket: send_text, send, send_binary, recv and the handlers round-trip", () => {
 	// v0: 468db67b4b
 	it("sends text, JSON and binary frames in order, reads the server's JSON, fires message then close, closes 1000", async () => {
 		const script: Script = {

@@ -32,13 +32,13 @@ pub fn streamed(
     Ok(outcome)
 }
 
-/// An SSE operation's `EventStream<T>`, read until `take` events (absent: until its end), then
+/// An SSE operation's `EventStream<SseEvent<T>>`, read until `take` events (absent: until its end), then
 /// dropped, which closes it. A yielded error is kept (the first) and the reads carry on, as Go's
 /// driver does, so a stream that does not end after its error shows in `yields`. The trace holds
 /// the yields (events and errors), each event's `retry` (null when unset) and the typed headers
 /// that were sent.
 pub async fn observe_events<T, S, H>(
-    p: Prepared<sdk::EventStream<T>, S, H>,
+    p: Prepared<sdk::EventStream<sdk::SseEvent<T>>, S, H>,
     take: Option<u64>,
 ) -> Result<Outcome, String>
 where

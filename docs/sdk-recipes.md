@@ -150,11 +150,37 @@ The SDK is async. Dropping a stream closes its connection.
 
 ```rust
     while let Some(event) = stream.next().await {
-        seen.push(event?.data);
+        seen.push(match event? {
+            EventsListEvent::Message(e) | EventsListEvent::Unknown(e) => e.data, // each name's data as text
+        });
         if seen.len() == limit {
             break;
         }
     }
+```
+
+A stream the document types is typed end to end. An SSE operation with named events yields `<Op>Event`, an enum
+with one variant per name, each holding `SseEvent<Data>`, so a `match` reads `data` typed, each JSON event decoded by
+its name; a name the operation does not declare is `Unknown(SseEvent<String>)`. A WebSocket operation with declared
+messages answers `TypedWebSocket<In, Out>` and a realtime one `ResumableConnection<In, Out>`: `send` takes what the
+server receives, `recv` gives what it sends, every `send` is JSON, and `send_text` sends text as is. When those are a
+union keyed on one field, the read side is an enum that keeps a value the operation does not declare as `Unknown`,
+and `on_<value>` takes a handler of that member's type, run as `recv` reads. A socket's frame that is not JSON is
+`Error::Decode` from `recv`, handed to `on_error`, and the socket stays open; a realtime connection returns it once
+and reads on. A member named like a handler (`message`, `close`, `error`; on realtime only `message`) is heard only
+through `on_message`. This excerpt runs against the small streaming API the TypeScript one calls.
+
+```rust
+async fn chat(client: &Client) -> Result<(), Error> {
+    let mut chat = client.chat().open(&ChatOpenOpts::default()).await?;
+    chat.on_said(|message| println!("{}", message.text));
+    chat.on_error(|error| eprintln!("{error}"));
+    chat.send(&ChatIn::Say(Say { r#type: "say".into(), text: "hi".into() })).await?;
+    if let Some(Ok(ChatOut::Unknown(other))) = chat.recv().await {
+        println!("undeclared {other}"); // the handlers ran as recv read it
+    }
+    Ok(())
+}
 ```
 
 From blocking code, drive the SDK with a runtime of your own: one per thread, never inside async code. In your own

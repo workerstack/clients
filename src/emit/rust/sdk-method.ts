@@ -47,7 +47,7 @@ const METHOD_LOCALS = ["body", "client", "form", "opts", "spec"]
 /** How a stream operation answers. */
 function streamAnswer(op: SdkOp, at: RustTypeContext): StreamAnswer {
 	if (op.stream === "sse") return sseAnswer(op, at)
-	return op.stream === "ws" ? wsAnswer() : realtimeAnswer(op, at)
+	return op.stream === "ws" ? wsAnswer(op, at) : realtimeAnswer(op, at)
 }
 
 /** How a method answers: a stream's way, else its answer's kind read. */

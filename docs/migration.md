@@ -284,6 +284,44 @@ async fn listing(client: &Client) -> String {
 }
 ```
 
+## The Rust SDK's stream types are generic in what they read and send
+
+`TypedWebSocket` is `TypedWebSocket<In = Vec<u8>, Out = serde_json::Value>` and `ResumableConnection` is
+`ResumableConnection<In = serde_json::Value, Out = serde_json::Value>`; an operation without messages keeps the
+defaults, so a bare `TypedWebSocket` or `ResumableConnection` still names it. `EventStream` is `EventStream<E = SseEvent>`
+and yields `E`: an untyped stream's `EventStream<String>` is `EventStream`, and a typed one's `EventStream<T>` is
+`EventStream<SseEvent<T>>`. An operation the document types now answers its own types:
+
+- An SSE operation with named events yields `EventStream<<Op>Event>`: an enum with one variant per event name, each
+  holding `SseEvent<Data>`, and `Unknown(SseEvent<String>)` for a name it does not declare. A `match` reads `data`
+  typed. An unnamed event is `message`. A declared JSON event that does not decode is `Error::Decode` and ends the
+  stream, as before.
+- A WebSocket operation with declared messages answers `TypedWebSocket<In, Out>`: `recv` returns `In`, `send` takes
+  `Out` and sends it as JSON, and `send_text` and `send_binary` send as is. A frame that is not JSON is
+  `Error::Decode` from `recv`, handed to `on_error`, and the socket stays open. `WsEvent` and
+  `on(event, FnMut(&[u8]))` are gone: use `on_message(FnMut(&In))`, `on_close(FnMut(&str))` and
+  `on_error(FnMut(&Error))`. `send_json(&T)` is `send(&Out)`; on an untyped socket it takes a `serde_json::Value`.
+- A realtime operation with declared messages answers `ResumableConnection<In, Out>`: `recv` returns `In`, `send`
+  takes `Out`, and `on_message` runs as `recv` reads each message. A message that is not JSON or does not decode is
+  `Error::Decode` once, and the connection reads on. On an untyped connection `send(&T)` takes a `serde_json::Value`,
+  and `connect` and `connect_with_defaults` open only the untyped one.
+- When the server's messages are a union keyed on one field, the read side is the enum Rust declares for it, with
+  `Unknown(serde_json::Value)` for a value the operation does not declare, and `on_<value>(handler)` takes a handler of
+  that member's type; a member named like a handler is heard only through `on_message`.
+
+```text v0
+pub fn talk(&self, opts: &WsTalkOpts) -> Call<TypedWebSocket>                    // recv -> Vec<u8>; send_json(&T)
+pub fn room(&self, opts: &RtRoomOpts) -> Call<ResumableConnection<serde_json::Value>>
+pub fn list(&self, opts: &OutSseListOpts) -> Call<EventStream<String>, S>
+```
+
+```text
+pub fn talk(&self, opts: &WsTalkOpts) -> Call<TypedWebSocket<WsTalkSend, WsTalkReceive>>
+pub fn room(&self, opts: &RtRoomOpts) -> Call<ResumableConnection<RtRoomSend, RtRoomReceive>>
+pub fn list(&self, opts: &OutSseListOpts) -> Call<EventStream<OutSseListEvent>, S>
+pub fn echo(&self, opts: &WsEchoOpts) -> Call<TypedWebSocket>  // an operation without messages
+```
+
 ## The TS SDK's realtime `token?` and `onAuthExpired?` are gone
 
 Neither was ever read. A connection's `headers` may be a function read on every dial, and the client's

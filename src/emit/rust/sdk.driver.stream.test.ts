@@ -182,7 +182,7 @@ describe("dispatchRs: a realtime operation's arm, and the stream files dispatch.
 	})
 })
 
-describe.skipIf(!RUST)("the Rust test driver: SSE, EventStream<T>", () => {
+describe.skipIf(!RUST)("the Rust test driver: SSE, EventStream<SseEvent<T>>", () => {
 	it("observes typed events with event and id until take, and traces retry (null when unset) and the typed headers", async () => {
 		const reply: Reply = {
 			headers: { "x-stream-id": "s-1" },

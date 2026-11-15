@@ -628,8 +628,16 @@ describe("the Go runtime within its byte budget (bit 12, G14)", () => {
  * Bit 21 i7, +110 B to 137,986 B: transport.rs +110, a realtime send's POST read through answer::none, the one answer
  * path, so its 2xx past the cap is Error::Decode, not a dial's Error::Transport (`ok` still answers the dials).
  * Plan 55, +64 B to 138,050 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
+ * Backend plan 12, +6,759 B to 144,809 B: typed event streams, sockets and realtime connections. Dead code first: the
+ *   socket's `WsEvent`, `on` and `send_json` are cut, and a scan finds no runtime function in the changed files
+ *   without a caller. ws.rs +2,684 (`TypedWebSocket<In, Out>`: the stored frame reader and its two codecs, the typed
+ *   `send` and `recv`, `on_message`, `on_close` and `on_error` over typed handler lists, the dial split from the typed
+ *   socket), realtime.rs +1,987 (`ResumableConnection<In, Out>`, the lenient and strict parses, `on_message` run in
+ *   `recv`, the untyped public opens split from the crate's typed one), events.rs +1,031 (`EventStream<E>` over a
+ *   whole-event decode, `Named` and `named_data` naming the event), realtime_loop.rs +1,002 (`deliver` advancing the
+ *   cursor before it decodes, the run split into `connect` and `typed`), transport_ws.rs +63, transport_sse.rs -8.
  */
-const RUST_RUNTIME_BYTES = 138_050
+const RUST_RUNTIME_BYTES = 144_809
 
 describe("the Rust runtime within its byte budget (bit 13, G14)", () => {
 	it(

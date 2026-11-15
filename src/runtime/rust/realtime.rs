@@ -16,7 +16,7 @@ use crate::transport::{Transport, TransportConn, TransportKind, TransportOpts};
 use crate::transport_longpoll::LongpollTransport;
 use crate::transport_sse::SseTransport;
 use crate::transport_ws::WsTransport;
-use crate::ws::canceled;
+use crate::ws::{Handler, canceled};
 
 /// Where a realtime connection is in its life.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,12 +29,16 @@ pub enum ConnectionState {
     Disconnected,
 }
 
-/// A realtime connection: `recv` reads the next message as `E`, reconnecting through the chain
-/// after a drop, the advanced cursor resuming it. Reconnects back off exponentially from the
-/// reconnect delay (an SSE `retry` the server sent, else `reconnect_delay_ms`, else 1 s; capped at
-/// 30 s, with jitter) for up to `max_reconnect_attempts` (5 when `None`). Dropping it closes the
-/// transport.
-pub struct ResumableConnection<E = Value> {
+/// How a connection reads a message's text into the value its cursor is read from and `In` is
+/// decoded from.
+pub(crate) type Parse = fn(String) -> Result<Value, Error>;
+
+/// A realtime connection: `recv` reads the next message as `In`, what the server sends, reconnecting
+/// through the chain after a drop, the advanced cursor resuming it; `send` takes `Out`, what the
+/// server receives. Reconnects back off exponentially from the reconnect delay (an SSE `retry` the
+/// server sent, else `reconnect_delay_ms`, else 1 s; capped at 30 s, with jitter) for up to
+/// `max_reconnect_attempts` (5 when `None`). Dropping it closes the transport.
+pub struct ResumableConnection<In = Value, Out = Value> {
     pub(crate) url: String,
     pub(crate) transports: Vec<Box<dyn Transport>>,
     pub(crate) opts: TransportOpts,
@@ -46,32 +50,31 @@ pub struct ResumableConnection<E = Value> {
     pub(crate) retry: Option<u64>,
     pub(crate) failure: Option<Error>,
     pub(crate) cancel: Option<Signal>,
-    pub(crate) events: PhantomData<fn() -> E>,
+    pub(crate) parse: Parse,
+    pub(crate) on_message: Vec<Handler<In>>,
+    pub(crate) sends: PhantomData<fn(&Out)>,
 }
 
-impl<E: DeserializeOwned> ResumableConnection<E> {
+/// A message's text as JSON, else as a JSON string: an untyped connection reads any text.
+pub(crate) fn lenient(text: String) -> Result<Value, Error> {
+    Ok(serde_json::from_str(&text).unwrap_or(Value::String(text)))
+}
+
+/// A message's text as JSON, else the error naming it: a typed connection reads only JSON.
+#[allow(dead_code)] // an SDK reads the message types its operations declare
+pub(crate) fn strict(text: String) -> Result<Value, Error> {
+    serde_json::from_str(&text)
+        .map_err(|e| Error::decode(format!("realtime message is not valid JSON: {e}")))
+}
+
+impl ResumableConnection {
     /// Opens `url` over the first of `transports` that opens, in order, with `opts`' cursor.
     pub async fn connect(
         url: impl Into<String>,
         opts: TransportOpts,
         transports: Vec<Box<dyn Transport>>,
     ) -> Result<Self, Error> {
-        let mut rc = ResumableConnection {
-            url: url.into(),
-            transports,
-            opts,
-            conn: None,
-            current: None,
-            proven: None,
-            state: ConnectionState::Disconnected,
-            attempts: 0,
-            retry: None,
-            failure: None,
-            cancel: None,
-            events: PhantomData,
-        };
-        rc.bounded_open().await?;
-        Ok(rc)
+        Self::open_with(url.into(), opts, transports, lenient).await
     }
 
     /// Opens `url` over the default chain, each transport dialing with `client`'s configuration.
@@ -87,11 +90,41 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
         ];
         Self::connect(url, opts, chain).await
     }
+}
 
-    /// The next message; after a drop it reconnects first. `None` once closed or the call's
-    /// `cancel_on` fired. Giving up returns the last failure once, then `None`. Cancel-safe: a
-    /// dropped `recv` loses no delivered message.
-    pub async fn recv(&mut self) -> Option<Result<E, Error>> {
+impl<In: DeserializeOwned, Out> ResumableConnection<In, Out> {
+    /// Opens `url` over the first of `transports` that opens, each message read by `parse`.
+    pub(crate) async fn open_with(
+        url: String,
+        opts: TransportOpts,
+        transports: Vec<Box<dyn Transport>>,
+        parse: Parse,
+    ) -> Result<Self, Error> {
+        let mut rc = ResumableConnection {
+            url,
+            transports,
+            opts,
+            conn: None,
+            current: None,
+            proven: None,
+            state: ConnectionState::Disconnected,
+            attempts: 0,
+            retry: None,
+            failure: None,
+            cancel: None,
+            parse,
+            on_message: Vec::new(),
+            sends: PhantomData,
+        };
+        rc.bounded_open().await?;
+        Ok(rc)
+    }
+
+    /// The next message, after each `on_message` handler ran on it; after a drop it reconnects
+    /// first. A message that is no `In` is `Err(Error::Decode)` once, and the next one reads on.
+    /// `None` once closed or the call's `cancel_on` fired. Giving up returns the last failure once,
+    /// then `None`. Cancel-safe: a dropped `recv` loses no delivered message.
+    pub async fn recv(&mut self) -> Option<Result<In, Error>> {
         let signal = self.cancel.clone();
         let read = tokio::select! {
             biased;
@@ -108,7 +141,7 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
         }
     }
 
-    async fn read(&mut self) -> Option<Result<E, Error>> {
+    async fn read(&mut self) -> Option<Result<In, Error>> {
         loop {
             if self.state == ConnectionState::Disconnected {
                 return None;
@@ -120,7 +153,13 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
                 continue;
             };
             match conn.recv().await {
-                Some(Ok(message)) => return Some(self.deliver(message)),
+                Some(Ok(message)) => {
+                    let delivered = self.deliver(message);
+                    if let Ok(m) = &delivered {
+                        self.on_message.iter_mut().for_each(|handler| handler(m));
+                    }
+                    return Some(delivered);
+                }
                 failed => {
                     let e = failed.and_then(Result::err).unwrap_or(Error::Closed);
                     self.dropped(e);
@@ -128,11 +167,20 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
             }
         }
     }
+}
 
+impl<In, Out: Serialize> ResumableConnection<In, Out> {
     /// Sends `message` as JSON on the open transport (an SSE or long-poll one POSTs it).
-    pub async fn send<T: Serialize + ?Sized>(&mut self, message: &T) -> Result<(), Error> {
+    pub async fn send(&mut self, message: &Out) -> Result<(), Error> {
         let text = serde_json::to_string(message).map_err(Error::decode)?;
         self.send_text(&text).await
+    }
+}
+
+impl<In, Out> ResumableConnection<In, Out> {
+    /// Calls `handler` on each message `recv` reads, before it returns it.
+    pub fn on_message(&mut self, handler: impl FnMut(&In) + Send + 'static) {
+        self.on_message.push(Box::new(handler));
     }
 
     /// Sends `text` as it is on the open transport (an SSE or long-poll one POSTs it).
@@ -142,9 +190,7 @@ impl<E: DeserializeOwned> ResumableConnection<E> {
             None => Err(Error::Closed),
         }
     }
-}
 
-impl<E> ResumableConnection<E> {
     /// Where the connection is in its life.
     pub fn state(&self) -> ConnectionState {
         self.state
