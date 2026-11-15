@@ -50,15 +50,19 @@ describe("scripts/pack.ts", () => {
 		},
 	)
 
-	it("refuses a file:, link: or git spec a consumer would install, naming the field and the spec", () => {
-		expect([
-			refusal("dependencies", "file:vendor/x.tgz"),
-			refusal("peerDependencies", "link:../x"),
-			refusal("optionalDependencies", "git+https://example.com/x.git"),
-		]).toEqual([
-			'pack: @workerstack/clients dependencies.x is "file:vendor/x.tgz"; a published manifest names only registry versions',
-			'pack: @workerstack/clients peerDependencies.x is "link:../x"; a published manifest names only registry versions',
-			'pack: @workerstack/clients optionalDependencies.x is "git+https://example.com/x.git"; a published manifest names only registry versions',
-		])
-	})
+	it(
+		"refuses a file:, link: or git spec a consumer would install, naming the field and the spec",
+		{ timeout: PACK_TIMEOUT },
+		() => {
+			expect([
+				refusal("dependencies", "file:vendor/x.tgz"),
+				refusal("peerDependencies", "link:../x"),
+				refusal("optionalDependencies", "git+https://example.com/x.git"),
+			]).toEqual([
+				'pack: @workerstack/clients dependencies.x is "file:vendor/x.tgz"; a published manifest names only registry versions',
+				'pack: @workerstack/clients peerDependencies.x is "link:../x"; a published manifest names only registry versions',
+				'pack: @workerstack/clients optionalDependencies.x is "git+https://example.com/x.git"; a published manifest names only registry versions',
+			])
+		},
+	)
 })

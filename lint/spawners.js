@@ -15,6 +15,7 @@ export const DEFERRED = new Map([])
 /** Repo path → the exports a test may call that spawn, each found by spawners.test.ts. */
 export const SPAWNING_HELPERS = new Map([
 	["lint/rule-harness.ts", ["oxlintReports"]],
+	["scripts/pack.ts", ["pack"]],
 	["scripts/sdk-budget.ts", ["listedEntries", "runtimeBytes"]],
 	["src/cli.ts", ["generated", "main"]],
 	["src/emit/cli/__fixtures__/built.ts", ["builtCli"]],
