@@ -32,15 +32,21 @@ const MULTIPART = "a multipart body is driven by a consumer program (FilePart)"
 
 const literal = (text: string) => JSON.stringify(text)
 
-/* each stream kind's own Opts lines, by the fixed field names the emitter gives them */
-const LAST_EVENT_ID = `${BODY}o.last_event_id = call.last_event_id.clone();`
-const RECONNECT_TOKEN = `${BODY}o.reconnect_token = call.reconnect_token.clone();`
-const PROTOCOLS = `${BODY}if let Some(p) = &d.protocols { o.protocols = p.clone(); }`
-const RECONNECT = `${BODY}if let Some(r) = &d.realtime { o.max_reconnect_attempts = r.max_reconnect_attempts; o.reconnect_delay_ms = r.reconnect_delay_ms; }`
+/* each stream kind's own Opts lines, by the fixed field names the emitter gives them; a realtime op's stream fields
+ * sit in its one `o.transport` */
+const T = "o.transport"
 const STREAM_OPTS: Readonly<Record<NonNullable<RustCallPlan["stream"]>, readonly string[]>> = {
-	realtime: [LAST_EVENT_ID, RECONNECT_TOKEN, PROTOCOLS, RECONNECT],
-	sse: [LAST_EVENT_ID],
-	ws: [RECONNECT_TOKEN, PROTOCOLS],
+	realtime: [
+		`${BODY}${T}.last_event_id = call.last_event_id.clone();`,
+		`${BODY}${T}.reconnect_token = call.reconnect_token.clone();`,
+		`${BODY}if let Some(p) = &d.protocols { ${T}.protocols = p.clone(); }`,
+		`${BODY}if let Some(r) = &d.realtime { ${T}.max_reconnect_attempts = r.max_reconnect_attempts; ${T}.reconnect_delay_ms = r.reconnect_delay_ms; }`,
+	],
+	sse: [`${BODY}o.last_event_id = call.last_event_id.clone();`],
+	ws: [
+		`${BODY}o.reconnect_token = call.reconnect_token.clone();`,
+		`${BODY}if let Some(p) = &d.protocols { o.protocols = p.clone(); }`,
+	],
 }
 
 /** How `plan`'s prepared call `prepared` is observed: by its stream's kind, else as an answer. */

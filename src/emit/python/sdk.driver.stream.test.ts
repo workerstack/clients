@@ -119,7 +119,7 @@ describe("pythonCallPlans: a stream operation's plan", () => {
 			ticks: events["ticks.stream"],
 		}).toEqual({
 			live: [{ channel: "channel" }, ["channel"], "realtime"],
-			resume: { protocols: "protocols2" },
+			resume: { protocols: "protocols" },
 			socket: [{ since: "since" }, "ws", false],
 			ticks: {
 				accessors: ["ticks"],

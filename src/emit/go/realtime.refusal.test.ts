@@ -79,7 +79,7 @@ const body = (n: number) => `	refreshed := 0
 		},
 	})
 	/* no early return: the consumer prints its notes at the end of main */
-	if rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{ReconnectDelayMs: 10}); err != nil {
+	if rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{Transport: sdk.TransportOpts{ReconnectDelayMs: 10}}); err != nil {
 		note("open error " + refusal(err))
 	} else {
 		note(take(rc, ${n}))

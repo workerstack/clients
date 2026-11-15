@@ -300,8 +300,8 @@ goDescribe("every realtime dial carries the call's declared params and its own r
 	}, 600_000)
 })
 
-goDescribe("one resume pair on the wire: the synthetic Opts fields carry a declared resume param (Fd3)", () => {
-	it("folds a declared reconnect_token, last_event_id and Last-Event-ID into the stream fields, a colliding protocols becoming Protocols2", async () => {
+goDescribe("one resume pair on the wire: the Opts' one Transport carries a declared resume param (Fd3)", () => {
+	it("folds a declared reconnect_token, last_event_id and Last-Event-ID into Transport, a declared protocols keeping its name", async () => {
 		/* V0BUG: v0 emitted ReconnectToken2 beside ReconnectToken and sent both pairs */
 		const run = await program(
 			`	for _, v := range []any{sdk.FeedLiveOpts{}, sdk.FeedResumeOpts{}} {
@@ -319,8 +319,8 @@ goDescribe("one resume pair on the wire: the synthetic Opts fields carry a decla
 			built: true,
 			out: {
 				main: [
-					"FeedLiveOpts Channel XTenant LastEventID ReconnectToken Protocols MaxReconnectAttempts ReconnectDelayMs",
-					"FeedResumeOpts Protocols2 LastEventID ReconnectToken Protocols MaxReconnectAttempts ReconnectDelayMs",
+					"FeedLiveOpts Channel XTenant Transport",
+					"FeedResumeOpts Protocols Transport",
 					"func(context.Context, *sdk.FeedLiveOpts, ...sdk.RequestOption) (*sdk.ResumableConnection, error)",
 				],
 			},
@@ -334,6 +334,37 @@ goDescribe("one resume pair on the wire: the synthetic Opts fields carry a decla
 			[{ frames: [{ n: 1 }], kind: "frames" }],
 			[["/resume?protocols=p&last_event_id=5&reconnect_token=rt", undefined]],
 		])
+	}, 600_000)
+})
+
+goDescribe("a realtime method's Transport: the caller's value stays, Cursor resumes", () => {
+	it("hands the connection a copy of Transport, and resumes past the last message from Cursor", async () => {
+		const replies = [refused, sse([ev(1)], "hold"), refused, sse([ev(2)], "hold")]
+		const [run, hops] = await served(replies, async (server) => {
+			const body = `	o := &sdk.FeedLiveOpts{Channel: "c", Transport: sdk.TransportOpts{ReconnectDelayMs: 10}}
+	live := sdk.NewClient(sdk.Config{BaseURL: input.Base})
+	rc := must(live.Feed.Live(ctx, o))
+	note(take(rc, 1))
+	id, token := rc.Cursor()
+	note(o.Transport.LastEventID == "", o.Transport.ReconnectToken == "", id, token, rc.Close())
+	resume := sdk.TransportOpts{LastEventID: id, ReconnectToken: token}
+	again := must(live.Feed.Live(ctx, &sdk.FeedLiveOpts{Channel: "c", Transport: resume}))
+	note(take(again, 1), again.Close())`
+			return [await program(body, { base: server.url }), server.hops.map(wire)] as const
+		})
+		expect({ ...ran(run), hops }, run.stderr).toEqual({
+			built: true,
+			hops: [
+				["/feed?channel=c", undefined],
+				["/feed?channel=c", undefined],
+				["/feed?channel=c&last_event_id=1&reconnect_token=rt-1", undefined],
+				["/feed?channel=c&reconnect_token=rt-1", "1"],
+			],
+			out: {
+				main: [JSON.stringify([frame(1)]), "true true 1 rt-1 <nil>", `${JSON.stringify([frame(2)])} <nil>`],
+			},
+			vet: [],
+		})
 	}, 600_000)
 })
 

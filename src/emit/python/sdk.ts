@@ -52,6 +52,7 @@ const RUNTIME: Readonly<Record<string, string>> = {
 	ResumableConnection: "realtime",
 	Safe: "result",
 	SyncTransport: "send_sync",
+	TransportOpts: "transport",
 	TypedWebSocket: "ws",
 }
 

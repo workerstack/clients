@@ -5,11 +5,11 @@
  */
 import type { CsStream } from "./sdk-answer.ts"
 
-/** The subprotocols a WebSocket or realtime dial offers. */
-export const PROTOCOLS = { ident: "protocols", type: "IReadOnlyList<string>?" }
+/** The subprotocols a WebSocket dial offers. */
+const PROTOCOLS = { ident: "protocols", type: "IReadOnlyList<string>?" }
 
-/** The resume cursor's token, which the WebSocket and realtime methods take. */
-export const RECONNECT_TOKEN = { ident: "reconnectToken", type: "string?" }
+/** The resume cursor's token, which the WebSocket method takes. */
+const RECONNECT_TOKEN = { ident: "reconnectToken", type: "string?" }
 
 /** Whether a declared param is the `reconnect_token` query param, the resume channel a socket dial sends. */
 export const isReconnectToken = (name: string, where: string) => where === "query" && name === "reconnect_token"

@@ -9,8 +9,8 @@ import { type CsStream, eventType } from "./sdk-answer.ts"
 /** The header the SSE and realtime dials resume an event stream with. */
 export const LAST_EVENT_ID = "Last-Event-ID"
 
-/** The resume cursor's event id, which the SSE and realtime methods take. */
-export const LAST_EVENT_ID_FIELD = { ident: "lastEventId", type: "string?" }
+/** The resume cursor's event id, which the SSE method takes. */
+const LAST_EVENT_ID_FIELD = { ident: "lastEventId", type: "string?" }
 
 /** Whether a declared param is the Last-Event-ID header (any casing), the resume channel an SSE dial sends. */
 export const isLastEventIdHeader = (name: string, where: string) =>

@@ -17,14 +17,14 @@ def new_client() -> AsyncSDK:
 
 async def check_health(client: AsyncSDK) -> str | None:
     try:
-        await client.get_api_health()
+        await client.health.check()
     except APIStatusError as failed:
         return f"health check answered {failed.status}"
     return None
 
 
 async def health(client: AsyncSDK) -> str:
-    match await client.safe.get_api_health():
+    match await client.safe.health.check():
         case Ok(data, response):
             return f"answered {response.status}: {data}"
         case Err(DecodeError() as unreadable, response):
@@ -35,7 +35,7 @@ async def health(client: AsyncSDK) -> str:
 
 async def first_events(client: AsyncSDK, limit: int) -> list[str]:
     seen: list[str] = []
-    async with await client.get_api_events() as stream:  # leaving the block frees the connection
+    async with await client.events.list() as stream:  # leaving the block frees the connection
         async for event in stream:
             seen.append(event.data)
             if len(seen) == limit:

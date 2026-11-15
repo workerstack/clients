@@ -234,7 +234,7 @@ export function newClient(): Kitchen {
 
 export async function organization(client: Kitchen, orgId: string): Promise<string | null> {
 	try {
-		await client.getApiV1OrganizationsByOrgId({ params: { orgId } })
+		await client.organizations.retrieve({ params: { orgId } })
 		return orgId
 	} catch (error) {
 		if (error instanceof NotFoundError) return null
@@ -243,7 +243,7 @@ export async function organization(client: Kitchen, orgId: string): Promise<stri
 }
 
 export async function health(client: Kitchen): Promise<string> {
-	const result = await client.safe.getApiHealth()
+	const result = await client.safe.health.check()
 	if (result.ok) return "up"
 	if (result.error instanceof DecodeError) return `unreadable answer: ${result.error.message}`
 	return `answered ${result.error.status}`
@@ -320,7 +320,7 @@ same for its module and the version it links in. A path Go would not publish (no
 
 ```go
 func listing(ctx context.Context, client *sdk.Client) string {
-	r, err := client.Safe().GetApi(ctx, nil)
+	r, err := client.Safe().Root.List(ctx, nil)
 	if err != nil {
 		return fmt.Sprintf("no answer: %v", err) // never sent, refused, dropped, timed out or canceled
 	}
@@ -348,7 +348,7 @@ clients generate --spec openapi.json --target rust --out generated --rust-crate-
 
 ```rust
 async fn listing(client: &Client) -> String {
-    match client.safe().get_api(&GetApiOpts::default()).await {
+    match client.safe().root().list(&RootListOpts::default()).await {
         Ok(Answer::Ok { data, response }) => format!("answered {}: {data:?}", response.status),
         Ok(Answer::Err {
             error: SafeError::Api(failed),
@@ -379,7 +379,7 @@ clients' own manifest stays out of the sdist.
 
 ```python
 async def health(client: AsyncSDK) -> str:
-    match await client.safe.get_api_health():
+    match await client.safe.health.check():
         case Ok(data, response):
             return f"answered {response.status}: {data}"
         case Err(DecodeError() as unreadable, response):
@@ -404,7 +404,7 @@ into `dotnet pack`.
 ```csharp
     public static async Task<string> Listing(HttpSdkClient client, string id)
     {
-        var result = await client.Safe.GetApiAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
+        var result = await client.Safe.Root.ListAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
         return result.Match(
             found => $"answered {result.Response.Status}: {found}",
             error => error switch
@@ -432,7 +432,7 @@ the metadata block, whose authors are the POM's developers. Signing the publicat
 ```java
   static String listing(KitchenClient client) {
     // no answer (never sent, refused, timed out, canceled) still throws
-    Result<ListApiResponse200> result = client.safe().getApi(GetApiParams.builder().build());
+    Result<ListApiResponse200> result = client.safe().root().list(RootListParams.builder().build());
     int status = result.response().status();
     return result.fold(
         found -> "answered " + status + ": " + found,

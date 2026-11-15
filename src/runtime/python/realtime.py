@@ -4,6 +4,7 @@ long-poll) that reconnects after a drop and resumes past the last message it del
 
 import asyncio
 import contextlib
+import dataclasses
 import random
 from collections.abc import Sequence
 from enum import StrEnum
@@ -213,22 +214,13 @@ class AsyncRealtimeTransport(AsyncWsTransport):
         self,
         op: Operation[T],
         *,
-        last_event_id: str | None = None,
-        reconnect_token: str | None = None,
-        protocols: Sequence[str] | None = None,
-        max_reconnect_attempts: int | None = None,
-        reconnect_delay_ms: int | None = None,
+        transport: TransportOpts | None = None,
         **args: Unpack[CallArgs],
     ) -> ResumableConnection[T]:
         x = Exchange(self, op, args, stream=True)
         x.check()
-        opts = TransportOpts(
-            last_event_id,
-            reconnect_token,
-            list(protocols or []),
-            5 if max_reconnect_attempts is None else max_reconnect_attempts,
-            1000 if reconnect_delay_ms is None else reconnect_delay_ms,
-        )
+        # the connection advances its own copy: the caller's value stays as it was
+        opts = TransportOpts() if transport is None else dataclasses.replace(transport)
         dial = Dial(self, op, args, x.options.get("raw"))
         chain: list[TransportAdapter] = [
             WsAdapter(dial),

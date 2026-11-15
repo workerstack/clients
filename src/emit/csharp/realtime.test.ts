@@ -3,7 +3,7 @@
  * the method dials WebSocket, else SSE, else long-poll and returns `ResumableConnection<T>` connected (`JsonElement`
  * untyped), its token bounding the dial and the connection; a reconnect reopens the chain from the advanced cursor;
  * the backoff; the give-up once; every dial's params, auth, headers and request id, the SSE and long-poll dials through
- * the exchange, the WebSocket dial with no hook; decode; send; the emitted surface with its claimed `…2` params.
+ * the exchange, the WebSocket dial with no hook; decode; send; the emitted surface with its one `TransportOptions? transport`; resuming from `rc.Options`.
  * Driven on `realtime`, with consumer programs and csc; every timed call follows a warm one on its client.
  */
 import { describe, expect, it } from "vitest"
@@ -112,12 +112,14 @@ async function consumed(name: string, replies: readonly Reply[], body: string, t
 /** What csc holds of the realtime methods: each typed by its event schema, the folded resume params gone. */
 const WRONG = 'ResumableConnection<JsonElement> wrong = await c.Feed.LiveAsync("c");'
 const CLAIMED = 'await c.Feed.ResumeAsync(reconnectToken2: "x");'
+const WRONG_FLAT = 'await c.Feed.LiveAsync("c", maxReconnectAttempts: 3);'
 const TYPES = [
 	'using var c = Client(); ResumableConnection<Payload> x = await c.Feed.LiveAsync("c");',
-	'ResumableConnection<JsonElement> r = await c.Feed.ResumeAsync(protocols2: "p", lastEventId: "5", reconnectToken: "rt");',
+	'ResumableConnection<JsonElement> r = await c.Feed.ResumeAsync(protocols: "p", transport: new() { LastEventId = "5", ReconnectToken = "rt" });',
 	WRONG,
 	CLAIMED,
-	'await c.Feed.LiveAsync("c", maxReconnectAttempts: 3, reconnectDelay: TimeSpan.FromSeconds(2), protocols: ["v1"]);',
+	'await c.Feed.LiveAsync("c", transport: new() { MaxReconnectAttempts = 3, ReconnectDelay = TimeSpan.FromSeconds(2), Protocols = ["v1"] });',
+	WRONG_FLAT,
 	"(TransportOptions o, ConnectionState s, TransportKind? k) = (x.Options, x.State, x.ProvenTransport);",
 	"await foreach (Payload p in x) { long? n = p.N; }",
 ]
@@ -143,6 +145,7 @@ Note($"{rc.State}"); await rc.DisposeAsync(); Note($"{rc.State}");`
 		expect(findings()).toEqual([
 			`${WRONG} → CS0029: Cannot implicitly convert type 'HttpSdk.ResumableConnection<HttpSdk.Payload>' to 'HttpSdk.ResumableConnection<System.Text.Json.JsonElement>'`,
 			`${CLAIMED} → CS1739: The best overload for 'ResumeAsync' does not have a parameter named 'reconnectToken2'`,
+			`${WRONG_FLAT} → CS1739: The best overload for 'LiveAsync' does not have a parameter named 'maxReconnectAttempts'`,
 		])
 	})
 
@@ -294,9 +297,9 @@ describe.skipIf(!DOTNET)("a connection's states; a caller's adapter under the sa
 	it("is Connected, Reconnecting or Disconnected; a budget of 0 never reconnects and raises once", async () => {
 		/* a long-poll connect does not dial, so the 400 is the first read's. A read bounded by its own token at
 		 * 1,000 ms mid-reconnect leaves the connection reconnecting: the upgrade is held 2,000 ms past the bound */
-		const body = `Section("no-reconnect"); var rc = await Client().Feed.LiveAsync("c", maxReconnectAttempts: 0, reconnectDelay: TimeSpan.FromMilliseconds(1));
+		const body = `Section("no-reconnect"); var rc = await Client().Feed.LiveAsync("c", transport: new() { MaxReconnectAttempts = 0, ReconnectDelay = TimeSpan.FromMilliseconds(1) });
 Note($"{rc.State}"); Note(await Read(rc)); Note($"{rc.State} {await Read(rc)} {await Read(rc)}");
-Section("reconnecting"); var again = await Client().Feed.LiveAsync("c", reconnectDelay: TimeSpan.FromMilliseconds(1));
+Section("reconnecting"); var again = await Client().Feed.LiveAsync("c", transport: new() { ReconnectDelay = TimeSpan.FromMilliseconds(1) });
 Note($"{again.State} {await Read(again)}");
 using var bound = new CancellationTokenSource(1000);
 try { Note(await Read(again, bound.Token)); } catch (OperationCanceledException) { Note($"timed out {again.State}"); }
@@ -416,49 +419,72 @@ describe.skipIf(!DOTNET)("the SSE and long-poll dials ride the exchange; the Web
 	})
 })
 
-describe.skipIf(!DOTNET)("a message that does not decode keeps the connection; send POSTs; …2 is sent", SLOW, () => {
-	/* ported: python realtime.test.ts:425 (STJ refuses another JSON kind itself: `5` into Payload) */
-	it("throws DecodeException for a message that does not decode, the cursor advanced and the connection kept", async () => {
-		const body = `await using var rc = await Client().Feed.LiveAsync("c", reconnectDelay: TimeSpan.FromMilliseconds(1));
+describe.skipIf(!DOTNET)(
+	"a message that does not decode keeps the connection; send POSTs; a declared param is sent",
+	SLOW,
+	() => {
+		/* ported: python realtime.test.ts:425 (STJ refuses another JSON kind itself: `5` into Payload) */
+		it("throws DecodeException for a message that does not decode, the cursor advanced and the connection kept", async () => {
+			const body = `await using var rc = await Client().Feed.LiveAsync("c", transport: new() { ReconnectDelay = TimeSpan.FromMilliseconds(1) });
 Note(await Read(rc)); Note(await Read(rc)); Note($"{rc.State}"); Note(rc.Options.LastEventId);`
-		const { hops, out, stderr } = await consumed("kind", [refused, sse(["id: 1\ndata: 5\n\n", ev(2)], "hold")], body)
-		const decode = expect.stringMatching(/^err DecodeException: a message does not decode: /)
-		const want = [2, [decode, 'ok {"n":2,"reconnect_token":"rt-2"}', "Connected", "2"]]
-		expect([hops.length, out?.main], stderr).toEqual(want)
-	})
+			const { hops, out, stderr } = await consumed("kind", [refused, sse(["id: 1\ndata: 5\n\n", ev(2)], "hold")], body)
+			const decode = expect.stringMatching(/^err DecodeException: a message does not decode: /)
+			const want = [2, [decode, 'ok {"n":2,"reconnect_token":"rt-2"}', "Connected", "2"]]
+			expect([hops.length, out?.main], stderr).toEqual(want)
+		})
 
-	/* ported: python realtime.test.ts:438 */
-	it("POSTs on a long-poll connection with the call's params, the bearer and compact JSON, then polls", async () => {
-		const replies = [refused, unavailable, { json: {}, status: 200 }, polled(1, "7")]
-		const sending = live({ headers: { "x-tenant": "acme" }, send: ['{"hi":1}'], take: 1 })
-		const drove = await drive(replies, [sending], { script: QUICK, setup: TOK })
-		const seen = [failure(drove), drove.run.observed]
-		expect(seen, drove.run.stderr).toEqual([undefined, frames({ n: 1, reconnect_token: "rt-7" })])
-		expect(drove.hops.slice(2)).toMatchObject([
-			{ ...JSON_POST, headers: { authorization: "Bearer tok", "x-tenant": "acme" } },
-			{ method: "GET", url: FEED_URL },
-		])
-		expect(drove.bodies[2]?.toString()).toBe('{"hi":1}')
-	})
+		/* ported: python realtime.test.ts:438 */
+		it("POSTs on a long-poll connection with the call's params, the bearer and compact JSON, then polls", async () => {
+			const replies = [refused, unavailable, { json: {}, status: 200 }, polled(1, "7")]
+			const sending = live({ headers: { "x-tenant": "acme" }, send: ['{"hi":1}'], take: 1 })
+			const drove = await drive(replies, [sending], { script: QUICK, setup: TOK })
+			const seen = [failure(drove), drove.run.observed]
+			expect(seen, drove.run.stderr).toEqual([undefined, frames({ n: 1, reconnect_token: "rt-7" })])
+			expect(drove.hops.slice(2)).toMatchObject([
+				{ ...JSON_POST, headers: { authorization: "Bearer tok", "x-tenant": "acme" } },
+				{ method: "GET", url: FEED_URL },
+			])
+			expect(drove.bodies[2]?.toString()).toBe('{"hi":1}')
+		})
 
-	/* ported: python realtime.test.ts:451 (a 405 has no class of its own: UnexpectedStatusException, Fb14) */
-	it("POSTs on an SSE connection; a POST answered 405 throws its status exception, observed as the call's error", async () => {
-		const replies = [refused, sse([ev(1)], "hold"), { json: { message: "no" }, status: 405 }]
-		const drove = await drive(replies, [live({ send: ['{"hi":1}'], take: 1 })], { script: QUICK, setup: TOK })
-		expect(drove.hops[2], drove.run.stderr).toMatchObject({ ...JSON_POST, headers: { authorization: "Bearer tok" } })
-		const seen = [drove.run.observed, failure(drove), call(drove)?.error?.chain.includes("ApiStatusException")]
-		const rejected = [{ body: { message: "no" }, errorKey: null, kind: "error", status: 405 }]
-		expect(seen).toEqual([rejected, ["UnexpectedStatusException", 405, "stream"], true])
-	})
+		/* ported: python realtime.test.ts:451 (a 405 has no class of its own: UnexpectedStatusException, Fb14) */
+		it("POSTs on an SSE connection; a POST answered 405 throws its status exception, observed as the call's error", async () => {
+			const replies = [refused, sse([ev(1)], "hold"), { json: { message: "no" }, status: 405 }]
+			const drove = await drive(replies, [live({ send: ['{"hi":1}'], take: 1 })], { script: QUICK, setup: TOK })
+			expect(drove.hops[2], drove.run.stderr).toMatchObject({ ...JSON_POST, headers: { authorization: "Bearer tok" } })
+			const seen = [drove.run.observed, failure(drove), call(drove)?.error?.chain.includes("ApiStatusException")]
+			const rejected = [{ body: { message: "no" }, errorKey: null, kind: "error", status: 405 }]
+			expect(seen).toEqual([rejected, ["UnexpectedStatusException", 405, "stream"], true])
+		})
 
-	/* ported: python realtime.test.ts:477 (C#'s clash.feed in the realtime document, contract 50 §4.1) */
-	it("sends a claimed …2 param by its wire name beside a budget of 0", async () => {
-		const body = `var rc = await Client().Clash.FeedAsync("c", maxReconnectAttempts2: 3, reconnectDelay2: 4, maxReconnectAttempts: 0);
+		/* ported: python realtime.test.ts:477 (C#'s clash.feed in the realtime document, contract 50 §4.1) */
+		it("sends a declared max_reconnect_attempts param by its wire name beside a transport budget of 0", async () => {
+			const body = `var rc = await Client().Clash.FeedAsync("c", maxReconnectAttempts: 3, reconnectDelay: 4, transport: new() { MaxReconnectAttempts = 0 });
 Note(await Read(rc)); Note(await Read(rc));`
-		const { hops, out, stderr } = await consumed("clash", [refused, refused, bad], body)
+			const { hops, out, stderr } = await consumed("clash", [refused, refused, bad], body)
+			const want = [
+				[CLASH_URL, CLASH_URL, CLASH_URL],
+				["err BadRequestException: HTTP 400: bad", "none"],
+			]
+			expect([hops, out?.main], stderr).toEqual(want)
+		})
+	},
+)
+
+describe.skipIf(!DOTNET)("a connection advances its own copy of the caller's TransportOptions", SLOW, () => {
+	it("leaves the caller's value as it was, and resumes past the last message from rc.Options", async () => {
+		const body = `var mine = new TransportOptions { ReconnectDelay = TimeSpan.FromMilliseconds(1) };
+var rc = await Client().Feed.LiveAsync("c", transport: mine);
+Note(await Read(rc)); await rc.CloseAsync();
+Note($"{mine.LastEventId ?? "none"} {mine.ReconnectToken ?? "none"} {rc.Options.LastEventId} {rc.Options.ReconnectToken}");
+await using var again = await Client().Feed.LiveAsync("c", transport: rc.Options);
+Note(await Read(again));`
+		const replies = [refused, sse([ev(1)], "hold"), refused, sse([ev(2)], "hold")]
+		const { hops, out, stderr } = await consumed("resumed", replies, body)
+		const read2 = 'ok {"n":2,"reconnect_token":"rt-2"}'
 		const want = [
-			[CLASH_URL, CLASH_URL, CLASH_URL],
-			["err BadRequestException: HTTP 400: bad", "none"],
+			[FEED_URL, FEED_URL, AT_1, "/feed?channel=c&reconnect_token=rt-1"],
+			[`ok ${READ_1}`, "none none 1 rt-1", read2],
 		]
 		expect([hops, out?.main], stderr).toEqual(want)
 	})
@@ -467,31 +493,31 @@ Note(await Read(rc)); Note(await Read(rc));`
 /** The realtime `<returns>` line (contract 50 §2): one per realtime method, and one on its `client.Safe` twin, the very method. */
 const RETURNS =
 	"    /// <returns>The connection over WebSocket, else SSE, else long-poll: it reconnects after a drop and resumes after the last message it delivered; the token, CloseAsync or DisposeAsync ends it.</returns>"
-const OPTS = "TransportOptions.Of(lastEventId, reconnectToken, protocols, maxReconnectAttempts, reconnectDelay)"
+const OPTS = "(transport ?? new()).Copy()"
 const FIELDS =
-	"string? lastEventId = null, string? reconnectToken = null, IReadOnlyList<string>? protocols = null, int? maxReconnectAttempts = null, TimeSpan? reconnectDelay = null, RequestOptions? options = null, CancellationToken cancellationToken = default) =>"
+	"TransportOptions? transport = null, RequestOptions? options = null, CancellationToken cancellationToken = default) =>"
 const CTX = "HttpSdkJsonContext.Default"
-/** contract 50 §2.1's realtime lines, and `clash.feed`'s by the same rules (its clashing queries claimed `…2`) */
+/** contract 50 §2.1's realtime lines, and `clash.feed`'s by the same rules (its reconnect-named queries keep their names) */
 const EMITTED = [
 	'    private static readonly Operation _live = new("GET", "/feed", [], Idempotent: false);',
 	'    private static readonly Operation _resume = new("GET", "/resume", [], Idempotent: false);',
 	'    private static readonly Operation _feed = new("GET", "/realtime-clash/feed", [], Idempotent: false);',
 	`    public Task<ResumableConnection<Payload>> LiveAsync(string channel, string? xTenant = null, ${FIELDS}`,
 	`        _t.RealtimeAsync(_live, new([], [Arg.Of("channel", channel, ${CTX}.String)], [Arg.Of("x-tenant", xTenant, ${CTX}.String)], null, null, options), ${OPTS}, ${CTX}.Payload, cancellationToken);`,
-	`    public Task<ResumableConnection<JsonElement>> ResumeAsync(string? protocols2 = null, ${FIELDS}`,
-	`        _t.RealtimeAsync(_resume, new([], [Arg.Of("protocols", protocols2, ${CTX}.String)], [], null, null, options), ${OPTS}, ${CTX}.JsonElement, cancellationToken);`,
-	`    public Task<ResumableConnection<Payload>> FeedAsync(string channel, long? maxReconnectAttempts2 = null, long? reconnectDelay2 = null, ${FIELDS}`,
-	`        _t.RealtimeAsync(_feed, new([], [Arg.Of("channel", channel, ${CTX}.String), Arg.Of("max_reconnect_attempts", maxReconnectAttempts2, ${CTX}.NullableInt64), Arg.Of("reconnect_delay", reconnectDelay2, ${CTX}.NullableInt64)], [], null, null, options), ${OPTS}, ${CTX}.Payload, cancellationToken);`,
+	`    public Task<ResumableConnection<JsonElement>> ResumeAsync(string? protocols = null, ${FIELDS}`,
+	`        _t.RealtimeAsync(_resume, new([], [Arg.Of("protocols", protocols, ${CTX}.String)], [], null, null, options), ${OPTS}, ${CTX}.JsonElement, cancellationToken);`,
+	`    public Task<ResumableConnection<Payload>> FeedAsync(string channel, long? maxReconnectAttempts = null, long? reconnectDelay = null, ${FIELDS}`,
+	`        _t.RealtimeAsync(_feed, new([], [Arg.Of("channel", channel, ${CTX}.String), Arg.Of("max_reconnect_attempts", maxReconnectAttempts, ${CTX}.NullableInt64), Arg.Of("reconnect_delay", reconnectDelay, ${CTX}.NullableInt64)], [], null, null, options), ${OPTS}, ${CTX}.Payload, cancellationToken);`,
 ]
 const CLAIMS = {
 	channel: "channel",
-	max_reconnect_attempts: "maxReconnectAttempts2",
-	reconnect_delay: "reconnectDelay2",
+	max_reconnect_attempts: "maxReconnectAttempts",
+	reconnect_delay: "reconnectDelay",
 }
 
-describe("the emitted realtime surface: the stream fields reserved, a clashing declared param claimed …2", () => {
+describe("the emitted realtime surface: one transport value, a declared param keeps its name", () => {
 	/* ported: python realtime.test.ts:462 (C# carries no event kind on the Operation: STJ checks it) */
-	it("emits §2.1's methods and fields byte for byte, and claims max_reconnect_attempts and reconnect_delay as …2", () => {
+	it("emits §2.1's methods and fields byte for byte, and leaves max_reconnect_attempts and reconnect_delay unclaimed", () => {
 		const lines = (generateCSharpSdk(FIXTURES.realtime.document()).files["Client.cs"] ?? "").split("\n")
 		const query = csharpCallPlans(FIXTURES.realtime.document())["clash.feed"]?.query
 		const [missing, returns] = [EMITTED.filter((line) => !lines.includes(line)), lines.filter((l) => l === RETURNS)]

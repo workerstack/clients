@@ -150,10 +150,10 @@ describe("dispatchRs: a realtime operation's arm, and the stream files dispatch.
 			"            let mut o = sdk::FeedLiveOpts::default();",
 			'            if let Some(v) = call.search("channel") { o.channel = from(v)?; }',
 			'            if let Some(v) = call.header_param("x-tenant") { o.x_tenant = Some(from(v)?); }',
-			"            o.last_event_id = call.last_event_id.clone();",
-			"            o.reconnect_token = call.reconnect_token.clone();",
-			"            if let Some(p) = &d.protocols { o.protocols = p.clone(); }",
-			"            if let Some(r) = &d.realtime { o.max_reconnect_attempts = r.max_reconnect_attempts; o.reconnect_delay_ms = r.reconnect_delay_ms; }",
+			"            o.transport.last_event_id = call.last_event_id.clone();",
+			"            o.transport.reconnect_token = call.reconnect_token.clone();",
+			"            if let Some(p) = &d.protocols { o.transport.protocols = p.clone(); }",
+			"            if let Some(r) = &d.realtime { o.transport.max_reconnect_attempts = r.max_reconnect_attempts; o.transport.reconnect_delay_ms = r.reconnect_delay_ms; }",
 			"            call.no_body()?;",
 			"            let c = client.feed().live(&o);",
 			"            live::observe_live(apply(c, call, input, d), call).await",
@@ -162,7 +162,7 @@ describe("dispatchRs: a realtime operation's arm, and the stream files dispatch.
 		/* one arm whichever client dispatch is sent (bit 21 i4): a connection is the same Call on client.safe() */
 		expect(dispatchRs(plansOf("realtime"))).toContain(arm)
 		expect(dispatchRs(plansOf("realtime"))).toContain(
-			'if let Some(v) = call.search("protocols") { o.protocols2 = Some(from(v)?); }',
+			'if let Some(v) = call.search("protocols") { o.protocols = Some(from(v)?); }',
 		)
 	})
 

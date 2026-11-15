@@ -54,7 +54,7 @@ const BODY = `	refreshed := false
 			return "new", nil
 		},
 	})
-	rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{ReconnectDelayMs: 10})
+	rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{Transport: sdk.TransportOpts{ReconnectDelayMs: 10}})
 	if err != nil {
 		note("open: " + err.Error())
 		return

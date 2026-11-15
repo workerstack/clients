@@ -180,7 +180,7 @@ describe("csharpCallPlans: a stream operation's plan", () => {
 			/* the hand-written plans the refusals run on name what the emitter's do */
 			hand: [PLANS["feed.live"], PLANS["rooms.socket"], PLANS["ticks.stream"]].map(named),
 			live: [{ channel: "channel" }, { "x-tenant": "xTenant" }],
-			resume: [{ protocols: "protocols2" }, {}],
+			resume: [{ protocols: "protocols" }, {}],
 			socket: [{ since: "since" }, "ws"],
 			ticks: expect.objectContaining({
 				accessors: ["Ticks"],

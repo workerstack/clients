@@ -15,7 +15,7 @@ import { DecodeError, Kitchen, NotFoundError } from "./kitchen"
 
 export async function organization(client: Kitchen, orgId: string): Promise<string | null> {
 	try {
-		await client.getApiV1OrganizationsByOrgId({ params: { orgId } })
+		await client.organizations.retrieve({ params: { orgId } })
 		return orgId
 	} catch (error) {
 		if (error instanceof NotFoundError) return null
@@ -24,7 +24,7 @@ export async function organization(client: Kitchen, orgId: string): Promise<stri
 }
 
 export async function health(client: Kitchen): Promise<string> {
-	const result = await client.safe.getApiHealth()
+	const result = await client.safe.health.check()
 	if (result.ok) return "up"
 	if (result.error instanceof DecodeError) return `unreadable answer: ${result.error.message}`
 	return `answered ${result.error.status}`
@@ -71,7 +71,7 @@ export async function room(client: Streams): Promise<void> {
 Breaking out of a `range` over a stream closes it; a context ends it quietly.
 
 ```go
-	for event, err := range client.GetApiEvents(ctx, nil) {
+	for event, err := range client.Events.List(ctx, nil) {
 		if err != nil {
 			return seen, err
 		}
@@ -113,7 +113,7 @@ fn health_blocking(client: &Client) -> Result<(), String> {
 `async with` frees a stream's connection when the block ends; a dropped stream frees it only when it is collected.
 
 ```python
-    async with await client.get_api_events() as stream:  # leaving the block frees the connection
+    async with await client.events.list() as stream:  # leaving the block frees the connection
         async for event in stream:
             seen.append(event.data)
             if len(seen) == limit:
@@ -125,7 +125,7 @@ fn health_blocking(client: &Client) -> Result<(), String> {
 `await using` disposes a stream, and with it its connection.
 
 ```csharp
-        await using var stream = await client.GetApiEventsAsync(); // disposing it frees the connection
+        await using var stream = await client.Events.ListAsync(); // disposing it frees the connection
         await foreach (var ev in stream)
         {
             seen.Add(ev.Data);
@@ -138,7 +138,7 @@ fn health_blocking(client: &Client) -> Result<(), String> {
 Open a stream in try-with-resources: a `break` out of a for-each without one keeps the connection.
 
 ```java
-    try (EventStream<String> stream = client.getApiEvents(GetApiEventsParams.builder().build())) {
+    try (EventStream<String> stream = client.events().list(EventsListParams.builder().build())) {
       for (SseEvent<String> event : stream) {
         seen.add(event.data());
         if (seen.size() == limit) {

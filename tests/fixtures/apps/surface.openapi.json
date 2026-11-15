@@ -1,5 +1,5 @@
 {
-	"openapi": "3.1.0",
+	"openapi": "3.2.1",
 	"info": {
 		"title": "Backend Surface",
 		"version": "1.0.0"
@@ -7,6 +7,7 @@
 	"paths": {
 		"/in/all/{resourceId}": {
 			"put": {
+				"operationId": "in.all.replace",
 				"x-backend-route": "PUT /in/all/:resourceId",
 				"requestBody": {
 					"content": {
@@ -98,6 +99,7 @@
 		},
 		"/in/cookies": {
 			"get": {
+				"operationId": "in.cookies.list",
 				"x-backend-route": "GET /in/cookies",
 				"parameters": [
 					{
@@ -163,6 +165,7 @@
 		},
 		"/in/file": {
 			"post": {
+				"operationId": "in.file.create",
 				"x-backend-route": "POST /in/file",
 				"requestBody": {
 					"content": {
@@ -284,6 +287,7 @@
 		},
 		"/in/headers": {
 			"get": {
+				"operationId": "in.headers.list",
 				"x-backend-route": "GET /in/headers",
 				"parameters": [
 					{
@@ -457,6 +461,7 @@
 		},
 		"/in/params/{orgId}/members/{memberId}": {
 			"get": {
+				"operationId": "in.params.members.retrieve",
 				"x-backend-route": "GET /in/params/:orgId/members/:memberId",
 				"parameters": [
 					{
@@ -893,6 +898,7 @@
 		},
 		"/out/binary": {
 			"get": {
+				"operationId": "out.binary.list",
 				"x-backend-route": "GET /out/binary",
 				"responses": {
 					"200": {
@@ -940,6 +946,7 @@
 		},
 		"/out/csv": {
 			"get": {
+				"operationId": "out.csv.list",
 				"x-backend-route": "GET /out/csv",
 				"responses": {
 					"200": {
@@ -987,6 +994,7 @@
 		},
 		"/out/html": {
 			"get": {
+				"operationId": "out.html.list",
 				"x-backend-route": "GET /out/html",
 				"responses": {
 					"200": {
@@ -1034,6 +1042,7 @@
 		},
 		"/out/multi-status": {
 			"post": {
+				"operationId": "out.multiStatus.create",
 				"x-backend-route": "POST /out/multi-status",
 				"requestBody": {
 					"content": {
@@ -1105,6 +1114,7 @@
 		},
 		"/out/no-content/{id}": {
 			"delete": {
+				"operationId": "out.noContent.delete",
 				"x-backend-route": "DELETE /out/no-content/:id",
 				"parameters": [
 					{
@@ -1146,7 +1156,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/DeleteOutNoContentResponse404"
+									"$ref": "#/components/schemas/Err404NotFound"
 								}
 							}
 						},
@@ -1169,14 +1179,51 @@
 		},
 		"/out/sse": {
 			"get": {
+				"operationId": "out.sse.list",
 				"x-backend-route": "GET /out/sse",
 				"responses": {
 					"200": {
 						"description": "ok",
 						"content": {
 							"text/event-stream": {
-								"schema": {
-									"$ref": "#/components/schemas/ListOutCsvResponse200"
+								"itemSchema": {
+									"oneOf": [
+										{
+											"properties": {
+												"data": {
+													"contentMediaType": "application/json",
+													"contentSchema": {
+														"type": "object",
+														"properties": {
+															"n": {
+																"type": "number"
+															}
+														},
+														"required": ["n"],
+														"additionalProperties": false
+													},
+													"type": "string"
+												},
+												"event": {
+													"const": "data"
+												}
+											},
+											"required": ["event", "data"],
+											"type": "object"
+										},
+										{
+											"properties": {
+												"data": {
+													"type": "string"
+												},
+												"event": {
+													"const": "heartbeat"
+												}
+											},
+											"required": ["event", "data"],
+											"type": "object"
+										}
+									]
 								}
 							}
 						}
@@ -1216,6 +1263,7 @@
 		},
 		"/out/text": {
 			"get": {
+				"operationId": "out.text.list",
 				"x-backend-route": "GET /out/text",
 				"responses": {
 					"200": {
@@ -1263,6 +1311,7 @@
 		},
 		"/out/xml": {
 			"get": {
+				"operationId": "out.xml.list",
 				"x-backend-route": "GET /out/xml",
 				"responses": {
 					"200": {
@@ -1310,6 +1359,7 @@
 		},
 		"/rs/upload": {
 			"post": {
+				"operationId": "rs.upload.create",
 				"x-backend-route": "POST /rs/upload",
 				"requestBody": {
 					"content": {
@@ -1365,8 +1415,60 @@
 				}
 			}
 		},
+		"/rt/room": {
+			"get": {
+				"x-websocket": {
+					"receive": {
+						"$ref": "#/components/schemas/RtRoomReceive"
+					},
+					"send": {
+						"$ref": "#/components/schemas/RtRoomSend"
+					}
+				},
+				"tags": ["realtime"],
+				"operationId": "rt.room",
+				"x-realtime": true,
+				"x-backend-route": "WS /rt/room",
+				"responses": {
+					"101": {
+						"description": "WebSocket upgrade"
+					},
+					"400": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err400ValidationError"
+								}
+							}
+						},
+						"description": "validation_error",
+						"x-backend-error": true
+					},
+					"401": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err401Unauthorized"
+								}
+							}
+						},
+						"description": "unauthorized",
+						"x-backend-error": true
+					}
+				},
+				"x-backend-errors": {
+					"unauthorized": {
+						"status": 401
+					},
+					"validation_error": {
+						"status": 400
+					}
+				}
+			}
+		},
 		"/status/accepted": {
 			"post": {
+				"operationId": "status.accepted.create",
 				"x-backend-route": "POST /status/accepted",
 				"requestBody": {
 					"content": {
@@ -1424,6 +1526,7 @@
 		},
 		"/status/created": {
 			"post": {
+				"operationId": "status.created.create",
 				"x-backend-route": "POST /status/created",
 				"requestBody": {
 					"content": {
@@ -1481,6 +1584,7 @@
 		},
 		"/status/no-content": {
 			"delete": {
+				"operationId": "status.noContent.delete",
 				"x-backend-route": "DELETE /status/no-content",
 				"responses": {
 					"204": {
@@ -1521,6 +1625,7 @@
 		},
 		"/status/ok": {
 			"get": {
+				"operationId": "status.ok.list",
 				"x-backend-route": "GET /status/ok",
 				"responses": {
 					"200": {
@@ -1568,6 +1673,7 @@
 		},
 		"/stream/filtered": {
 			"get": {
+				"operationId": "stream.filtered.list",
 				"x-backend-route": "GET /stream/filtered",
 				"parameters": [
 					{
@@ -1592,8 +1698,17 @@
 						"description": "ok",
 						"content": {
 							"text/event-stream": {
-								"schema": {
-									"$ref": "#/components/schemas/ListOutCsvResponse200"
+								"itemSchema": {
+									"properties": {
+										"data": {
+											"type": "string"
+										},
+										"event": {
+											"const": "subscribed"
+										}
+									},
+									"required": ["event", "data"],
+									"type": "object"
 								}
 							}
 						}
@@ -1650,6 +1765,36 @@
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
+					},
+					"400": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err400ValidationError"
+								}
+							}
+						},
+						"description": "validation_error",
+						"x-backend-error": true
+					},
+					"401": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err401Unauthorized"
+								}
+							}
+						},
+						"description": "unauthorized",
+						"x-backend-error": true
+					}
+				},
+				"x-backend-errors": {
+					"unauthorized": {
+						"status": 401
+					},
+					"validation_error": {
+						"status": 400
 					}
 				}
 			}
@@ -1663,6 +1808,36 @@
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
+					},
+					"400": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err400ValidationError"
+								}
+							}
+						},
+						"description": "validation_error",
+						"x-backend-error": true
+					},
+					"401": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err401Unauthorized"
+								}
+							}
+						},
+						"description": "unauthorized",
+						"x-backend-error": true
+					}
+				},
+				"x-backend-errors": {
+					"unauthorized": {
+						"status": 401
+					},
+					"validation_error": {
+						"status": 400
 					}
 				}
 			}
@@ -1676,6 +1851,36 @@
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
+					},
+					"400": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err400ValidationError"
+								}
+							}
+						},
+						"description": "validation_error",
+						"x-backend-error": true
+					},
+					"401": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err401Unauthorized"
+								}
+							}
+						},
+						"description": "unauthorized",
+						"x-backend-error": true
+					}
+				},
+				"x-backend-errors": {
+					"unauthorized": {
+						"status": 401
+					},
+					"validation_error": {
+						"status": 400
 					}
 				}
 			}
@@ -1688,6 +1893,22 @@
 				"x-backend-route": "WS /ws/room",
 				"parameters": [
 					{
+						"in": "cookie",
+						"name": "session",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "header",
+						"name": "x-room-token",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
 						"in": "query",
 						"name": "roomId",
 						"required": true,
@@ -1699,6 +1920,100 @@
 				"responses": {
 					"101": {
 						"description": "WebSocket upgrade"
+					},
+					"400": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err400ValidationError"
+								}
+							}
+						},
+						"description": "validation_error",
+						"x-backend-error": true
+					},
+					"401": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err401Unauthorized"
+								}
+							}
+						},
+						"description": "unauthorized",
+						"x-backend-error": true
+					},
+					"404": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err404NotFound"
+								}
+							}
+						},
+						"description": "not_found",
+						"x-backend-error": true
+					}
+				},
+				"x-backend-errors": {
+					"not_found": {
+						"status": 404
+					},
+					"unauthorized": {
+						"status": 401
+					},
+					"validation_error": {
+						"status": 400
+					}
+				}
+			}
+		},
+		"/ws/talk": {
+			"get": {
+				"x-websocket": {
+					"receive": {
+						"$ref": "#/components/schemas/WsTalkReceive"
+					},
+					"send": {
+						"$ref": "#/components/schemas/WsTalkSend"
+					}
+				},
+				"tags": ["websocket"],
+				"operationId": "ws.talk",
+				"x-backend-route": "WS /ws/talk",
+				"responses": {
+					"101": {
+						"description": "WebSocket upgrade"
+					},
+					"400": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err400ValidationError"
+								}
+							}
+						},
+						"description": "validation_error",
+						"x-backend-error": true
+					},
+					"401": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Err401Unauthorized"
+								}
+							}
+						},
+						"description": "unauthorized",
+						"x-backend-error": true
+					}
+				},
+				"x-backend-errors": {
+					"unauthorized": {
+						"status": 401
+					},
+					"validation_error": {
+						"status": 400
 					}
 				}
 			}
@@ -1713,6 +2028,9 @@
 		},
 		{
 			"name": "websocket"
+		},
+		{
+			"name": "realtime"
 		}
 	],
 	"components": {
@@ -2093,7 +2411,7 @@
 				"required": ["error_key", "fields", "message", "status", "status_key", "success"],
 				"type": "object"
 			},
-			"DeleteOutNoContentResponse404": {
+			"Err404NotFound": {
 				"properties": {
 					"error_key": {
 						"enum": ["not_found"],
@@ -2165,6 +2483,68 @@
 				"required": ["uploadId"],
 				"additionalProperties": false
 			},
+			"RtRoomReceive": {
+				"oneOf": [
+					{
+						"type": "object",
+						"properties": {
+							"text": {
+								"type": "string"
+							},
+							"type": {
+								"type": "string",
+								"const": "say"
+							}
+						},
+						"required": ["text", "type"]
+					},
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "leave"
+							}
+						},
+						"required": ["type"]
+					}
+				],
+				"discriminator": {
+					"propertyName": "type"
+				}
+			},
+			"RtRoomSend": {
+				"oneOf": [
+					{
+						"type": "object",
+						"properties": {
+							"text": {
+								"type": "string"
+							},
+							"type": {
+								"type": "string",
+								"const": "said"
+							}
+						},
+						"required": ["text", "type"],
+						"additionalProperties": false
+					},
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "left"
+							}
+						},
+						"required": ["type"],
+						"additionalProperties": false
+					}
+				],
+				"discriminator": {
+					"propertyName": "type"
+				}
+			},
 			"CreateStatuRequest": {
 				"type": "object",
 				"properties": {
@@ -2202,6 +2582,68 @@
 				},
 				"required": ["v"],
 				"additionalProperties": false
+			},
+			"WsTalkReceive": {
+				"oneOf": [
+					{
+						"type": "object",
+						"properties": {
+							"text": {
+								"type": "string"
+							},
+							"type": {
+								"type": "string",
+								"const": "say"
+							}
+						},
+						"required": ["text", "type"]
+					},
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "ping"
+							}
+						},
+						"required": ["type"]
+					}
+				],
+				"discriminator": {
+					"propertyName": "type"
+				}
+			},
+			"WsTalkSend": {
+				"oneOf": [
+					{
+						"type": "object",
+						"properties": {
+							"text": {
+								"type": "string"
+							},
+							"type": {
+								"type": "string",
+								"const": "said"
+							}
+						},
+						"required": ["text", "type"],
+						"additionalProperties": false
+					},
+					{
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string",
+								"const": "pong"
+							}
+						},
+						"required": ["type"],
+						"additionalProperties": false
+					}
+				],
+				"discriminator": {
+					"propertyName": "type"
+				}
 			}
 		}
 	}

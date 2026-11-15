@@ -62,7 +62,7 @@ cannot flag it: search for `.error` reads on your calls by hand if your API answ
 
 ```ts v0
 const client = new Kitchen({ baseURL: "https://api.example.com" })
-const { data, error, status } = await client.getApiHealth()
+const { data, error, status } = await client.health.check()
 if (error) console.error("answered", status)
 else console.log(data)
 ```
@@ -71,7 +71,7 @@ else console.log(data)
 import { DecodeError, Kitchen } from "./kitchen"
 
 const client = new Kitchen({ baseURL: "https://api.example.com" })
-const result = await client.safe.getApiHealth()
+const result = await client.safe.health.check()
 if (!result.ok) {
 	const why = result.error instanceof DecodeError ? "an unreadable body" : result.error.status
 	console.error("answered", result.response.status, why)
@@ -104,7 +104,7 @@ else:
 
 ```python
 async def health(client: AsyncSDK) -> str:
-    match await client.safe.get_api_health():
+    match await client.safe.health.check():
         case Ok(data, response):
             return f"answered {response.status}: {data}"
         case Err(DecodeError() as unreadable, response):
@@ -149,7 +149,7 @@ if err == nil && !res.OK() {
 
 ```go
 func listing(ctx context.Context, client *sdk.Client) string {
-	r, err := client.Safe().GetApi(ctx, nil)
+	r, err := client.Safe().Root.List(ctx, nil)
 	if err != nil {
 		return fmt.Sprintf("no answer: %v", err) // never sent, refused, dropped, timed out or canceled
 	}
@@ -204,7 +204,7 @@ if !r.ok() {
 
 ```rust
 async fn listing(client: &Client) -> String {
-    match client.safe().get_api(&GetApiOpts::default()).await {
+    match client.safe().root().list(&RootListOpts::default()).await {
         Ok(Answer::Ok { data, response }) => format!("answered {}: {data:?}", response.status),
         Ok(Answer::Err {
             error: SafeError::Api(failed),
@@ -421,7 +421,7 @@ import { APIConnectionError, Kitchen } from "./kitchen"
 
 const client = new Kitchen({ baseURL: "https://api.example.com" })
 try {
-	await client.getApiHealth()
+	await client.health.check()
 } catch (error) {
 	if (error instanceof APIConnectionError) console.error("unreachable", error.cause)
 }
@@ -455,7 +455,7 @@ import { Kitchen, NotFoundError } from "./kitchen"
 
 const client = new Kitchen({ baseURL: "https://api.example.com" })
 try {
-	await client.getApiV1OrganizationsByOrgId({ params: { orgId: "org-404" } })
+	await client.organizations.retrieve({ params: { orgId: "org-404" } })
 } catch (error) {
 	if (error instanceof NotFoundError) console.error("no such organization")
 }

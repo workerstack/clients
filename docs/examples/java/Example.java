@@ -3,9 +3,9 @@
 // in the docs' tests.
 import com.example.kitchen.ApiException;
 import com.example.kitchen.EventStream;
-import com.example.kitchen.GetApiEventsParams;
-import com.example.kitchen.GetApiHealthParams;
-import com.example.kitchen.GetApiParams;
+import com.example.kitchen.EventsListParams;
+import com.example.kitchen.HealthCheckParams;
+import com.example.kitchen.RootListParams;
 import com.example.kitchen.KitchenClient;
 import com.example.kitchen.ListApiResponse200;
 import com.example.kitchen.Result;
@@ -27,7 +27,7 @@ public final class Example {
 
   static String checkHealth(KitchenClient client) {
     try {
-      client.getApiHealth(GetApiHealthParams.builder().build());
+      client.health().check(HealthCheckParams.builder().build());
       return null;
     } catch (ApiException failed) {
       return "health check answered " + failed.status();
@@ -36,7 +36,7 @@ public final class Example {
 
   static String listing(KitchenClient client) {
     // no answer (never sent, refused, timed out, canceled) still throws
-    Result<ListApiResponse200> result = client.safe().getApi(GetApiParams.builder().build());
+    Result<ListApiResponse200> result = client.safe().root().list(RootListParams.builder().build());
     int status = result.response().status();
     return result.fold(
         found -> "answered " + status + ": " + found,
@@ -49,7 +49,7 @@ public final class Example {
   static List<String> firstEvents(KitchenClient client, int limit) {
     List<String> seen = new ArrayList<>();
     // try-with-resources frees the connection, a break out of the loop included
-    try (EventStream<String> stream = client.getApiEvents(GetApiEventsParams.builder().build())) {
+    try (EventStream<String> stream = client.events().list(EventsListParams.builder().build())) {
       for (SseEvent<String> event : stream) {
         seen.add(event.data());
         if (seen.size() == limit) {

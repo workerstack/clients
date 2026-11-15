@@ -7,20 +7,22 @@
  * (emit/rust/__fixtures__/driver/script.rs, trace.rs, stream.rs) reads the same script, refusing for
  * good what is Go's alone (`ctxTimeoutMs`, `isKeys`, `isErrors`, `ws.readLimit`), and records its
  * errors as `RustError`: its trace is `Trace<RustError>`. `protocols`, `realtime` and `ws` mean the
- * same to it, on the Opts fields and `TypedWebSocket` methods of those names. The Python driver
- * (emit/python/__fixtures__/driver/script.py, tracing.py, stream.py) reads it on `SDK` and `AsyncSDK` alike,
+ * same to it, on the Opts fields (a realtime call's `transport`) and `TypedWebSocket` methods of those names. The
+ * Python driver (emit/python/__fixtures__/driver/script.py, tracing.py, stream.py) reads it on `SDK` and
+ * `AsyncSDK` alike,
  * refuses the same Go-only members, adds `taskCancel` (an `AsyncSDK` task's), and records its errors as
  * `PythonError`: its trace is `Trace<PythonError>`. It drives streams on `AsyncSDK` alone, refusing a stream call
  * on `SDK` (which has none), `raw: true` on a stream, and the stream members Rust refuses, in the same words;
- * `protocols` and `realtime` are the method's `protocols`, `max_reconnect_attempts` and `reconnect_delay_ms`.
+ * `protocols` and `realtime` are the method's `protocols`, `max_reconnect_attempts` and `reconnect_delay_ms`, a
+ * realtime method's on its one `transport`.
  * The C# driver (emit/csharp/__fixtures__/driver/) takes the same envelope on its one async client and records
  * its errors as `CsError`: its trace is `Trace<CsError>`. It reads the script (refusing `ctxTimeoutMs`, `isKeys`,
  * `isErrors` and `taskCancel` for good, and a multipart call), maps `cancel` to the method's `CancellationToken`,
  * and `httpClient` to `ClientConfig.Handler` (a caller chain). In phase d it drives SSE, WebSocket and realtime
  * calls (`events`, `frames`, `live`), refusing `raw: true` on a stream and `ws.readLimit` for good; `protocols` and
- * `realtime` are the method's `protocols`, `maxReconnectAttempts` and `reconnectDelay`; a cancel observes the
- * stream's quiet end and traces its OCE (`canceled: true`, `via: "stream"`); it never disposes a stream it
- * observed, and records `closeError` when `CloseAsync` throws.
+ * `realtime` are the method's `protocols`, `maxReconnectAttempts` and `reconnectDelay` (a realtime method's on its
+ * one `TransportOptions transport`); a cancel observes the stream's quiet end and traces its OCE (`canceled: true`,
+ * `via: "stream"`); it never disposes a stream it observed, and records `closeError` when `CloseAsync` throws.
  */
 
 /** The Java driver's error record (java-error.ts), beside the others. */

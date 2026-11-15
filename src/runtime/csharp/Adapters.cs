@@ -40,15 +40,8 @@ public sealed class TransportOptions
     /// <summary>The first reconnect's base delay, doubled per attempt up to 30 s; an SSE <c>retry</c> replaces it.</summary>
     public TimeSpan ReconnectDelay { get; init; } = TimeSpan.FromSeconds(1);
 
-    internal static TransportOptions Of(string? lastEventId, string? reconnectToken, IReadOnlyList<string>? protocols, int? maxReconnectAttempts, TimeSpan? reconnectDelay) =>
-        new()
-        {
-            LastEventId = lastEventId,
-            ReconnectToken = reconnectToken,
-            Protocols = protocols ?? [],
-            MaxReconnectAttempts = maxReconnectAttempts ?? 5,
-            ReconnectDelay = reconnectDelay ?? TimeSpan.FromSeconds(1),
-        };
+    /* the connection's own copy: it advances the cursor, never the caller's value */
+    internal TransportOptions Copy() => (TransportOptions)MemberwiseClone();
 
     /* past a message: its SSE id, else the payload's id or last_event_id (a string or an integer), and its reconnect_token */
     internal void Advance(string? id, JsonElement payload)

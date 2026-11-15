@@ -41,7 +41,7 @@ TypeScript, Python, Go, Rust, C# and Java: all six SDKs.
 import { DecodeError, Kitchen } from "./kitchen"
 
 const client = new Kitchen({ baseURL: "https://api.example.com" })
-const result = await client.safe.getApiV1OrganizationsByOrgId({ params: { orgId: "org-1" } })
+const result = await client.safe.organizations.retrieve({ params: { orgId: "org-1" } })
 if (result.ok) console.log(result.data, result.response.status)
 else if (result.error instanceof DecodeError) console.error("unreadable answer", result.error.body)
 else if (result.error.status === 404) console.error("no such organization", result.error.body)
@@ -56,7 +56,7 @@ its body unread. What has no answer raises in both styles, as in TS.
 
 ```python
 async def health(client: AsyncSDK) -> str:
-    match await client.safe.get_api_health():
+    match await client.safe.health.check():
         case Ok(data, response):
             return f"answered {response.status}: {data}"
         case Err(DecodeError() as unreadable, response):
@@ -76,7 +76,7 @@ the same one.
 
 ```go
 func listing(ctx context.Context, client *sdk.Client) string {
-	r, err := client.Safe().GetApi(ctx, nil)
+	r, err := client.Safe().Root.List(ctx, nil)
 	if err != nil {
 		return fmt.Sprintf("no answer: %v", err) // never sent, refused, dropped, timed out or canceled
 	}
@@ -106,7 +106,7 @@ realtime method is the same `Call` on both clients. `client.safe()` returns a cl
 
 ```rust
 async fn listing(client: &Client) -> String {
-    match client.safe().get_api(&GetApiOpts::default()).await {
+    match client.safe().root().list(&RootListOpts::default()).await {
         Ok(Answer::Ok { data, response }) => format!("answered {}: {data:?}", response.status),
         Ok(Answer::Err {
             error: SafeError::Api(failed),
@@ -134,7 +134,7 @@ is the `EventStream<T>`), its error status at the opening the Err; a WebSocket o
 ```csharp
     public static async Task<string> Listing(HttpSdkClient client, string id)
     {
-        var result = await client.Safe.GetApiAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
+        var result = await client.Safe.Root.ListAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
         return result.Match(
             found => $"answered {result.Response.Status}: {found}",
             error => error switch
@@ -162,7 +162,7 @@ WebSocket or realtime method is the very method.
 ```java
   static String listing(KitchenClient client) {
     // no answer (never sent, refused, timed out, canceled) still throws
-    Result<ListApiResponse200> result = client.safe().getApi(GetApiParams.builder().build());
+    Result<ListApiResponse200> result = client.safe().root().list(RootListParams.builder().build());
     int status = result.response().status();
     return result.fold(
         found -> "answered " + status + ": " + found,

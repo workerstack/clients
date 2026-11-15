@@ -100,15 +100,16 @@ const consumed = (name: string, replies: readonly Reply[], body: string) =>
 		return { hops: server.hops.map((hop) => hop.url), run }
 	})
 
-/** Each method's await typed by its event schema, a declared resume param folded into the stream fields. */
+/** Each method's await typed by its event schema, a declared resume param carried by `transport`, no flat field. */
 const SURFACE = `from typing import Any
 import http_sdk as sdk
 async def main(a: sdk.AsyncSDK) -> None:
     rc: sdk.ResumableConnection[sdk.Payload] = await a.feed.live(channel="c")
     first: sdk.Payload | None = await rc.recv()
-    r: sdk.ResumableConnection[Any] = await a.feed.resume(protocols2="p", last_event_id="5", reconnect_token="rt")
+    r: sdk.ResumableConnection[Any] = await a.feed.resume(protocols="p", transport=sdk.TransportOpts(last_event_id="5", reconnect_token="rt"))
     sdk.SDK().feed
     await a.feed.resume(reconnect_token2="rt")
+    await a.feed.live(channel="c", max_reconnect_attempts=3)
 `
 
 describe.skipIf(!PY)("a realtime method is AsyncSDK's, its await opening the connection (G2, Fd4)", SLOW, () => {
@@ -125,10 +126,11 @@ note(str(rc.state))`
 			hops: 2,
 			out: ["[true, true, false]", '["ResumableConnection", "connected"]', "disconnected"],
 		})
-		/* the declared resume params fold into the stream fields: v0 emitted reconnect_token2 beside them */
+		/* the declared resume params fold into `transport`: v0 emitted reconnect_token2 beside them */
 		expect(checked("realtime", SURFACE)).toEqual([
 			expect.stringMatching(/"SDK" has no attribute "feed"/),
 			expect.stringMatching(/Unexpected keyword argument "reconnect_token2" for "resume"/),
+			expect.stringMatching(/Unexpected keyword argument "max_reconnect_attempts" for "live"/),
 		])
 	})
 
@@ -257,12 +259,12 @@ describe.skipIf(!PY)("a realtime connection gives up with the real error once, t
 		/* Fd9: no connecting state, and 0 means no reconnect. A long-poll connect does not dial, so the 400 is
 		 * the first recv's. A recv timed out mid-reconnect leaves it reconnecting: the upgrade is held past it */
 		const body = `section("no-reconnect")
-rc = await aclient().feed.live(channel="c", max_reconnect_attempts=0, reconnect_delay_ms=1)
+rc = await aclient().feed.live(channel="c", transport=sdk.TransportOpts(max_reconnect_attempts=0, reconnect_delay_ms=1))
 note(str(rc.state))
 note(await read(rc))
 note(f"{rc.state} {await read(rc)} {await read(rc)}")
 section("reconnecting")
-rc = await aclient().feed.live(channel="c", reconnect_delay_ms=1)
+rc = await aclient().feed.live(channel="c", transport=sdk.TransportOpts(reconnect_delay_ms=1))
 note(f"{rc.state} {await read(rc)}")
 try:
     await asyncio.wait_for(rc.recv(), 0.5)
@@ -423,10 +425,30 @@ describe.skipIf(!PY)("the SSE and long-poll dials ride the shared exchange; the 
 	})
 })
 
+describe.skipIf(!PY)("a realtime method's transport: the caller's value stays, conn.opts resumes", SLOW, () => {
+	it("advances its own copy of the caller's TransportOpts, and resumes past the last message from rc.opts", async () => {
+		const body = `mine = sdk.TransportOpts(reconnect_delay_ms=1)
+rc = await aclient().feed.live(channel="c", transport=mine)
+note(await read(rc))
+await rc.close()
+note([mine.last_event_id, mine.reconnect_token, rc.opts.last_event_id, rc.opts.reconnect_token])
+again = await aclient().feed.live(channel="c", transport=rc.opts)
+note(await read(again))
+await again.close()`
+		const replies = [refused, sse([ev(1)], "hold"), refused, sse([ev(2)], "hold")]
+		const { hops, run } = await consumed("resumed", replies, body)
+		const read2 = 'ok {"n": 2, "reconnect_token": "rt-2"}'
+		expect({ hops, out: run.out?.main }, run.stderr).toEqual({
+			hops: [FEED_URL, FEED_URL, AT_1, `${FEED_URL}&reconnect_token=rt-1`],
+			out: [`ok ${READ_1}`, '[null, null, "1", "rt-1"]', read2],
+		})
+	})
+})
+
 describe.skipIf(!PY)("a message's kind checked against the event schema; send POSTs compact JSON", SLOW, () => {
 	it("raises DecodeError for a message of another JSON kind, the cursor advanced and the connection kept", async () => {
 		/* Fd5, as Rust's deliver: the attempts reset and the cursor moves before the kind is checked */
-		const body = `rc = await aclient().feed.live(channel="c", reconnect_delay_ms=1)
+		const body = `rc = await aclient().feed.live(channel="c", transport=sdk.TransportOpts(reconnect_delay_ms=1))
 note([await read(rc), await read(rc), str(rc.state), rc.opts.last_event_id])
 await rc.close()`
 		const { hops, run } = await consumed("kind", [refused, sse([`id: 1\ndata: 5\n\n`, ev(2)], "hold")], body)
@@ -461,13 +483,13 @@ await rc.close()`
 	})
 })
 
-describe("the emitted realtime surface: the stream fields reserved, the event's kind on the Operation", () => {
-	it("claims a declared max_reconnect_attempts or reconnect_delay_ms as …2, and pins a typed event's kind", () => {
-		/* Rust and Go claim `…2`; HEAD emitted the name twice, a duplicate argument (a SyntaxError). Fd5: the
-		 * typed event's JSON kind rides its Operation, an untyped one's none */
+describe("the emitted realtime surface: one transport keyword, the event's kind on the Operation", () => {
+	it("keeps a declared max_reconnect_attempts or reconnect_delay_ms by its name, and pins a typed event's kind", () => {
+		/* the policy lives in `transport`, so a declared param of its name is no clash. Fd5: the typed event's
+		 * JSON kind rides its Operation, an untyped one's none */
 		const client = generatePythonSdk(FIXTURES.realtime.document()).files["src/http_sdk/client.py"] ?? ""
 		const flat = client.replace(/\s+/g, "").replaceAll(",)", ")")
-		const claimed = { max_reconnect_attempts: "max_reconnect_attempts2", reconnect_delay_ms: "reconnect_delay_ms2" }
+		const claimed = { max_reconnect_attempts: "max_reconnect_attempts", reconnect_delay_ms: "reconnect_delay_ms" }
 		const typed = 'Operation[Payload]=Operation("GET","/feed",answer="none",shape="object",stream="realtime")'
 		const untyped = 'Operation[Any]=Operation("GET","/resume",answer="none",stream="realtime")'
 		const clash = pythonCallPlans(FIXTURES.fixtures.document())["realtime-clash.feed.live"]?.query
@@ -476,13 +498,13 @@ describe("the emitted realtime surface: the stream fields reserved, the event's 
 	})
 })
 
-describe.skipIf(!PY)("the emitted realtime package with a claimed field compiles and sends it", SLOW, () => {
-	it("imports under the gate, and sends the …2 params by their wire names beside a budget of 0", async () => {
+describe.skipIf(!PY)("the emitted realtime package with a policy-named param compiles and sends it", SLOW, () => {
+	it("imports under the gate, and sends the declared params by their wire names beside a transport budget of 0", async () => {
 		/* documents.ts's Python-only `realtime-clash` path in the merged `fixtures` registry document (G17) */
 		const sdk = compiledPython("fixtures")
 		expect(sdk.imported, sdk.stderr).toBe(true)
 		const body = `${READ}
-rc = await aclient().realtime_clash.feed.live(channel="c", max_reconnect_attempts2=3, reconnect_delay_ms2=4, max_reconnect_attempts=0)
+rc = await aclient().realtime_clash.feed.live(channel="c", max_reconnect_attempts=3, reconnect_delay_ms=4, transport=sdk.TransportOpts(max_reconnect_attempts=0))
 note([await read(rc), await read(rc)])`
 		const { hops, ran } = await served([refused, refused, bad], async (server) => {
 			const done = await sdk.exec(program(sdk.package, "clash", body), JSON.stringify({ base: server.url }))

@@ -22,7 +22,7 @@ func newClient() *sdk.Client {
 }
 
 func checkHealth(ctx context.Context, client *sdk.Client) error {
-	err := client.GetApiHealth(ctx, nil)
+	err := client.Health.Check(ctx, nil)
 	var failed *sdk.ClientError
 	if errors.As(err, &failed) {
 		return fmt.Errorf("health check answered %d: %s", failed.StatusCode, failed.Key)
@@ -31,7 +31,7 @@ func checkHealth(ctx context.Context, client *sdk.Client) error {
 }
 
 func listing(ctx context.Context, client *sdk.Client) string {
-	r, err := client.Safe().GetApi(ctx, nil)
+	r, err := client.Safe().Root.List(ctx, nil)
 	if err != nil {
 		return fmt.Sprintf("no answer: %v", err) // never sent, refused, dropped, timed out or canceled
 	}
@@ -50,7 +50,7 @@ func listing(ctx context.Context, client *sdk.Client) string {
 
 func firstEvents(ctx context.Context, client *sdk.Client, limit int) ([]string, error) {
 	var seen []string
-	for event, err := range client.GetApiEvents(ctx, nil) {
+	for event, err := range client.Events.List(ctx, nil) {
 		if err != nil {
 			return seen, err
 		}

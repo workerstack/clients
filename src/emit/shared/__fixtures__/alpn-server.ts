@@ -8,7 +8,7 @@
  * this fixture can speak TLS on loopback. The CA's own key was discarded when it signed the leaf. None of it protects
  * anything; never trust this CA or reuse this key outside a test.
  */
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createSecureServer } from "node:http2"
 import type { AddressInfo } from "node:net"
 import type { TLSSocket } from "node:tls"
@@ -75,10 +75,15 @@ export async function alpnServer(): Promise<AlpnServer> {
 	}
 }
 
-/** `run` with SSL_CERT_FILE naming the test CA, so the child processes it spawns trust the server; restored after. */
+/**
+ * `run` with SSL_CERT_FILE naming the test CA, so the child processes it spawns trust the server; restored after. Each
+ * run writes its own file, removed after: the version legs run in parallel processes, and a shared file rewritten by
+ * one is empty for a moment to a child of another.
+ */
 export async function trusted<T>(run: () => Promise<T>): Promise<T> {
-	const dir = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/tls")
-	mkdirSync(dir, { recursive: true })
+	const root = join(process.env.HOME ?? homedir(), ".cache/backend-tmp/tls")
+	mkdirSync(root, { recursive: true })
+	const dir = mkdtempSync(join(root, "ca-"))
 	const file = join(dir, "test-ca.pem")
 	writeFileSync(file, `${CA}\n`)
 	const before = process.env.SSL_CERT_FILE
@@ -88,5 +93,6 @@ export async function trusted<T>(run: () => Promise<T>): Promise<T> {
 	} finally {
 		if (before === undefined) delete process.env.SSL_CERT_FILE
 		else process.env.SSL_CERT_FILE = before
+		rmSync(dir, { force: true, recursive: true })
 	}
 }

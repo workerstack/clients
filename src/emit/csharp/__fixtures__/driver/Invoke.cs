@@ -17,7 +17,7 @@ namespace Http.Driver;
 /// <c>headersInto</c> (Fc7), and <c>cancel</c> is the method's <c>CancellationToken</c> alone. A stream method's own
 /// fields bind by their fixed names (contract 50 §2, claimed before any declared param): <c>lastEventId</c> and
 /// <c>reconnectToken</c> from the call, <c>protocols</c>, <c>maxReconnectAttempts</c> and <c>reconnectDelay</c> from
-/// the script; a bound value no parameter takes fails the run. A call header no param declares goes in
+/// the script, a realtime method's as its one <c>transport</c>; a bound value no parameter takes fails the run. A call header no param declares goes in
 /// <c>RequestOptions.Headers</c> (F6); the options also carry the call's timeout, a named origin's base URL, and
 /// always a <c>RawResponse</c> to read. The method runs with <c>DoNotWrapExceptions</c>, so the SDK's own exception
 /// arrives, and a result is read only when the declared return type is generic (P5). A stream plan's open and reads
@@ -126,13 +126,16 @@ internal static class Invoke
         }
         if (plan.Stream is not null)
         {
-            Fields(bound, call, entry);
+            Fields(sdk, bound, call, plan.Stream, entry);
         }
         return bound;
     }
 
-    /// <summary>A stream method's own fields, each given one bound by its fixed name; Protocol.cs refused a misfit.</summary>
-    private static void Fields(Dictionary<string, object?> bound, Call call, CallScript? entry)
+    /// <summary>
+    /// A stream method's own fields, each given one bound by its fixed name; a realtime method's are the properties
+    /// of its one <c>transport</c>, bound only when one is given. Protocol.cs refused a misfit.
+    /// </summary>
+    private static void Fields(Sdk sdk, Dictionary<string, object?> bound, Call call, string kind, CallScript? entry)
     {
         var fields = new (string Name, object? Value)[]
         {
@@ -141,11 +144,19 @@ internal static class Invoke
             ("protocols", entry?.Protocols),
             ("maxReconnectAttempts", entry?.Realtime?.MaxReconnectAttempts),
             ("reconnectDelay", entry?.Realtime?.ReconnectDelayMs is { } ms ? (TimeSpan?)TimeSpan.FromMilliseconds(ms) : null),
-        };
-        foreach (var (name, value) in fields.Where(field => field.Value is not null))
+        }.Where(field => field.Value is not null).ToList();
+        if (kind != "realtime")
         {
-            bound[name] = value;
+            fields.ForEach(field => bound[field.Name] = field.Value);
+            return;
         }
+        if (fields.Count == 0)
+        {
+            return;
+        }
+        var transport = sdk.Create("TransportOptions");
+        fields.ForEach(field => Sdk.Set(transport, char.ToUpperInvariant(field.Name[0]) + field.Name[1..], field.Value));
+        bound["transport"] = transport;
     }
 
     /// <summary><paramref name="size"/> bytes <c>i &amp; 0xff</c> as a <paramref name="type"/> (<c>BinaryBody</c>): in memory, or one-shot.</summary>

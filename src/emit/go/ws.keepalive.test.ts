@@ -73,7 +73,7 @@ describe.skipIf(!GO)("the Go SDK's WebSocket keepalive (bit 19 d1)", () => {
 
 /** A realtime feed under a 200 ms keepalive: its first two frames, read within 5 s, or how the read ended. */
 const REALTIME = `	c := sdk.NewClient(sdk.Config{BaseURL: input.Base, WSKeepalive: 200 * time.Millisecond})
-	rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{ReconnectDelayMs: 10})
+	rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{Transport: sdk.TransportOpts{ReconnectDelayMs: 10}})
 	if err != nil {
 		panic(err)
 	}

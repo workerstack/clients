@@ -19,7 +19,7 @@ public static class Example
     {
         try
         {
-            await client.GetApiHealthAsync();
+            await client.Health.CheckAsync();
             return null;
         }
         catch (ApiStatusException failed)
@@ -30,7 +30,7 @@ public static class Example
 
     public static async Task<string> Listing(HttpSdkClient client, string id)
     {
-        var result = await client.Safe.GetApiAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
+        var result = await client.Safe.Root.ListAsync(id); // no answer (never sent, refused, timed out, canceled) still throws
         return result.Match(
             found => $"answered {result.Response.Status}: {found}",
             error => error switch
@@ -44,7 +44,7 @@ public static class Example
     public static async Task<List<string>> FirstEvents(HttpSdkClient client, int limit)
     {
         var seen = new List<string>();
-        await using var stream = await client.GetApiEventsAsync(); // disposing it frees the connection
+        await using var stream = await client.Events.ListAsync(); // disposing it frees the connection
         await foreach (var ev in stream)
         {
             seen.Add(ev.Data);

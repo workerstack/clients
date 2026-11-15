@@ -75,8 +75,11 @@ func streamRefusal(j job) error {
 }
 
 // streamOpts sets an <Op>Opts' stream fields by their fixed names: the call's resume cursor, the
-// scripted protocols and the realtime reconnect knobs.
+// scripted protocols and the realtime reconnect knobs, a realtime method's on its one Transport.
 func streamOpts(opts reflect.Value, j job) error {
+	if j.p.Stream != nil && *j.p.Stream == "realtime" {
+		opts = opts.FieldByName("Transport")
+	}
 	rt := j.d.Realtime
 	if rt == nil {
 		rt = &realtimeScript{}

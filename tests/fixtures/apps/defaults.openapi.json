@@ -1,5 +1,5 @@
 {
-	"openapi": "3.1.0",
+	"openapi": "3.2.1",
 	"info": {
 		"title": "Backend Defaults",
 		"version": "0.0.1"
@@ -7,6 +7,7 @@
 	"paths": {
 		"/echo": {
 			"post": {
+				"operationId": "echo.create",
 				"x-backend-route": "POST /echo",
 				"responses": {
 					"201": {
@@ -24,6 +25,7 @@
 		},
 		"/health": {
 			"get": {
+				"operationId": "health.list",
 				"x-backend-route": "GET /health",
 				"responses": {
 					"200": {
@@ -34,6 +36,7 @@
 		},
 		"/users/{id}": {
 			"get": {
+				"operationId": "users.retrieve",
 				"x-backend-route": "GET /users/:id",
 				"parameters": [
 					{

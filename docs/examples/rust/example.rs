@@ -2,7 +2,7 @@
 // same kind of call on the safe mirror answering an `Answer`, an event stream released by dropping it, and the async
 // SDK called from blocking code. Built by the docs' tests.
 use sdk::{Answer, Client, ClientConfig, Error, SafeError};
-use sdk::{GetApiEventsOpts, GetApiHealthOpts, GetApiOpts};
+use sdk::{EventsListOpts, HealthCheckOpts, RootListOpts};
 
 fn new_client() -> Result<Client, Error> {
     Client::new(ClientConfig {
@@ -14,7 +14,7 @@ fn new_client() -> Result<Client, Error> {
 }
 
 async fn check_health(client: &Client) -> Result<(), String> {
-    match client.get_api_health(&GetApiHealthOpts::default()).await {
+    match client.health().check(&HealthCheckOpts::default()).await {
         Ok(()) => Ok(()),
         Err(Error::Api(failed)) => Err(format!("health check answered {}", failed.status())),
         Err(other) => Err(other.to_string()),
@@ -22,7 +22,7 @@ async fn check_health(client: &Client) -> Result<(), String> {
 }
 
 async fn listing(client: &Client) -> String {
-    match client.safe().get_api(&GetApiOpts::default()).await {
+    match client.safe().root().list(&RootListOpts::default()).await {
         Ok(Answer::Ok { data, response }) => format!("answered {}: {data:?}", response.status),
         Ok(Answer::Err {
             error: SafeError::Api(failed),
@@ -37,7 +37,7 @@ async fn listing(client: &Client) -> String {
 }
 
 async fn first_events(client: &Client, limit: usize) -> Result<Vec<String>, Error> {
-    let mut stream = client.get_api_events(&GetApiEventsOpts::default()).await?;
+    let mut stream = client.events().list(&EventsListOpts::default()).await?;
     let mut seen = Vec::new();
     while let Some(event) = stream.next().await {
         seen.push(event?.data);

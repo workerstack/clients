@@ -207,14 +207,14 @@ describe("response headers (G5)", () => {
 })
 
 describe("streams beside calls", () => {
-	it("folds a realtime op's declared Last-Event-ID into its own field (Fd3)", () => {
+	it("folds a realtime op's declared Last-Event-ID into its one transport (Fd3)", () => {
 		expect({
 			headers: pythonCallPlans(BODIES)["live.connect"]?.headers,
 			signature: lines(BODIES, "def connect("),
 		}).toEqual({
 			headers: {},
 			signature: [
-				"    async def connect(self, *, last_event_id: str | None = None, reconnect_token: str | None = None, protocols: Sequence[str] | None = None, max_reconnect_attempts: int | None = None, reconnect_delay_ms: int | None = None, options: RequestOptions | None = None) -> ResumableConnection[Any]:",
+				"    async def connect(self, *, transport: TransportOpts | None = None, options: RequestOptions | None = None) -> ResumableConnection[Any]:",
 			],
 		})
 	})

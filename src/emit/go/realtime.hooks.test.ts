@@ -66,7 +66,7 @@ const BODY = `	var mu sync.Mutex
 			return nil
 		}},
 	})
-	if rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{ReconnectDelayMs: 10}); err != nil {
+	if rc, err := c.Feed.Live(ctx, &sdk.FeedLiveOpts{Transport: sdk.TransportOpts{ReconnectDelayMs: 10}}); err != nil {
 		note("open error " + err.Error())
 	} else {
 		note(take(rc, 2))

@@ -1,9 +1,9 @@
 /**
  * C#'s phase-d realtime document (contract 50 §4.1): the shared `realtime` document (bit 13's, in
  * shared/__fixtures__/documents-streams.ts, byte-identical for Rust and Python) and one path only the C# legs
- * drive: `clash.feed`, whose declared queries `max_reconnect_attempts` and `reconnect_delay` share their
- * identifiers with the realtime fields, so the emitter claims them `maxReconnectAttempts2` and `reconnectDelay2`
- * and the fold runs executed (Python's clash ran on a Python-only path the same way).
+ * drive: `clash.feed`, whose declared queries `max_reconnect_attempts` and `reconnect_delay` are named like the
+ * transport's reconnect policy and keep their names beside the one `transport` field, sent by their wire names
+ * (Python's clash ran on a Python-only path the same way).
  */
 import { realtime } from "../../shared/__fixtures__/documents-streams.ts"
 

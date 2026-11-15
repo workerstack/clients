@@ -134,7 +134,7 @@ internal sealed record CallScript(
     JsonNode? TaskCancel = null,
     WsScript? Ws = null);
 
-/// <summary>The realtime method's <c>maxReconnectAttempts</c> and <c>reconnectDelay</c> (in ms here).</summary>
+/// <summary>The realtime method's <c>transport.MaxReconnectAttempts</c> and <c>ReconnectDelay</c> (in ms here).</summary>
 internal sealed record RealtimeScript(int? MaxReconnectAttempts = null, int? ReconnectDelayMs = null);
 
 /// <summary>

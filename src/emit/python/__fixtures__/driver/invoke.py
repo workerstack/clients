@@ -9,7 +9,8 @@ for goes in ``options["headers"]`` (F6). ``options`` also carries the call's tim
 ``base_url`` of the origin it names (alt, drop or refused), the script's ``cancel`` event, and always a ``RawResponse`` to read; the
 script's ``idempotencyKey`` is the method's idempotency keyword. A stream call adds its fields:
 ``last_event_id`` from ``lastEventId``, ``reconnect_token`` from ``reconnectToken``, and the
-script's ``protocols`` and ``realtime`` (``max_reconnect_attempts``, ``reconnect_delay_ms``).
+script's ``protocols`` and ``realtime`` (``max_reconnect_attempts``, ``reconnect_delay_ms``); a
+realtime call's as its one ``transport``, a ``TransportOpts``.
 
 Refused: a multipart body for good (its ``FilePart``s have no JSON form, so a consumer program
 drives it); a stream control the operation cannot take, ``raw: true`` on a stream (it has no single
@@ -195,8 +196,11 @@ def keywords(call: Call, plan: Plan) -> tuple[dict[str, Any], dict[str, str]]:
     return kwargs, extra
 
 
-def stream_fields(call: Call, directives: CallScript) -> dict[str, Any]:
-    """A stream call's own keywords, each only when the call or its script sets it."""
+def stream_fields(
+    call: Call, directives: CallScript, plan: Plan, module: Any
+) -> dict[str, Any]:
+    """A stream call's own keywords, each only when the call or its script sets it; a realtime
+    call's as the properties of its one ``transport``."""
     fields: dict[str, Any] = {}
     if "lastEventId" in call:
         fields["last_event_id"] = call["lastEventId"]
@@ -209,6 +213,8 @@ def stream_fields(call: Call, directives: CallScript) -> dict[str, Any]:
         fields["max_reconnect_attempts"] = realtime["maxReconnectAttempts"]
     if "reconnectDelayMs" in realtime:
         fields["reconnect_delay_ms"] = realtime["reconnectDelayMs"]
+    if plan["stream"] == "realtime" and fields:
+        return {"transport": module.TransportOpts(**fields)}
     return fields
 
 
@@ -257,7 +263,7 @@ def prepare(
     if reason is not None:
         raise DriverError(reason)
     kwargs, extra = keywords(call, plan)
-    kwargs.update(stream_fields(call, directives))
+    kwargs.update(stream_fields(call, directives, plan, target.module))
     if "idempotencyKey" in directives and plan["idempotencyKey"] is not None:
         kwargs[plan["idempotencyKey"]] = directives["idempotencyKey"]
     headers_into: dict[str, Any] | None = None

@@ -78,12 +78,12 @@ const READ = `fn read(r: Option<Result<sdk::Payload, sdk::Error>>) -> String {
 
 /** Some(0) over a refused chain whose poll fails; then a reconnect whose upgrade is held past a `recv` timeout. */
 const STATES = sections({
-	"no-reconnect": `    let o = sdk::FeedLiveOpts { channel: "c".into(), max_reconnect_attempts: Some(0), reconnect_delay_ms: Some(1), ..Default::default() };
+	"no-reconnect": `    let o = sdk::FeedLiveOpts { channel: "c".into(), transport: sdk::TransportOpts { max_reconnect_attempts: Some(0), reconnect_delay_ms: Some(1), ..Default::default() }, ..Default::default() };
     let mut rc = client(base)?.feed().live(&o).await?;
     n.note(format!("{:?}", rc.state()));
     n.note(read(rc.recv().await));
     n.note(format!("{:?} {}", rc.state(), read(rc.recv().await)));`,
-	reconnecting: `    let o = sdk::FeedLiveOpts { channel: "c".into(), reconnect_delay_ms: Some(1), ..Default::default() };
+	reconnecting: `    let o = sdk::FeedLiveOpts { channel: "c".into(), transport: sdk::TransportOpts { reconnect_delay_ms: Some(1), ..Default::default() }, ..Default::default() };
     let mut rc = client(base)?.feed().live(&o).await?;
     n.note(format!("{:?} {}", rc.state(), read(rc.recv().await)));
     let timed = tokio::time::timeout(std::time::Duration::from_millis(500), rc.recv()).await.is_err();
@@ -91,12 +91,12 @@ const STATES = sections({
     n.note(format!("{:?} {:?} {}", rc.close().await, rc.state(), read(rc.recv().await)));`,
 })
 
-/** Each method's Call typed by its event schema, FeedResumeOpts named field by field, every state matched. */
+/** Each method's Call typed by its event schema, FeedResumeOpts named field by field (its declared resume params carried by `transport`), every state matched. */
 const SURFACE = {
 	body: `let c = client("http://127.0.0.1:9").expect("client");
     let o = sdk::FeedLiveOpts { channel: "c".into(), ..Default::default() };
     let _: sdk::Call<sdk::ResumableConnection<sdk::Payload>> = c.feed().live(&o);
-    let r = sdk::FeedResumeOpts { protocols2: Some("p".into()), last_event_id: None, reconnect_token: None, protocols: Vec::new(), max_reconnect_attempts: None, reconnect_delay_ms: None };
+    let r = sdk::FeedResumeOpts { protocols: Some("p".into()), transport: sdk::TransportOpts::default() };
     let _: sdk::Call<sdk::ResumableConnection<serde_json::Value>> = c.feed().resume(&r);
     let _: sdk::Call<sdk::ResumableConnection> = c.feed().resume(&r);
     for s in [sdk::ConnectionState::Connected, sdk::ConnectionState::Reconnecting, sdk::ConnectionState::Disconnected] {

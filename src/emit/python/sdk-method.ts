@@ -216,7 +216,8 @@ function methodLines(parts: Parts, async: boolean, env: MethodEnv, shadowed: Rea
 function noteImports(op: SdkOp, env: MethodEnv): void {
 	const names = { realtime: "ResumableConnection", sse: "EventStream", ws: "TypedWebSocket" }
 	if (op.stream !== null) env.imports.add(names[op.stream])
-	if (op.stream === "ws" || op.stream === "realtime") env.imports.add("Sequence")
+	if (op.stream === "ws") env.imports.add("Sequence")
+	if (op.stream === "realtime") env.imports.add("TransportOpts")
 }
 
 /** The method of `op` named `name`: its constant, its sync method (none for a stream), its async one, its plan. */

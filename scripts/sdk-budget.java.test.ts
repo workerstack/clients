@@ -177,8 +177,10 @@ const readJava = (app: string) => {
  * answering `R<T>`) is javac's "unexpected type"; a twin on the widest overload alone measures the same 94 but drops
  * the normal call's shorter overloads; the twin on every overload (built) keeps each. 94 + 20% = 113. An operation
  * over it is fixed in the schema, never by raising the ceiling.
+ * Plan 9 re-measured it over the backend's refreshed documents (76 surfaces): max 79 (kitchen/realtime.chat.connect), so
+ * 79 + 20% = 95.
  */
-const JAVA_SDK_CEILING = ceilingOf([94], HEADROOM)
+const JAVA_SDK_CEILING = ceilingOf([79], HEADROOM)
 
 /** One operation's emitted files: a resource whose signature GJF wrapped, its safe mirror's twin, and its Params record. */
 const WRAPPED = {
@@ -248,17 +250,17 @@ describe("the v1 Java SDK within the budget (bit 16, G13)", () => {
 			ceiling: JAVA_SDK_CEILING,
 			over: overCeiling(measured, JAVA_SDK_CEILING),
 			surfaces: measured.tokens.size,
-		}).toEqual({ ceiling: 113, over: [], surfaces: 72 })
+		}).toEqual({ ceiling: 95, over: [], surfaces: 76 })
 	})
 
 	/* the ceiling's own input, so a surface that shrinks brings the ceiling down instead of leaving stale headroom */
 	it("measures its largest surface where its ceiling comes from", () => {
 		const { at, tokens } = peakSurface(measuredSurfaces("java", readJava))
 		expect({ at, ceiling: JAVA_SDK_CEILING, derived: ceilingOf([tokens], HEADROOM), tokens }).toEqual({
-			at: "surface/getInParamsMembersByOrgIdAndMemberId",
-			ceiling: 113,
-			derived: 113,
-			tokens: 94,
+			at: "kitchen/realtime.chat.connect",
+			ceiling: 95,
+			derived: 95,
+			tokens: 79,
 		})
 	})
 })

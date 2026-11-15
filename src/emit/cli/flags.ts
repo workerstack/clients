@@ -203,8 +203,12 @@ const LAST_EVENT_ID = ["last-event-id", "LastEventID", "resume after this event 
 const RECONNECT_TOKEN = ["reconnect-token", "ReconnectToken", "resume with this reconnect token"] as const
 const CURSOR = { realtime: [LAST_EVENT_ID, RECONNECT_TOKEN], sse: [LAST_EVENT_ID], ws: [RECONNECT_TOKEN] }
 
-/** A stream command's own flags: --take, a realtime one's --max-reconnects, and its cursor flags, each set into its Opts field. */
+/**
+ * A stream command's own flags: --take, a realtime one's --max-reconnects, and its cursor flags, each set into its
+ * Opts field (a realtime one's into its one `Transport`).
+ */
 function streamFlags(stream: NonNullable<SdkOp["stream"]>, lines: string[], opts: string[]): void {
+	const into = stream === "realtime" ? "opts.Transport" : "opts"
 	lines.push("\tp.Take()")
 	if (stream === "realtime") {
 		lines.push("\tp.MaxReconnects()")
@@ -213,12 +217,16 @@ function streamFlags(stream: NonNullable<SdkOp["stream"]>, lines: string[], opts
 			"\tif err != nil {",
 			"\t\treturn err",
 			"\t}",
-			"\topts.MaxReconnectAttempts = reconnects",
+			`\t${into}.MaxReconnectAttempts = reconnects`,
 		)
 	}
 	for (const [flag, field, usage] of CURSOR[stream]) {
 		lines.push(flagLine(flag, { enum: [], kind: "string", list: false }, false, usage))
-		opts.push(`\tif err := cli.Set(&opts.${field}, p.Values(${goString(flag)})); err != nil {`, "\t\treturn err", "\t}")
+		opts.push(
+			`\tif err := cli.Set(&${into}.${field}, p.Values(${goString(flag)})); err != nil {`,
+			"\t\treturn err",
+			"\t}",
+		)
 	}
 }
 
