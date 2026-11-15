@@ -17,6 +17,7 @@ import {
 } from "./realtime.ts"
 
 type QueueEntry = { type: "done" } | { error: unknown; type: "error" } | { type: "value"; value: unknown }
+type MessageHandler = (data: never) => void
 
 /**
  * One logical stream over reconnecting transports: messages arrive in order through the async
@@ -41,6 +42,8 @@ export class Resumable implements ResumableConnection {
 	readonly #timers = new Set<ReturnType<typeof setTimeout>>()
 	/** the transport being dialed, closed with the connection */
 	#dialing: TransportConnection | null = null
+	/** `on`'s handlers by event: `"message"`, and the values of the dispatch key */
+	readonly #handlers = new Map<string, Set<MessageHandler>>()
 
 	constructor(opts: ResumableConnectionOpts, refresh?: () => Promise<boolean>) {
 		this.#opts = opts
@@ -125,6 +128,7 @@ export class Resumable implements ResumableConnection {
 			this.#lastEventId = frame.id ?? this.#lastEventId
 			this.#reconnectToken = frame.reconnectToken || this.#reconnectToken
 			this.#enqueue({ type: "value", value: frame.data })
+			this.#hear(frame.data)
 		} else if (frame.t === "ready") this.#reconnectToken = frame.reconnectToken || this.#reconnectToken
 		else if (frame.t === "pong") this.#keepalive?.onPong()
 		else {
@@ -248,6 +252,24 @@ export class Resumable implements ResumableConnection {
 		const attempt = this.#attempts
 		safely(() => this.#opts.onReconnecting?.(attempt, transportAt(0)))
 		this.#later(() => void this.#connect(), this.#opts.reconnectDelayMs ?? 1000)
+	}
+
+	/** `data` to `on("message")`, then to `on(value)` by the dispatch key's value. */
+	#hear(data: unknown): void {
+		const key = this.#opts.dispatch
+		const value = key === undefined || typeof data !== "object" || data === null ? undefined : Reflect.get(data, key)
+		const events = typeof value === "string" && value !== "message" ? ["message", value] : ["message"]
+		for (const event of events)
+			for (const handler of this.#handlers.get(event) ?? []) safely(() => (handler as (data: unknown) => void)(data))
+	}
+
+	on(event: string, handler: MessageHandler): void {
+		const handlers = this.#handlers.get(event) ?? new Set()
+		this.#handlers.set(event, handlers.add(handler))
+	}
+
+	off(event: string, handler: MessageHandler): void {
+		this.#handlers.get(event)?.delete(handler)
 	}
 
 	send(data: unknown): Promise<void> {

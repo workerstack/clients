@@ -3,6 +3,7 @@ import { type OpenApiDocument, toIR } from "./build.ts"
 import { type IRSchema } from "./model.ts"
 import { irResolver, schemaToIR } from "./schema.ts"
 import {
+	dispatchKey,
 	irErrorEnvelope,
 	isJsonMedia,
 	isTextMedia,
@@ -217,6 +218,32 @@ describe("sseEventSchema: the typed data of an event stream", () => {
 			stream({ const: "x" }).events,
 			stream({}).events,
 		]).toEqual([ref("Tick"), undefined, { kind: "scalar", type: "integer" }, undefined, undefined, undefined])
+	})
+})
+
+describe("dispatchKey: the field a message union dispatches on", () => {
+	it("is the discriminator when every variant holds it as a string const, through refs, and nothing otherwise", () => {
+		const keyField = (schema: IRSchema): IRSchema => ({
+			fields: [{ name: "type", required: true, schema }],
+			kind: "object",
+		})
+		const said = keyField({ kind: "const", value: "said" })
+		const schemas: Record<string, IRSchema> = { Said: said }
+		const resolve = (schema: IRSchema) => (schema.kind === "ref" ? (schemas[schema.name] as IRSchema) : schema)
+		const union = (...variants: IRSchema[]): IRSchema => ({
+			discriminator: { propertyName: "type" },
+			kind: "union",
+			variants,
+		})
+		expect([
+			dispatchKey(union(ref("Said"), keyField({ kind: "const", value: "left" })), resolve),
+			dispatchKey(union(said, { kind: "scalar", type: "string" }), resolve),
+			dispatchKey(union(said, field({ kind: "const", value: "x" })), resolve),
+			dispatchKey(union(said, keyField({ kind: "const", value: 1 })), resolve),
+			dispatchKey(union(said, keyField({ kind: "scalar", type: "string" })), resolve),
+			dispatchKey({ kind: "union", variants: [said] }, resolve),
+			dispatchKey(said, resolve),
+		]).toEqual(["type", undefined, undefined, undefined, undefined, undefined, undefined])
 	})
 })
 

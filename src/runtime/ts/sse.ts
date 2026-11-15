@@ -7,6 +7,14 @@ export type SSEEvent<T = string> = {
 	retry?: number
 }
 
+/**
+ * One event of a stream that names its events (an OpenAPI 3.2 `itemSchema`), `M` mapping each name to its `data`:
+ * narrowing on `event` types `data`. An unnamed event is `message`, as `EventSource` names it.
+ */
+export type SSEEventOf<M> = {
+	[K in keyof M & string]: { data: M[K]; event: K; id?: string; retry?: number }
+}[keyof M & string]
+
 /* the siblings' caps, in UTF-8 bytes */
 const MAX_LINE = 1 << 20
 const MAX_EVENT = 8 << 20

@@ -4,7 +4,16 @@
  * in the member tree, so a renamed member (`state` → `state_`) is renamed in both.
  */
 import type { IR, IRBody, IRNamespace, IRParam, IRSchema } from "../../ir/model.ts"
-import { irErrorEnvelope, isJsonMedia, mediaEssence, type SdkOp, sdkModel, sseEventSchema } from "../../ir/sdk-model.ts"
+import {
+	dispatchKey,
+	irErrorEnvelope,
+	isJsonMedia,
+	mediaEssence,
+	type SdkOp,
+	sdkModel,
+	sseEventSchema,
+	sseEvents,
+} from "../../ir/sdk-model.ts"
 import { bodiesOf } from "../../ir/slots.ts"
 import { blockCommentText, tsString } from "../shared/escape.ts"
 import { compareCodeUnits, NameTable, pascalWords } from "../shared/lang.ts"
@@ -67,11 +76,13 @@ function inputOf(op: SdkOp, ctx: Context): { required: boolean; type: string } {
 	/* a header or cookie is text on the wire: an enum keeps its values, anything else is a string */
 	const text = (p: IRParam) => (p.schema.kind === "scalar" && p.schema.enum ? irToTs(p.schema, types) : "string")
 	const pathParams = op.pathParams.map((p) => ({ ...p, required: true }))
+	/* a browser WebSocket sends no headers and sets no cookies, so a socket call takes neither */
+	const socket = op.stream === "ws"
 	const parts = [
 		paramsPart("params", pathParams, (p) => irToTs(p.schema, types)),
 		paramsPart("search", op.query, (p) => irToTs(p.schema, types)),
-		paramsPart("headers", op.headers, text),
-		paramsPart("cookies", op.ir.params.cookie ?? [], text),
+		socket ? null : paramsPart("headers", op.headers, text),
+		socket ? null : paramsPart("cookies", op.ir.params.cookie ?? [], text),
 		...bodyParts(op, ctx),
 	].filter((part): part is Part => part !== null)
 	const ordered = [...parts.filter((p) => p.required), ...parts.filter((p) => !p.required)]
@@ -109,6 +120,46 @@ function headersOf(op: SdkOp): string | null {
 	return objectText(fields.map(([name, required]) => `${quoteKey(name)}${required ? "" : "?"}: string`))
 }
 
+/** A WebSocket op's socket: typed by its declared messages, `In` what the server receives, `Out` what it sends (D9). */
+function socketType(op: SdkOp, ctx: Context): string {
+	const messages = op.ir.messages
+	if (messages === undefined) return "TypedWebSocket"
+	const { receive, send } = messages
+	const key = send === undefined ? undefined : dispatchKey(send, ctx.resolve)
+	const args = [
+		receive === undefined ? "WsFrame" : irToTs(receive, ctx.types),
+		send === undefined ? "string" : irToTs(send, ctx.types),
+		...(key === undefined ? [] : [tsString(key)]),
+	]
+	while (args.length > 0 && args.at(-1) === ["WsFrame", "string"][args.length - 1]) args.pop()
+	return args.length === 0 ? "TypedWebSocket" : `TypedWebSocket<${args.join(", ")}>`
+}
+
+/** A realtime op's connection: what it yields (the messages it hears, else its event data), sends, and dispatches on. */
+function connectionType(op: SdkOp, ctx: Context): string {
+	const { receive, send } = op.ir.messages ?? {}
+	const yields = send ?? sseEventSchema(op.ir, ctx.resolve)
+	const key = send === undefined ? undefined : dispatchKey(send, ctx.resolve)
+	const args = [
+		yields === undefined ? "unknown" : irToTs(yields, ctx.types),
+		receive === undefined ? "unknown" : irToTs(receive, ctx.types),
+		...(key === undefined ? [] : [tsString(key)]),
+	]
+	while (args.length > 1 && args.at(-1) === "unknown") args.pop()
+	return `ResumableConnection<${args.join(", ")}>`
+}
+
+/** What an SSE op's stream yields: `SSEEventOf` its named events (D7), else `SSEEvent` of its one data schema. */
+function sseEventType(op: SdkOp, ctx: Context): string {
+	const named = sseEvents(op.ir)
+	if (named !== undefined) {
+		const fields = named.map(({ data, name }) => `${quoteKey(name)}: ${irToTs(data, ctx.types)}`)
+		return `SSEEventOf<${objectText(fields)}>`
+	}
+	const events = sseEventSchema(op.ir, ctx.resolve)
+	return events === undefined ? "SSEEvent" : `SSEEvent<${irToTs(events, ctx.types)}>`
+}
+
 /** `op`'s member line `name`: a REST call a HttpCall, a stream a HttpStream, defaults dropped; a connection its method. */
 function signature(name: string, op: SdkOp, ctx: Context): string {
 	const input = inputOf(op, ctx)
@@ -119,15 +170,11 @@ function signature(name: string, op: SdkOp, ctx: Context): string {
 	const key = quoteKey(name)
 	/* a realtime op is one resumable connection of its event data; any other is typed by its transport */
 	const { realtime, sse, websocket } = op.ir.extensions
-	if (realtime) {
-		const events = sseEventSchema(op.ir, ctx.resolve)
-		return `${key}(${arg("RealtimeCallOptions")}): ResumableConnection<${events ? irToTs(events, ctx.types) : "unknown"}>`
-	}
-	if (websocket) return `${key}(${arg("WsOptions")}): TypedWebSocket`
+	if (realtime) return `${key}(${arg("RealtimeCallOptions")}): ${connectionType(op, ctx)}`
+	if (websocket) return `${key}(${arg("WsOptions")}): ${socketType(op, ctx)}`
 	const errors = errorsOf(op, ctx.types, ctx.resolve)
 	if (sse) {
-		const events = sseEventSchema(op.ir, ctx.resolve)
-		const event = events === undefined ? "SSEEvent" : `SSEEvent<${irToTs(events, ctx.types)}>`
+		const event = sseEventType(op, ctx)
 		return `${key}: HttpStream<${[input.type, event, ...(errors === null ? [] : [errors])].join(", ")}>`
 	}
 	const headers = headersOf(op)

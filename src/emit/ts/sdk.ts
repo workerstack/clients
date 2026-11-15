@@ -88,8 +88,8 @@ const RUNTIME_TYPES = {
 		"TransportConnection",
 		"TransportOpts",
 	],
-	sse: ["SSEEvent"],
-	ws: ["TypedWebSocket"],
+	sse: ["SSEEvent", "SSEEventOf"],
+	ws: ["TypedWebSocket", "WsFrame"],
 } as const satisfies Record<"core" | "realtime" | "sse" | "ws", readonly string[]>
 
 /** The names of `lists` a runtime with `features` ships, ignoring case in their order. */

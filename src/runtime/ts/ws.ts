@@ -3,28 +3,61 @@
  * with no onAuthExpired refresh. The platform WebSocket exposes no ping and no message cap, so this socket has neither.
  */
 import type { HTTPClient } from "./http.ts"
+import { ClientError } from "./error.ts"
 import type { RequestOptions } from "./request.ts"
 
-export type TypedWebSocket = {
+/** What an untyped socket sends: strings, bytes and `Blob` as they are, any other value as JSON. */
+export type WsFrame = ArrayBuffer | ArrayBufferView | Blob | object | string
+
+/** The events every socket has; a message whose key is one of these names gets no `on(value)` of its own. */
+type SocketEvent = "binary" | "close" | "error" | "message" | "open"
+
+/** The values of `Out`'s field `K`, the lifecycle names left out. */
+type KeyOf<Out, K extends string> = Exclude<
+	Out extends { readonly [P in K]: infer V extends string } ? V : never,
+	SocketEvent
+>
+
+/** `on(value)` and `off(value)` for a socket whose messages are keyed on `K`; nothing for an unkeyed one. */
+type Keyed<Out, K extends string> = [K] extends [never]
+	? unknown
+	: {
+			off(event: KeyOf<Out, K>, handler: (...args: never[]) => void): void
+			/** The messages whose `K` is `event`, after `"message"` hears them. */
+			on<V extends KeyOf<Out, K>>(event: V, handler: (data: Extract<Out, { readonly [P in K]: V }>) => void): void
+		}
+
+/**
+ * A WebSocket typed both ways: `send` takes `In`, `on("message")` gets `Out`, and when `Out` is a union keyed on `K`,
+ * `on(value)` gets the member whose `K` is `value` (D9). Untyped, it sends `WsFrame` and hears text.
+ */
+export type TypedWebSocket<In = WsFrame, Out = string, K extends string = never> = {
 	close(code?: number, reason?: string): void
-	off(event: "binary" | "close" | "error" | "message" | "open", handler: (...args: never[]) => void): void
+	off(event: SocketEvent, handler: (...args: never[]) => void): void
 	/** Binary frames, as `ArrayBuffer`. Text frames go to `"message"`. */
 	on(event: "binary", handler: (data: ArrayBuffer) => void): void
 	on(event: "close", handler: (code: number, reason: string) => void): void
+	/** A socket error; for a socket with declared messages, also a text frame that is no JSON, as a `ClientError`. */
 	on(event: "error", handler: (error: unknown) => void): void
-	/** Text frames. */
-	on(event: "message", handler: (data: string) => void): void
+	/** Text frames: as text, or parsed as JSON for a socket with declared messages. */
+	on(event: "message", handler: (data: Out) => void): void
 	on(event: "open", handler: () => void): void
 	readonly readyState: number
 	/**
-	 * Strings, `ArrayBuffer`, typed arrays and `Blob` are sent as-is; any other value is JSON-encoded.
-	 * Sends before the socket opens are queued; after it closes they are dropped.
+	 * Untyped, strings, `ArrayBuffer`, typed arrays and `Blob` are sent as-is and any other value is JSON-encoded; with
+	 * declared messages every value is JSON. Sends before the socket opens are queued; after it closes they are dropped.
 	 */
-	send(data: ArrayBuffer | ArrayBufferView | Blob | object | string): void
-}
+	send(data: In): void
+} & Keyed<Out, K>
 
 export type WSOptions = {
 	protocols?: string | string[] | undefined
+	/** Parse each text frame as JSON: the operation declares what the server sends. */
+	decode?: boolean | undefined
+	/** The field a parsed message is handed to `on(value)` by. */
+	dispatch?: string | undefined
+	/** Send every value as JSON: the operation declares what the server receives. */
+	encode?: boolean | undefined
 }
 
 type Payload = Blob | string | Uint8Array<ArrayBuffer>
@@ -32,28 +65,8 @@ type Handler = (...args: never[]) => void
 
 const WS_EVENTS: readonly string[] = ["binary", "close", "error", "message", "open"]
 
-/** The DOM listener that hands `event` to `handler` in its typed shape. */
-function wrapListener(event: string, handler: Handler): EventListener {
-	const call = handler as (...args: unknown[]) => void
-	if (event === "message") {
-		return (e) => {
-			const data = (e as MessageEvent).data
-			if (typeof data === "string") call(data)
-		}
-	}
-	if (event === "binary") {
-		return (e) => {
-			const data = (e as MessageEvent).data
-			if (data instanceof ArrayBuffer) call(data)
-		}
-	}
-	if (event === "open") return () => call()
-	if (event === "close") return (e) => call((e as CloseEvent).code, (e as CloseEvent).reason)
-	return (e) => call(e)
-}
-
 /** `data` as a frame: text and Blobs as they are, bytes copied, anything else as JSON. */
-function toPayload(data: ArrayBuffer | ArrayBufferView | Blob | object | string): Payload {
+function toPayload(data: WsFrame): Payload {
 	if (typeof data === "string") return data
 	if (typeof Blob !== "undefined" && data instanceof Blob) return data
 	if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
@@ -66,30 +79,64 @@ function toPayload(data: ArrayBuffer | ArrayBufferView | Blob | object | string)
 	return JSON.stringify(data)
 }
 
+/** The error a text frame that is no JSON raises on a socket with declared messages. */
+function notJson(frame: string, error: unknown): ClientError {
+	const message = `WebSocket frame is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+	return new ClientError({ body: frame, message, response: Response.error(), status: 0 })
+}
+
 /** A WebSocket with typed events, a send queue until it opens, and nothing sent once it closes. */
 class TypedSocket {
 	readonly #ws: WebSocket
-	/* user handler → wrapped listener, per event, so one handler can be registered for several events */
-	readonly #listeners = new Map<string, WeakMap<Handler, EventListener>>()
+	readonly #opts: WSOptions
+	readonly #handlers = new Map<string, Set<Handler>>()
 	readonly #queue: Payload[] = []
 	#state: "closed" | "connecting" | "open" = "connecting"
 
-	constructor(ws: WebSocket) {
+	constructor(ws: WebSocket, opts: WSOptions) {
 		this.#ws = ws
+		this.#opts = opts
 		ws.binaryType = "arraybuffer"
 		ws.addEventListener("open", () => {
 			this.#state = "open"
 			for (const msg of this.#queue) ws.send(msg)
 			this.#queue.length = 0
+			this.#emit("open")
 		})
-		ws.addEventListener("close", () => {
+		ws.addEventListener("close", (e) => {
 			this.#state = "closed"
 			this.#queue.length = 0
+			this.#emit("close", (e as CloseEvent).code, (e as CloseEvent).reason)
 		})
+		ws.addEventListener("error", (e) => this.#emit("error", e))
+		ws.addEventListener("message", (e) => this.#frame((e as MessageEvent).data))
 	}
 
 	get readyState(): number {
 		return this.#ws.readyState
+	}
+
+	#emit(event: string, ...args: unknown[]): void {
+		const handlers = this.#handlers.get(event)
+		if (handlers === undefined) return
+		for (const handler of handlers) (handler as (...args: unknown[]) => void)(...args)
+	}
+
+	/** One frame from the server: bytes to `"binary"`, text to `"message"`, parsed and dispatched when typed. */
+	#frame(data: unknown): void {
+		if (data instanceof ArrayBuffer) return this.#emit("binary", data)
+		if (typeof data !== "string") return
+		if (this.#opts.decode !== true) return this.#emit("message", data)
+		let value: unknown
+		try {
+			value = JSON.parse(data)
+		} catch (error) {
+			return this.#emit("error", notJson(data, error))
+		}
+		this.#emit("message", value)
+		const { dispatch } = this.#opts
+		const key = dispatch !== undefined && typeof value === "object" && value !== null ? value[dispatch as never] : null
+		if (typeof key === "string" && !WS_EVENTS.includes(key)) this.#emit(key, value)
 	}
 
 	close(code?: number, reason?: string): void {
@@ -99,28 +146,19 @@ class TypedSocket {
 	}
 
 	on(event: string, handler: Handler): void {
-		if (!WS_EVENTS.includes(event)) return
-		const byHandler = this.#listeners.get(event) ?? new WeakMap<Handler, EventListener>()
-		this.#listeners.set(event, byHandler)
-		const target = event === "binary" ? "message" : event
-		const previous = byHandler.get(handler)
-		if (previous) this.#ws.removeEventListener(target, previous)
-		const wrapped = wrapListener(event, handler)
-		byHandler.set(handler, wrapped)
-		this.#ws.addEventListener(target, wrapped)
+		if (!WS_EVENTS.includes(event) && this.#opts.dispatch === undefined) return
+		const handlers = this.#handlers.get(event) ?? new Set<Handler>()
+		this.#handlers.set(event, handlers)
+		handlers.add(handler)
 	}
 
 	off(event: string, handler: Handler): void {
-		const byHandler = this.#listeners.get(event)
-		const wrapped = byHandler?.get(handler)
-		if (!wrapped) return
-		this.#ws.removeEventListener(event === "binary" ? "message" : event, wrapped)
-		byHandler?.delete(handler)
+		this.#handlers.get(event)?.delete(handler)
 	}
 
-	send(data: ArrayBuffer | ArrayBufferView | Blob | object | string): void {
+	send(data: WsFrame): void {
 		if (this.#state === "closed") return
-		const payload = toPayload(data)
+		const payload = this.#opts.encode === true ? JSON.stringify(data) : toPayload(data)
 		if (this.#state === "connecting") this.#queue.push(payload)
 		else this.#ws.send(payload)
 	}
@@ -140,7 +178,7 @@ export function createTypedWebSocket(
 	WebSocketImpl: typeof WebSocket = WebSocket,
 ): TypedWebSocket {
 	const ws = opts?.protocols ? new WebSocketImpl(url, opts.protocols) : new WebSocketImpl(url)
-	const socket = new TypedSocket(ws)
+	const socket = new TypedSocket(ws, opts ?? {})
 	const typed: TypedWebSocket = {
 		close: (code, reason) => socket.close(code, reason),
 		off: (event, handler) => socket.off(event, handler),

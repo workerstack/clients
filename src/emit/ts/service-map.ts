@@ -9,7 +9,10 @@ import {
 	type SdkStream,
 	type SdkSuccess,
 	sdkModel,
+	dispatchKey,
+	isJsonEventData,
 	sseEventSchema,
+	sseEvents,
 } from "../../ir/sdk-model.ts"
 import { openApiPathParams } from "../../ir/slots.ts"
 import { tsString } from "../shared/escape.ts"
@@ -29,10 +32,16 @@ export type ServiceEntry = {
 	params?: string[]
 	path: string
 	realtime?: true
-	/** an event stream; `"json"` when its declared event schema is not a string */
-	sse?: "json" | true
+	/** an event stream; `"json"` when its declared event schema is not a string, its JSON events' names when it names them */
+	sse?: "json" | string[] | true
 	wildcard?: string
 	ws?: true
+	/** the server declares what it sends: the socket parses each text frame */
+	decode?: true
+	/** the field a socket's message union is keyed on (D9) */
+	dispatch?: string
+	/** the server declares what it receives: the socket sends JSON */
+	encode?: true
 }
 
 export type ServiceMapNode = ServiceEntry | { [key: string]: ServiceMapNode }
@@ -104,6 +113,30 @@ function headersOf(op: IROperation, status: string): string[] {
 	return [...new Set(declared.map(({ name }) => name.toLowerCase()))].sort(compareCodeUnits)
 }
 
+/** How the runtime reads `op`'s events: the names of its JSON events when it names them (D7), else all or none. */
+function sseKind(op: IROperation, resolve: (schema: IRSchema) => IRSchema): NonNullable<ServiceEntry["sse"]> {
+	const named = sseEvents(op)
+	if (named !== undefined) return named.filter(({ data }) => isJsonEventData(data, resolve)).map(({ name }) => name)
+	return sseEventSchema(op, resolve) === undefined ? true : "json"
+}
+
+/**
+ * How a socket op's declared messages read on the wire: a WebSocket's sends JSON when the server declares `receive`
+ * and its frames parsed when it declares `send`; either kind's messages dispatched on `send`'s key (D9).
+ */
+function socketEntry(op: IROperation, resolve: (schema: IRSchema) => IRSchema): Partial<ServiceEntry> {
+	const { messages } = op
+	if (messages === undefined) return {}
+	const out: Partial<ServiceEntry> = {}
+	if (!op.extensions.realtime) {
+		if (messages.receive !== undefined) out.encode = true
+		if (messages.send !== undefined) out.decode = true
+	}
+	const key = messages.send === undefined ? undefined : dispatchKey(messages.send, resolve)
+	if (key !== undefined) out.dispatch = key
+	return out
+}
+
 /** The service entry of `op`; `success` is its success answer as the SDK model reads it. */
 function entryOf(op: IROperation, success: SdkSuccess, resolve: (schema: IRSchema) => IRSchema): ServiceEntry {
 	const entry: ServiceEntry = { method: op.method, path: op.path }
@@ -111,9 +144,10 @@ function entryOf(op: IROperation, success: SdkSuccess, resolve: (schema: IRSchem
 	if (params.length > 0) entry.params = params
 	const wildcard = op.params.path.find((p) => p.wildcard === true)
 	if (wildcard) entry.wildcard = wildcard.name
-	if (op.extensions.sse) entry.sse = sseEventSchema(op, resolve) === undefined ? true : "json"
+	if (op.extensions.sse) entry.sse = sseKind(op, resolve)
 	if (op.extensions.websocket) entry.ws = true
 	if (op.extensions.realtime) entry.realtime = true
+	Object.assign(entry, socketEntry(op, resolve))
 	if (op.extensions.idempotencyKey) entry.idempotent = true
 	const invalidate = op.extensions.invalidates
 	if (invalidate && invalidate.length > 0) entry.invalidate = [...invalidate]

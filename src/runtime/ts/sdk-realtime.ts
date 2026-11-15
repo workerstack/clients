@@ -7,4 +7,4 @@ import { type OperationCall, templateOf } from "./sdk.ts"
 export const realtimeOp: OperationCall =
 	(core, entry) =>
 	(input: RequestOptions & RealtimeOptions = {}): ResumableConnection =>
-		realtimeConnection(core.http, templateOf(entry), input)
+		realtimeConnection(core.http, templateOf(entry), input, entry.dispatch)

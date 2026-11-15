@@ -4,7 +4,14 @@
  * realtime calls alike, instead of in each emitter.
  */
 import { compareCodeUnits } from "../emit/shared/lang.ts"
-import { type IR, type IRMultipartPart, type IROperation, type IRParam, type IRSchema } from "./model.ts"
+import {
+	type IR,
+	type IRMultipartPart,
+	type IROperation,
+	type IRParam,
+	type IRSchema,
+	type IRSseEvent,
+} from "./model.ts"
 import { irResolver } from "./schema.ts"
 import { type IRPathSegment, parseOpenApiPath } from "./slots.ts"
 
@@ -134,17 +141,48 @@ const isStringSchema = (schema: IRSchema) =>
 	(schema.kind === "scalar" && schema.type === "string") ||
 	(schema.kind === "const" && typeof schema.value === "string")
 
+/** The SSE response of `op`: its `text/event-stream` answer, if any. */
+const sseResponse = (op: IROperation) =>
+	Object.values(op.responses).find(
+		({ contentType }) => contentType !== undefined && mediaEssence(contentType) === "text/event-stream",
+	)
+
+/** The named events an SSE op's `itemSchema` declares (D7), in order; none for a stream of one `schema`. */
+export function sseEvents(op: IROperation): readonly IRSseEvent[] | undefined {
+	const events = sseResponse(op)?.events
+	return events === undefined || events.length === 0 ? undefined : events
+}
+
+/** Whether an event's `data` of `schema` is JSON on the wire: anything but text, which core sends as is. */
+export const isJsonEventData = (schema: IRSchema, resolve: (schema: IRSchema) => IRSchema): boolean => {
+	const resolved = resolve(schema)
+	return resolved.kind !== "unknown" && !isStringSchema(resolved)
+}
+
+/**
+ * The field a message union dispatches on (D9): its discriminator's `propertyName` when every variant is an object
+ * whose field there is a string const; none for any other schema.
+ */
+export function dispatchKey(schema: IRSchema, resolve: (schema: IRSchema) => IRSchema): string | undefined {
+	const union = resolve(schema)
+	if (union.kind !== "union" || union.discriminator === undefined) return undefined
+	const key = union.discriminator.propertyName
+	const keyed = union.variants.every((variant) => {
+		const object = resolve(variant)
+		const field = object.kind === "object" ? object.fields.find(({ name }) => name === key) : undefined
+		const value = field === undefined ? undefined : resolve(field.schema)
+		return value?.kind === "const" && typeof value.value === "string"
+	})
+	return keyed ? key : undefined
+}
+
 /**
  * The schema an SSE op declares for its events' `data`, when it is not a string: such events are
  * JSON (core JSON-encodes an object `data`) and the client parses them.
  */
 export function sseEventSchema(op: IROperation, resolve: (schema: IRSchema) => IRSchema): IRSchema | undefined {
-	const response = Object.values(op.responses).find(
-		({ contentType }) => contentType !== undefined && mediaEssence(contentType) === "text/event-stream",
-	)
-	if (response?.schema === undefined) return undefined
-	const resolved = resolve(response.schema)
-	return resolved.kind === "unknown" || isStringSchema(resolved) ? undefined : response.schema
+	const schema = sseResponse(op)?.schema
+	return schema !== undefined && isJsonEventData(schema, resolve) ? schema : undefined
 }
 
 function opOf(op: IROperation, resolve: (schema: IRSchema) => IRSchema): SdkOp {

@@ -63,6 +63,39 @@ describe("serviceMapOf: what an entry carries, each only when set", () => {
 	})
 })
 
+describe("serviceMapOf: how a socket reads its declared messages", () => {
+	it("encodes a WebSocket's sends when the server receives, decodes when it sends, and dispatches on send's key", () => {
+		const keyed = {
+			discriminator: { propertyName: "type" },
+			oneOf: [{ properties: { type: { const: "said" } }, required: ["type"], type: "object" }],
+		}
+		const socket = (operationId: string, messages: Json, flag = "x-websocket") => ({
+			get: {
+				operationId,
+				responses: { 101: { description: "" } },
+				"x-websocket": messages,
+				...(flag === "x-realtime" ? { "x-realtime": true } : {}),
+			},
+		})
+		const map = structuredClone(
+			serviceMapOf(
+				ir({
+					"/bare": socket("bare", {}),
+					"/hears": socket("hears", { receive: { type: "object" } }),
+					"/room": socket("room", { receive: { type: "object" }, send: keyed }, "x-realtime"),
+					"/says": socket("says", { send: keyed }),
+				}),
+			),
+		) as Record<string, Json>
+		expect([map.bare, map.hears, map.says, map.room]).toEqual([
+			{ method: "GET", path: "/bare", ws: true },
+			{ encode: true, method: "GET", path: "/hears", ws: true },
+			{ decode: true, dispatch: "type", method: "GET", path: "/says", ws: true },
+			{ dispatch: "type", method: "GET", path: "/room", realtime: true, ws: true },
+		])
+	})
+})
+
 describe("memberTree: names a client cannot expose", () => {
 	it("renames an Object.prototype name at any depth, and a client member only at the root", () => {
 		const tree = memberTree(

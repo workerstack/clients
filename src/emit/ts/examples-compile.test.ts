@@ -4,9 +4,10 @@
  * beside the generated files. A realtime block imports from `./live`, an SDK whose document has an `x-realtime`
  * operation, since an SDK ships the realtime helpers only then (plan 32). A webhook receiver block imports from
  * `./shop.webhook.gen` of the Shop SDK, whose document declares the Standard Webhooks event the webhooks page sends (plan 36).
+ * A typed stream block imports from `./streams`, an SDK of named SSE events and keyed WebSocket and realtime messages.
  */
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterAll, describe, expect, it } from "vitest"
 import { allBlocks, type Block, docsDocument, exampleOf, REPO } from "../shared/__fixtures__/docs-blocks.ts"
@@ -72,6 +73,16 @@ const SHOP = {
 	},
 }
 
+/** The API the typed stream blocks call: the IR's stream fixtures of named SSE events and keyed messages, as one. */
+const STREAMS = ["sse-item-schema", "ws-keyed", "realtime-keyed"]
+	.map((name) => join(import.meta.dirname, `../../ir/__fixtures__/specs/streams/${name}.json`))
+	.map((path) => JSON.parse(readFileSync(path, "utf8")) as { components: { schemas: object }; paths: object })
+	.reduce((all, { components, paths }) => ({
+		...all,
+		components: { schemas: { ...all.components.schemas, ...components.schemas } },
+		paths: { ...all.paths, ...paths },
+	}))
+
 /** tsc's errors for `sources` (name → code, each a module beside the generated SDK), by source and line. */
 export function sdkTypeErrors(sources: Readonly<Record<string, string>>, dir: string): string[] {
 	for (const [path, text] of Object.entries(generateSdk(docsDocument(), { name: "Kitchen" }).files))
@@ -82,6 +93,9 @@ export function sdkTypeErrors(sources: Readonly<Record<string, string>>, dir: st
 	writeFileSync(join(dir, "live.ts"), 'export * from "./live.index.gen"\n')
 	for (const [path, text] of Object.entries(generateSdk(SHOP, { name: "Shop" }).files))
 		writeFileSync(join(dir, path), text)
+	for (const [path, text] of Object.entries(generateSdk(STREAMS, { name: "Streams" }).files))
+		writeFileSync(join(dir, path), text)
+	writeFileSync(join(dir, "streams.ts"), 'export * from "./streams.index.gen"\n')
 	for (const [name, code] of Object.entries(sources)) writeFileSync(join(dir, name), `${code}export {}\n`)
 	writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ compilerOptions: OPTIONS, files: Object.keys(sources) }))
 	const out = spawnSync("node", [TSC, "-p", "tsconfig.json"], { cwd: dir, encoding: "utf8" }).stdout

@@ -6,6 +6,7 @@
 import { Project, ts } from "ts-morph"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { emittedApp, emittedSdk, recordingFetch } from "./__fixtures__/emitted.ts"
+import { FakeSocket } from "./__fixtures__/fake-socket.ts"
 import { generateSdk } from "./sdk.ts"
 
 type Json = Record<string, unknown>
@@ -20,43 +21,6 @@ type Socket = {
 }
 
 type Sdk = Record<string, Record<string, (input?: Json) => Socket>>
-
-/** A browser WebSocket the test scripts: it records its URL, protocols and frames; the test opens, feeds and closes it. */
-class FakeSocket extends EventTarget {
-	static sockets: FakeSocket[] = []
-	binaryType = "blob"
-	readyState = 0
-	readonly protocols: string | string[] | undefined
-	readonly sent: unknown[] = []
-	readonly url: string
-
-	constructor(url: string | URL, protocols?: string | string[]) {
-		super()
-		this.url = String(url)
-		this.protocols = protocols
-		FakeSocket.sockets.push(this)
-	}
-
-	/** The handshake completes. */
-	accept(): void {
-		this.readyState = 1
-		this.dispatchEvent(new Event("open"))
-	}
-
-	/** A frame from the server. */
-	receive(data: unknown): void {
-		this.dispatchEvent(new MessageEvent("message", { data }))
-	}
-
-	send(data: unknown): void {
-		this.sent.push(data)
-	}
-
-	close(code = 1005, reason = ""): void {
-		this.readyState = 3
-		this.dispatchEvent(Object.assign(new Event("close"), { code, reason }))
-	}
-}
 
 /** The reference app's `/api/echo-ws`: greets with "connected" on open, then echoes each frame. */
 class EchoServer extends FakeSocket {

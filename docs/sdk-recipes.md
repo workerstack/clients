@@ -31,6 +31,41 @@ export async function health(client: Kitchen): Promise<string> {
 }
 ```
 
+A stream the document types is typed end to end. An SSE operation with named events yields a union keyed on `event`,
+each `data` typed and parsed from JSON; an unnamed event reads `event: "message"`. A WebSocket or realtime operation
+with declared messages sends what the server receives and hears what it sends, and when those are a union keyed on one
+field, `on("<value>")` hears each member. A socket's text frame that is not JSON reaches `on("error")`. A member named
+like a socket event (`open`, `close`, `error`, `binary`, `message`) is heard only through `on("message")`. A browser
+socket sends no headers or cookies, so a socket call takes neither. This excerpt compiles against an SDK of a small
+streaming API (`Streams`).
+
+```ts sdk
+import type { Streams } from "./streams"
+
+export async function ticks(client: Streams): Promise<number[]> {
+	const at: number[] = []
+	for await (const event of client.ticks.stream()) {
+		if (event.event === "tick") at.push(event.data.at)
+		else console.log("note", event.data)
+	}
+	return at
+}
+
+export function chat(client: Streams): void {
+	const chat = client.chat.open()
+	chat.on("said", (message) => console.log(message.text))
+	chat.on("error", (error) => console.error(error))
+	chat.send({ type: "say", text: "hi" })
+}
+
+export async function room(client: Streams): Promise<void> {
+	const room = client.room.join()
+	room.on("left", () => console.log("someone left"))
+	await room.send({ type: "say", text: "hi" })
+	for await (const message of room) if (message.type === "said") console.log(message.text)
+}
+```
+
 ## Go
 
 Breaking out of a `range` over a stream closes it; a context ends it quietly.

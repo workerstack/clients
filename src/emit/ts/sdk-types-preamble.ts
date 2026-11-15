@@ -30,9 +30,11 @@ export const RESERVED = [
 	"Result",
 	"SDKConfig",
 	"SSEEvent",
+	"SSEEventOf",
 	"SseOptions",
 	"TypedWebSocket",
 	"Uint8Array",
+	"WsFrame",
 	"WsOptions",
 ]
 
@@ -43,7 +45,9 @@ const RUNTIME_TYPES = [
 	"ResumableConnection",
 	"SDKConfig",
 	"SSEEvent",
+	"SSEEventOf",
 	"TypedWebSocket",
+	"WsFrame",
 ] as const
 
 /** The input fields every call takes, by transport. */

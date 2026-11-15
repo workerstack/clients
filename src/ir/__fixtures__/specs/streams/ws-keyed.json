@@ -1,0 +1,57 @@
+{
+	"openapi": "3.2.1",
+	"info": { "title": "Keyed WebSocket messages", "version": "1.0.0" },
+	"paths": {
+		"/chat": {
+			"get": {
+				"operationId": "chat.open",
+				"x-websocket": {
+					"receive": { "$ref": "#/components/schemas/ChatIn" },
+					"send": { "$ref": "#/components/schemas/ChatOut" }
+				},
+				"responses": { "101": { "description": "Switching Protocols" } }
+			}
+		},
+		"/notes": {
+			"get": {
+				"operationId": "notes.open",
+				"x-websocket": { "send": { "$ref": "#/components/schemas/Note" } },
+				"responses": { "101": { "description": "Switching Protocols" } }
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"ChatIn": {
+				"oneOf": [{ "$ref": "#/components/schemas/Say" }, { "$ref": "#/components/schemas/Ping" }],
+				"discriminator": { "propertyName": "type" }
+			},
+			"Say": {
+				"type": "object",
+				"properties": { "type": { "const": "say" }, "text": { "type": "string" } },
+				"required": ["type", "text"]
+			},
+			"Ping": { "type": "object", "properties": { "type": { "const": "ping" } }, "required": ["type"] },
+			"ChatOut": {
+				"oneOf": [{ "$ref": "#/components/schemas/Said" }, { "$ref": "#/components/schemas/Closing" }],
+				"discriminator": { "propertyName": "type" }
+			},
+			"Said": {
+				"type": "object",
+				"properties": { "type": { "const": "said" }, "text": { "type": "string" } },
+				"required": ["type", "text"]
+			},
+			"Closing": {
+				"type": "object",
+				"properties": { "type": { "const": "close" }, "reason": { "type": "string" } },
+				"required": ["type", "reason"]
+			},
+			"Note": {
+				"oneOf": [
+					{ "type": "object", "properties": { "body": { "type": "string" } }, "required": ["body"] },
+					{ "type": "string" }
+				]
+			}
+		}
+	}
+}

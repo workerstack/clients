@@ -408,17 +408,23 @@ expectType<Equal<OperationCtx<"multi">, Routes["/multi"]["get"]["ctx"]>>()`
 })
 
 describe("the operationId slot: WebSocket ids", () => {
-	it("types a WebSocket id as kind ws: BaseCtx with its params, and its search input when it declares one", () => {
+	it("types a WebSocket id as kind ws: BaseCtx with its params, and the upgrade's search, headers and cookies", () => {
 		const app = httpDoc([
 			named("WS", "/feed/:room", "feed"),
-			named("WS", "/rooms/:room/live", "rooms.live", { input: { search: object({ token: STRING }, []) } }),
+			named("WS", "/rooms/:room/live", "rooms.live", {
+				input: {
+					cookies: object({ session: STRING }),
+					headers: object({ "x-tenant": STRING }),
+					search: object({ token: STRING }, []),
+				},
+			}),
 			named("WS", "/ping", "ping"),
 		])
 		const consumer = `import type { HttpOperationId, OperationCtx, OperationId } from "@workerstack/backend/http"
 expectType<Equal<OperationId, "feed" | "ping" | "rooms.live">>()
 expectType<Equal<HttpOperationId, never>>()
 expectType<Same<OperationCtx<"feed">["params"], { room: string }>>()
-expectType<Same<OperationCtx<"rooms.live">["input"], { search: { token?: string } }>>()
+expectType<Same<OperationCtx<"rooms.live">["input"], { search: { token?: string }; headers: { "x-tenant": string }; cookies: { session: string } }>>()
 expectType<Equal<OperationCtx<"ping">, BaseCtx>>()
 expectType<Equal<"input" extends keyof OperationCtx<"feed"> ? true : false, false>>()`
 		const { diagnostics, text } = check(app, consumer)
@@ -429,7 +435,7 @@ expectType<Equal<"input" extends keyof OperationCtx<"feed"> ? true : false, fals
 				['"ping"', '{ kind: "ws"; ctx: BaseCtx }'],
 				[
 					'"rooms.live"',
-					'{ kind: "ws"; ctx: BaseCtx & { readonly input: { search: { token?: string } }; readonly params: { room: string } } }',
+					'{ kind: "ws"; ctx: BaseCtx & { readonly input: { search: { token?: string }; headers: { "x-tenant": string }; cookies: { session: string } }; readonly params: { room: string } } }',
 				],
 			],
 		})

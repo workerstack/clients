@@ -103,7 +103,8 @@ describe("the v1 SDK within the budget (bit 11)", () => {
  * (`v1SdkSurfaces`: each operation's one member line, `HttpCall<…>` or `HttpStream<…>`, which types its raw
  * overload, its value and its safe twin's Result alike): max 81 (kitchen, SDK.postApiV1Organizations), sum 2,694; at
  * 425f0a4 the two overload lines measured max 162, sum 5,258. 81 + 20% headroom = 98. An operation over it is fixed
- * in the schema, never by raising the ceiling.
+ * in the schema, never by raising the ceiling. Backend plan 8 re-measured it at 81: the e2e documents declare no
+ * typed events or messages, so no surface moved.
  */
 const TS_SDK_CEILING = ceilingOf([81], HEADROOM)
 
@@ -837,8 +838,13 @@ describe("the C# runtime within its byte budget (bit 15, G14)", () => {
  * `: Resumable`), and `@internal` on the three symbol-keyed HTTPClient members the declarations leave out.
  * Plan 39 5.5, -6 B to 132,251: InputFor's doc names `streamed()`, core's new name for `readableStream()`.
  * Plan 55, +5 B to 132,256 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
+ * Backend plan 8, +6,208 B to 138,464 B: typed event streams and sockets. ws.ts +2,191 (TypedWebSocket's three type
+ * params and on(value), the JSON frame parse and its error, dispatch by key), realtime.ts +1,344 and
+ * realtime-connection.ts +994 (ResumableConnection's In and K, on and off beside the iterator), sdk-sse.ts +674 (the
+ * per-name parse, an unnamed typed event read as message), sdk.ts +423 (the map entry's decode, dispatch and encode),
+ * sse.ts +350 (SSEEventOf), realtime-transports.ts +145, sdk-ws.ts +71 and sdk-realtime.ts +16 (passing them on).
  */
-const TS_RUNTIME_BYTES = 132_256
+const TS_RUNTIME_BYTES = 138_464
 
 describe("the TS runtime within its byte budget (bit 11, G14)", () => {
 	it(

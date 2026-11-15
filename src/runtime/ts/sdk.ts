@@ -21,11 +21,18 @@ export type ServiceEntry = {
 	/** the OpenAPI path template, `{param}` kept */
 	path: string
 	realtime?: boolean
-	/** an event stream; `"json"` when its events carry JSON `data` the client parses */
-	sse?: boolean | "json"
+	/** an event stream; `"json"` when its events carry JSON `data` the client parses, or the names of the events that
+	    do when the operation names its events (an unnamed one is `message`) */
+	sse?: boolean | "json" | readonly string[]
 	/** the param that spans segments (`x-backend-wildcard`) */
 	wildcard?: string
 	ws?: boolean
+	/** a socket whose server declares what it sends: each text frame is parsed as JSON */
+	decode?: boolean
+	/** the field a socket's parsed message is handed to `on(value)` by (D9) */
+	dispatch?: string
+	/** a socket whose server declares what it receives: every send is JSON */
+	encode?: boolean
 	/** how a stream, WebSocket or realtime operation is called; a REST one has none */
 	call?: OperationCall
 }

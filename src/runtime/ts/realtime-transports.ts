@@ -14,7 +14,7 @@ import { createTypedWebSocket, wsUrl } from "./ws.ts"
 
 type Target = { http: HTTPClient; opts: RequestOptions; path: string }
 
-export type RealtimeOptions = Omit<ResumableConnectionOpts, "headers" | "signal" | "transports" | "url">
+export type RealtimeOptions = Omit<ResumableConnectionOpts, "dispatch" | "headers" | "signal" | "transports" | "url">
 
 /** A payload's JSON when it parses, else its text. */
 function payloadOf(text: string): unknown {
@@ -140,10 +140,19 @@ function pollAdapter(at: Target): TransportAdapter {
 	}
 }
 
-/** An x-realtime op's chain, as Go's: WebSocket, SSE, long-poll; no JSON keepalive unless set. */
-export function realtimeConnection(http: HTTPClient, path: string, input: RequestOptions & RealtimeOptions): Resumable {
+/**
+ * An x-realtime op's chain, as Go's: WebSocket, SSE, long-poll; no JSON keepalive unless set. `dispatch` is the field
+ * its declared messages are keyed on.
+ */
+export function realtimeConnection(
+	http: HTTPClient,
+	path: string,
+	input: RequestOptions & RealtimeOptions,
+	dispatch?: string,
+): Resumable {
 	const { baseURL, cookies, headers, params, search, signal, ...opts } = input
 	const at = { http, opts: { baseURL, cookies, headers, params, search }, path }
 	const transports = [wsAdapter(at), sseAdapter(at), pollAdapter(at)]
-	return new Resumable({ keepaliveInterval: 0, ...opts, signal, transports, url: path }, () => http[REFRESH_AUTH]())
+	const resumable = { keepaliveInterval: 0, ...opts, dispatch, signal, transports, url: path }
+	return new Resumable(resumable, () => http[REFRESH_AUTH]())
 }

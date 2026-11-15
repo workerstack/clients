@@ -7,21 +7,38 @@ import { type OperationCall, optionsFor, type SdkCore, type ServiceEntry, templa
 import type { SSEEvent } from "./sse.ts"
 import { later, openStream } from "./stream.ts"
 
-/** Each event with its `data` parsed as JSON; an event that does not parse fails the stream, naming it. */
-function jsonEvents(events: AsyncIterable<SSEEvent>): AsyncIterable<SSEEvent<unknown>> {
+/** `event` with its `data` parsed as JSON; data that does not parse fails the stream, naming the event. */
+function parsed(event: SSEEvent): SSEEvent<unknown> {
+	try {
+		return { ...event, data: JSON.parse(event.data) }
+	} catch (e) {
+		const name = event.id === undefined ? "an event" : `event ${JSON.stringify(event.id)}`
+		const message = `SSE ${name} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`
+		throw new ClientError({ body: event.data, message, response: Response.error(), status: 0 })
+	}
+}
+
+/**
+ * The events of `events` as `entry` reads them: each parsed (`"json"`); or, for a stream that names its events, each
+ * named `message` when it has no name and parsed when `sse` holds its name; else as they came.
+ */
+function eventsOf(events: AsyncIterable<SSEEvent>, sse: ServiceEntry["sse"]): AsyncIterable<SSEEvent<unknown>> {
+	if (sse === "json") return mapEvents(events, parsed)
+	if (typeof sse !== "object") return events
+	return mapEvents(events, (raw) => {
+		const event = { ...raw, event: raw.event ?? "message" }
+		return sse.includes(event.event) ? parsed(event) : event
+	})
+}
+
+/** `events`, each through `map`. */
+function mapEvents(
+	events: AsyncIterable<SSEEvent>,
+	map: (event: SSEEvent) => SSEEvent<unknown>,
+): AsyncIterable<SSEEvent<unknown>> {
 	return {
 		async *[Symbol.asyncIterator]() {
-			for await (const event of events) {
-				let data: unknown
-				try {
-					data = JSON.parse(event.data)
-				} catch (e) {
-					const name = event.id === undefined ? "an event" : `event ${JSON.stringify(event.id)}`
-					const message = `SSE ${name} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`
-					throw new ClientError({ body: event.data, message, response: Response.error(), status: 0 })
-				}
-				yield { ...event, data }
-			}
+			for await (const event of events) yield map(event)
 		},
 	}
 }
@@ -43,7 +60,7 @@ async function open(core: SdkCore, entry: ServiceEntry, input: RequestOptions): 
 		if (selector !== undefined) core.mark(entry, input.params, selector)
 	}
 	const { data, response } = await openStream(core.http, { meta, method: entry.method, onOpen, opts, path: template })
-	return { data: entry.sse === "json" ? jsonEvents(data) : data, response }
+	return { data: eventsOf(data, entry.sse), response }
 }
 
 /** An event stream: sent when iterated, or opened into a Result by the safe twin. */

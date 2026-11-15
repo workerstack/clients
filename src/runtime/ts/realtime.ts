@@ -270,6 +270,8 @@ export type ResumableConnectionOpts = {
 	/** Ping every this many ms (WebSocket 20 s, SSE none, unless set; 0: none); one unanswered as long reconnects. */
 	keepaliveInterval?: number | undefined
 	lastEventId?: string | undefined
+	/** The field each message is handed to `on(value)` by: the operation's declared messages are keyed on it. */
+	dispatch?: string | undefined
 	/** Reconnects after a drop before the stream ends; 0 retries forever. Default 5. */
 	maxReconnectAttempts?: number | undefined
 	onReconnected?: (() => void) | undefined
@@ -281,13 +283,35 @@ export type ResumableConnectionOpts = {
 	url: string
 }
 
-export type ResumableConnection<T = unknown> = {
+/** The values of `T`'s field `K`, `"message"` left out: `on("message")` hears every message. */
+type MessageKey<T, K extends string> = Exclude<
+	T extends { readonly [P in K]: infer V extends string } ? V : never,
+	"message"
+>
+
+/** `on(value)` and `off(value)` for a connection whose messages are keyed on `K`; nothing for an unkeyed one. */
+type KeyedMessages<T, K extends string> = [K] extends [never]
+	? unknown
+	: {
+			off(event: MessageKey<T, K>, handler: (...args: never[]) => void): void
+			/** The messages whose `K` is `event`, after `"message"` hears them. */
+			on<V extends MessageKey<T, K>>(event: V, handler: (data: Extract<T, { readonly [P in K]: V }>) => void): void
+		}
+
+/**
+ * One logical stream of `T` that sends `In`. Iterating it opens it; `on("message")` and, when `T` is a union keyed on
+ * `K`, `on(value)` (D9) hear each message as it arrives, beside the iterator, which still yields every one.
+ */
+export type ResumableConnection<T = unknown, In = unknown, K extends string = never> = {
 	close(reason?: string): void
+	off(event: "message", handler: (...args: never[]) => void): void
+	/** Every message as it arrives; a handler that throws is skipped, and the stream carries on. */
+	on(event: "message", handler: (data: T) => void): void
 	readonly provenTransport: Transport | null
 	/** Resolves once sent; over SSE and long-poll a POST, rejecting with its error. */
-	send(data: unknown): Promise<void>
+	send(data: In): Promise<void>
 	/** `send`'s raw form: `text` as it is, a text frame or a POSTed text/plain body. */
 	sendText(text: string): Promise<void>
 	readonly state: ConnectionState
 	[Symbol.asyncIterator](): AsyncIterableIterator<T>
-}
+} & KeyedMessages<T, K>

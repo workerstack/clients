@@ -239,12 +239,14 @@ function baseCtx(extracted: ExtractedTypes | null, name: string): string {
 
 /**
  * A WebSocket route's ctx, as core's `WSRouteCtx` types its callbacks: the base with the pattern's params, and the
- * search input `.input()` declares. Extracted additions are keyed by HTTP routes only, so none join here.
+ * search, headers and cookies `.input()` declares. Extracted additions are keyed by HTTP routes only, so none join
+ * here.
  */
 function wsCtx(op: IROperation, id: string, options: GenerateTypesOptions, ctx: Ctx): string {
 	const own: Field[] = []
-	const search = wireInput(op, ctx).find(([key]) => key === "search")
-	if (search !== undefined) own.push(["readonly input", objectText([search])])
+	/* the upgrade request's validated search, headers and cookies, as core's `WithInput` holds them */
+	const input = wireInput(op, ctx).filter(([key]) => key === "search" || key === "headers" || key === "cookies")
+	if (input.length > 0) own.push(["readonly input", objectText(input)])
 	const params = ctxParams(options.extracted, id, pathOf(id))
 	if (params !== "{}") own.push(["readonly params", params])
 	const base = options.baseCtxName ?? "BaseCtx"

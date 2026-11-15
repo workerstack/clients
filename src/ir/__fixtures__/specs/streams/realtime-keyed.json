@@ -1,0 +1,40 @@
+{
+	"openapi": "3.2.1",
+	"info": { "title": "Keyed realtime messages", "version": "1.0.0" },
+	"paths": {
+		"/room": {
+			"get": {
+				"operationId": "room.join",
+				"x-realtime": true,
+				"x-websocket": {
+					"receive": { "$ref": "#/components/schemas/RoomIn" },
+					"send": { "$ref": "#/components/schemas/RoomOut" }
+				},
+				"responses": { "101": { "description": "Switching Protocols" } }
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"RoomIn": {
+				"oneOf": [{ "$ref": "#/components/schemas/RoomSay" }],
+				"discriminator": { "propertyName": "type" }
+			},
+			"RoomSay": {
+				"type": "object",
+				"properties": { "type": { "const": "say" }, "text": { "type": "string" } },
+				"required": ["type", "text"]
+			},
+			"RoomOut": {
+				"oneOf": [{ "$ref": "#/components/schemas/RoomSaid" }, { "$ref": "#/components/schemas/RoomLeft" }],
+				"discriminator": { "propertyName": "type" }
+			},
+			"RoomSaid": {
+				"type": "object",
+				"properties": { "type": { "const": "said" }, "text": { "type": "string" } },
+				"required": ["type", "text"]
+			},
+			"RoomLeft": { "type": "object", "properties": { "type": { "const": "left" } }, "required": ["type"] }
+		}
+	}
+}

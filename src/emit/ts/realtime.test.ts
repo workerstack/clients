@@ -159,7 +159,7 @@ async function firstMessage(document: Json, input?: Json): Promise<unknown> {
 	const mod = (await emittedSdk(document)) as unknown as { TestSDK: new (config: Json) => Json }
 	const sdk = new mod.TestSDK({ baseURL: "http://127.0.0.1:3000", fetch: recordingFetch().fetch })
 	const opened = (sdk.reconnectWs as (input?: Json) => Socket | Resumable)(input)
-	if (!("on" in opened)) {
+	if (Symbol.asyncIterator in opened) {
 		const [first] = await take(opened, 1)
 		opened.close()
 		return first

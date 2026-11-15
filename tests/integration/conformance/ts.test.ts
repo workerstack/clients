@@ -202,8 +202,13 @@ function framesOf(socket: Socket, call: Call): Promise<Json[]> {
 	})
 }
 
+/* a realtime connection has `on` and `send` too; a socket is the one that is not iterable */
 const isSocket = (value: unknown): value is Socket =>
-	typeof value === "object" && value !== null && typeof (value as Socket).on === "function" && "send" in value
+	typeof value === "object" &&
+	value !== null &&
+	typeof (value as Socket).on === "function" &&
+	"send" in value &&
+	!(Symbol.asyncIterator in value)
 
 const isStream = (value: unknown): value is AsyncIterable<Event> =>
 	typeof value === "object" && value !== null && Symbol.asyncIterator in value

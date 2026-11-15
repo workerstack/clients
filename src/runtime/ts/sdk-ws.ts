@@ -12,7 +12,8 @@ export const wsOp: OperationCall =
 	(input: WsInput = {}): TypedWebSocket => {
 		const url = new URL(wsUrl(core.http, templateOf(entry), { params: input.params, search: input.search }))
 		if (input.reconnectToken) url.searchParams.append("reconnect_token", input.reconnectToken)
-		const socket = createTypedWebSocket(url.toString(), { protocols: input.protocols })
+		const { decode, dispatch, encode } = entry
+		const socket = createTypedWebSocket(url.toString(), { decode, dispatch, encode, protocols: input.protocols })
 		if (entry.invalidate?.length) {
 			const selector = `WS ${interpolatePath(templateOf(entry), input.params)}`
 			socket.on("open", () => core.mark(entry, input.params, selector))
