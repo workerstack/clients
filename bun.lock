@@ -17,7 +17,7 @@
         "@total-typescript/ts-reset": "0.6.1",
         "@types/node": "26.1.1",
         "@vitest/coverage-v8": "4.1.10",
-        "@workerstack/backend": "1.0.0-rc.28",
+        "@workerstack/backend": "1.0.0-rc.29",
         "@workerstack/repo": "0.2.0-rc.2",
         "@workerstack/system": "0.3.0",
         "ajv": "8.20.0",
@@ -584,7 +584,7 @@
 
     "@vitest/utils": ["@vitest/utils@4.1.10", "", { "dependencies": { "@vitest/pretty-format": "4.1.10", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA=="],
 
-    "@workerstack/backend": ["@workerstack/backend@1.0.0-rc.28", "", { "dependencies": { "jiti": "2.7.0" }, "peerDependencies": { "@workerstack/clients": ">=1.0.0-rc.27" }, "optionalPeers": ["@workerstack/clients"], "bin": { "backend": "bin/backend.js" } }, "sha512-V9nD1D3F6B1Px0Pn8k/qgv0bTm/gu3lzECKzlVMLRN/94NyuCZgyZia6u9k+thYn7D5Xp/JB1r4K+i/50sy8qA=="],
+    "@workerstack/backend": ["@workerstack/backend@1.0.0-rc.29", "", { "dependencies": { "jiti": "2.7.0" }, "peerDependencies": { "@workerstack/clients": ">=1.0.0-rc.28" }, "optionalPeers": ["@workerstack/clients"], "bin": { "backend": "bin/backend.js" } }, "sha512-w2KF3raVw5j3m6rqqGXwsxSG/SS7k7uHN/qlfrUSdPhqqIIvWp7CDx/8BlilkDfnJe4z2UglZE7zUdeY1p5JrA=="],
 
     "@workerstack/references": ["@workerstack/references@0.1.1", "", {}, "sha512-JNB1a1QMHbTxckZ2HgT7wIAEIKw5Z6GKOu2w1rnf6BneQyVoOpm0KWuYE0ek4pWq8fVSgLdJFkhqdyePwIvcCw=="],
 
