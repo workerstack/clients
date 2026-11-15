@@ -260,7 +260,7 @@ function streamRoutes(app: ConformanceApp): void {
 	app
 		.get("/ticks")
 		.meta({ operationId: "ticks.stream", mcp: true })
-		.output({ "text/event-stream": { ok: z.object({ n: z.number().int() }) } })
+		.output({ "text/event-stream": { ok: { tick: z.object({ n: z.number().int() }) } } })
 		.handler((ctx) =>
 			ctx.res.sse(async (stream) => {
 				for (let n = 1; n <= 3; n++) await stream.send({ data: { n }, event: "tick", id: String(n) })
