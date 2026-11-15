@@ -32,7 +32,8 @@ run it again, then the tests the change reaches. A fix without a test that faile
 `references/tdd.md`.
 
 Locally, a commit runs the tests its change reaches: the touched test files and the tests of the code it changed.
-Never the full suites; those are CI's. CI on the pushed tip is the full gate: `fmt:check`, `lint`, `typecheck`, `test`
-and `test:harness`. After a push, `bun scripts/ci-wait.ts` waits for the run and names any failed job and its log.
+Never the full suites; those are CI's. CI on the pushed tip is the full gate: `fmt:check`, `repo check`, `typecheck`,
+`typecheck:src`, `test` and `test:harness`. After a push, `bun repo ci wait` waits for the run and names any failed job
+and its log.
 While CI is red, the only work is fixing it. Never use `--no-verify`. A failure is never skipped, retried away, or
 called flaky. Detail: `references/gates.md`.

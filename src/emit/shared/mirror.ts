@@ -6,19 +6,19 @@
  */
 
 /** The mirror's name before a language spells it. */
-export const MIRROR = "safe"
+export const MIRROR = "safe";
 
 /** A name a generation emits other than the spec's: what it names (`root group`, `component`), both names, and why. */
 export type Rename = {
-	readonly what: string
-	readonly name: string
-	readonly renamed: string
-	readonly because: string
-}
+  readonly what: string;
+  readonly name: string;
+  readonly renamed: string;
+  readonly because: string;
+};
 
 /** The one notice `target`'s generation reports for `rename`: never a silent rename. */
 export function renameNotice(target: string, { because, name, renamed, what }: Rename): string {
-	return `${target}: the ${what} "${name}" is emitted as "${renamed}": ${because}`
+  return `${target}: the ${what} "${name}" is emitted as "${renamed}": ${because}`;
 }
 
 /**
@@ -26,11 +26,12 @@ export function renameNotice(target: string, { because, name, renamed, what }: R
  * language's spelling) and is emitted as `renamed` instead; null for any other group.
  */
 export function mirrorNotice(target: string, spelled: string, group: string, renamed: string): string | null {
-	if (group !== spelled) return null
-	return renameNotice(target, {
-		because: `"${spelled}" is the client's safe mirror`,
-		name: group,
-		renamed,
-		what: "root group",
-	})
+  if (group !== spelled) return null;
+
+  return renameNotice(target, {
+    because: `"${spelled}" is the client's safe mirror`,
+    name: group,
+    renamed,
+    what: "root group",
+  });
 }

@@ -1,4 +1,8 @@
-/* copied from @workerstack/backend's tests/integration/conformance/reference-server.ts at b7c1db40, on backend's public exports: each package owns its test fixtures (roadmap 5 D7) */
+import { httpApp } from "@workerstack/backend/http";
+import type { SSEStream } from "@workerstack/backend/http";
+import type { WSContext } from "@workerstack/backend/http";
+import { ws } from "@workerstack/backend/ws";
+// copied from @workerstack/backend's tests/integration/conformance/reference-server.ts at b7c1db40, on backend's public exports: each package owns its test fixtures (roadmap 5 D7)
 /**
  * The resumable reference server (H8): the conformance target the SDK reconnect tests run against.
  * Conformance infrastructure, never shipped core: an in-memory event log on backend's two public
@@ -13,96 +17,96 @@
  * A cursor is client data, never identity: one that is not a log id the server could have issued
  * replays the whole log (not a whole number) or nothing (past the head).
  */
-import * as z from "zod"
-import { httpApp } from "@workerstack/backend/http"
-import type { SSEStream } from "@workerstack/backend/http"
-import type { WSContext } from "@workerstack/backend/http"
-import { ws } from "@workerstack/backend/ws"
+import * as z from "zod";
 
-export type ReferenceEvent = { readonly data: unknown; readonly id: number }
+export type ReferenceEvent = { readonly data: unknown; readonly id: number };
 
-type Listener = (event: ReferenceEvent) => void
+type Listener = (event: ReferenceEvent) => void;
 
-const WHOLE = /^(0|[1-9]\d*)$/
+const WHOLE = /^(0|[1-9]\d*)$/;
 
-/* the documented shapes (bit 11): a streamed payload is a JSON object; a stored event is its log id beside the payload */
-const Payload = z.looseObject({})
-const Stored = z.object({ data: z.unknown(), id: z.number().int() })
+// the documented shapes (bit 11): a streamed payload is a JSON object; a stored event is its log id beside the payload
+const Payload = z.looseObject({});
+const Stored = z.object({ data: z.unknown(), id: z.number().int() });
 
 /** The log position a client cursor names: `0` (the whole log) unless it is a whole number. */
 function positionOf(cursor: string | null | undefined): number {
-	return cursor != null && WHOLE.test(cursor) ? Number(cursor) : 0
+  return cursor != null && WHOLE.test(cursor) ? Number(cursor) : 0;
 }
 
 /** The SSE producer: every event after the client's `Last-Event-ID`, then live ones until it leaves. */
 function relay(follow: (position: number, deliver: Listener) => () => void) {
-	return async (stream: SSEStream): Promise<void> => {
-		const stop = follow(positionOf(stream.lastEventId), (event) => {
-			void stream.send({ data: Payload.parse(event.data), event: "message", id: String(event.id) })
-		})
-		try {
-			if (!stream.signal.aborted) {
-				await new Promise((resolve) => stream.signal.addEventListener("abort", resolve, { once: true }))
-			}
-		} finally {
-			stop()
-		}
-	}
+  return async (stream: SSEStream): Promise<void> => {
+    const stop = follow(positionOf(stream.lastEventId), (event) => {
+      void stream.send({ data: Payload.parse(event.data), event: "message", id: String(event.id) });
+    });
+
+    try {
+      if (!stream.signal.aborted)
+        await new Promise((resolve) => stream.signal.addEventListener("abort", resolve, { once: true }));
+    } finally {
+      stop();
+    }
+  };
 }
 
 export function createReferenceServer() {
-	const events: ReferenceEvent[] = []
-	const listeners = new Set<Listener>()
-	const sockets = new Map<WSContext, Listener>()
+  const events: ReferenceEvent[] = [];
+  const listeners = new Set<Listener>();
+  const sockets = new Map<WSContext, Listener>();
 
-	const append = (data: unknown): ReferenceEvent => {
-		const event = Object.freeze({ data, id: events.length + 1 })
-		events.push(event)
-		for (const listener of listeners) listener(event)
-		return event
-	}
+  const append = (data: unknown): ReferenceEvent => {
+    const event = Object.freeze({ data, id: events.length + 1 });
+    events.push(event);
 
-	/* the backlog and the live subscription start in one turn, so no event falls between them */
-	const follow = (position: number, deliver: Listener): (() => void) => {
-		for (const event of events.slice(position)) deliver(event)
-		listeners.add(deliver)
-		return () => listeners.delete(deliver)
-	}
+    for (const listener of listeners) listener(event);
 
-	const open = (socket: WSContext, cursor: string | null): void => {
-		const deliver: Listener = (event) => socket.send({ data: event.data, id: event.id })
-		sockets.set(socket, deliver)
-		follow(positionOf(cursor), deliver)
-	}
+    return event;
+  };
 
-	const app = httpApp<{}>()
-	app
-		.post("/events")
-		.meta({ operationId: "events.append", mcp: true })
-		.output({ "application/json": { ok: Stored } })
-		.handler(async (ctx) => ctx.res.json("ok", append(await ctx.req.json())))
-	app
-		.get("/events")
-		.meta({ operationId: "events.stream", mcp: true })
-		.output({ "text/event-stream": { ok: Payload } })
-		.handler((ctx) => ctx.res.sse(relay(follow)))
-	ws(app, "/events/ws")
-		.meta({ operationId: "events.socket" })
-		.handler({
-			onClose: (_ctx, socket) => {
-				const deliver = sockets.get(socket)
-				sockets.delete(socket)
-				if (deliver !== undefined) listeners.delete(deliver)
-			},
-			onOpen: (_ctx, socket) => open(socket, null),
-			onReconnect: (_ctx, socket, token) => open(socket, token),
-		})
+  // the backlog and the live subscription start in one turn, so no event falls between them
+  const follow = (position: number, deliver: Listener): (() => void) => {
+    for (const event of events.slice(position)) deliver(event);
+    listeners.add(deliver);
 
-	return {
-		app,
-		append,
-		events: events as readonly ReferenceEvent[],
-		/** Clients following the live log right now. */
-		following: () => listeners.size,
-	}
+    return () => listeners.delete(deliver);
+  };
+
+  const open = (socket: WSContext, cursor: string | null): void => {
+    const deliver: Listener = (event) => socket.send({ data: event.data, id: event.id });
+    sockets.set(socket, deliver);
+    follow(positionOf(cursor), deliver);
+  };
+
+  const app = httpApp<{}>();
+  app
+    .post("/events")
+    .meta({ mcp: true, operationId: "events.append" })
+    .output({ "application/json": { ok: Stored } })
+    .handler(async (ctx) => ctx.res.json("ok", append(await ctx.req.json())));
+  app
+    .get("/events")
+    .meta({ mcp: true, operationId: "events.stream" })
+    .output({ "text/event-stream": { ok: Payload } })
+    .handler((ctx) => ctx.res.sse(relay(follow)));
+  ws(app, "/events/ws")
+    .meta({ operationId: "events.socket" })
+    .handler({
+      onClose: (_ctx, socket) => {
+        const deliver = sockets.get(socket);
+        sockets.delete(socket);
+
+        if (deliver !== undefined) listeners.delete(deliver);
+      },
+      onOpen: (_ctx, socket) => open(socket, null),
+      onReconnect: (_ctx, socket, token) => open(socket, token),
+    });
+
+  return {
+    app,
+    append,
+    events: events as readonly ReferenceEvent[],
+    /** Clients following the live log right now. */
+    following: () => listeners.size,
+  };
 }

@@ -7,125 +7,145 @@
  * checkout read from its source by the backend-source condition, refused when this Bun resolves it elsewhere (bit 20).
  * With no core installed where the app resolves it, the refusal names it.
  */
-import { existsSync, readFileSync, realpathSync } from "node:fs"
-import { dirname, join, relative, resolve } from "node:path"
-import { pathToFileURL } from "node:url"
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const CORE = "@workerstack/backend"
-const DEFAULT_OPTIONS = { info: { title: "API", version: "0.0.0" } }
+const CORE = "@workerstack/backend";
+const DEFAULT_OPTIONS = { info: { title: "API", version: "0.0.0" } };
 
 /** Bun's resolver, as the loader uses it: `specifier` resolved from `from` under this process's conditions. */
-export type BunResolver = { resolveSync(specifier: string, from: string): string }
+export type BunResolver = { resolveSync(specifier: string, from: string): string };
 
-type Importer = (specifier: string) => Promise<Record<string, unknown>>
+type Importer = (specifier: string) => Promise<Record<string, unknown>>;
 
 /** `<module>[#export]` as its module path and the export it names, if any. */
 export function appRef(ref: string): { module: string; name: string | undefined } {
-	const at = ref.lastIndexOf("#")
-	return at < 0 ? { module: ref, name: undefined } : { module: ref.slice(0, at), name: ref.slice(at + 1) || undefined }
+  const at = ref.lastIndexOf("#");
+
+  return at < 0 ? { module: ref, name: undefined } : { module: ref.slice(0, at), name: ref.slice(at + 1) || undefined };
 }
 
 /** The core package root the module at `from` resolves, found the way Node looks: up each node_modules. */
 function coreRoot(from: string): string | undefined {
-	for (let dir = dirname(from); ; dir = dirname(dir)) {
-		const root = join(dir, "node_modules", CORE)
-		if (existsSync(join(root, "package.json"))) return root
-		if (dirname(dir) === dir) return undefined
-	}
+  for (let dir = dirname(from); ; dir = dirname(dir)) {
+    const root = join(dir, "node_modules", CORE);
+
+    if (existsSync(join(root, "package.json"))) return root;
+
+    if (dirname(dir) === dir) return undefined;
+  }
 }
 
 /** What a core checkout's source is read through, each mapped to its `backend-source` file. */
 type SourceAliases = {
-	/** its public subpaths (`@workerstack/backend/http/openapi`) */
-	readonly exports: Record<string, string>
-	/** its own subpath imports (`#output-check`), which jiti would resolve to the unbuilt dist/ */
-	readonly imports: Record<string, string>
-}
+  /** its public subpaths (`@workerstack/backend/http/openapi`) */
+  readonly exports: Record<string, string>;
+  /** its own subpath imports (`#output-check`), which jiti would resolve to the unbuilt dist/ */
+  readonly imports: Record<string, string>;
+};
 
 /** A package.json map's entries with a `backend-source` target: each keyed by `key(subpath)`, at that file under `root`. */
 function sourcesOf(
-	root: string,
-	map: Record<string, { "backend-source"?: string } | string>,
-	key: (subpath: string) => string,
+  root: string,
+  map: Record<string, { "backend-source"?: string } | string>,
+  key: (subpath: string) => string,
 ): Record<string, string> {
-	const out: Record<string, string> = {}
-	for (const [subpath, target] of Object.entries(map)) {
-		const source = typeof target === "object" ? target["backend-source"] : undefined
-		if (source !== undefined) out[key(subpath)] = join(root, source)
-	}
-	return out
+  const out: Record<string, string> = {};
+
+  for (const [subpath, target] of Object.entries(map)) {
+    const source = typeof target === "object" ? target["backend-source"] : undefined;
+
+    if (source !== undefined) out[key(subpath)] = join(root, source);
+  }
+
+  return out;
 }
 
 /** A core checkout's (it keeps tsconfig.json, which is never published) subpaths and imports mapped to their source. */
 function sourceAliases(root: string): SourceAliases {
-	if (!existsSync(join(root, "tsconfig.json"))) return { exports: {}, imports: {} }
-	const { exports = {}, imports = {} } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-		exports?: Record<string, { "backend-source"?: string } | string>
-		imports?: Record<string, { "backend-source"?: string } | string>
-	}
-	return {
-		exports: sourcesOf(root, exports, (subpath) => CORE + subpath.slice(1)),
-		imports: sourcesOf(root, imports, (subpath) => subpath),
-	}
+  if (!existsSync(join(root, "tsconfig.json"))) return { exports: {}, imports: {} };
+
+  const { exports = {}, imports = {} } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+    exports?: Record<string, { "backend-source"?: string } | string>;
+    imports?: Record<string, { "backend-source"?: string } | string>;
+  };
+
+  return {
+    exports: sourcesOf(root, exports, (subpath) => CORE + subpath.slice(1)),
+    imports: sourcesOf(root, imports, (subpath) => subpath),
+  };
 }
 
 /** The app `name` (else `app`, else `default`) of the loaded module `mod`, or why there is none. */
 function appOf(mod: Record<string, unknown>, ref: string, name: string | undefined): unknown {
-	const app = name === undefined ? (mod.app ?? mod.default) : mod[name]
-	if (typeof (app as { fetch?: unknown } | null)?.fetch === "function") return app
-	const which = name === undefined ? "no `app` or `default` export" : `no export ${JSON.stringify(name)}`
-	throw new Error(`--app ${ref}: ${which} that is a backend app (name one as <module>#<export>)`)
+  const app = name === undefined ? (mod.app ?? mod.default) : mod[name];
+
+  if (typeof (app as { fetch?: unknown } | null)?.fetch === "function") return app;
+  const which = name === undefined ? "no `app` or `default` export" : `no export ${JSON.stringify(name)}`;
+  throw new Error(`--app ${ref}: ${which} that is a backend app (name one as <module>#<export>)`);
 }
 
-/* Node: jiti, its one module cache shared by the app and its document, so both see one core module (its GRAPH symbol) */
+// Node: jiti, its one module cache shared by the app and its document, so both see one core module (its GRAPH symbol)
 async function jitiImporter(path: string, alias: Record<string, string>): Promise<Importer> {
-	const { createJiti } = await import("jiti")
-	const jiti = createJiti(path, { alias, fsCache: false, interopDefault: true })
-	return (specifier) => jiti.import(specifier) as Promise<Record<string, unknown>>
+  const { createJiti } = await import("jiti");
+  const jiti = createJiti(path, { alias, fsCache: false, interopDefault: true });
+
+  return (specifier) => jiti.import(specifier);
 }
 
-/*
- * Bun: its own import, never jiti, which there retries a module that threw through its Babel (evaluating it twice),
- * whose Error.prepareStackTrace hook then breaks Bun's captureStackTrace on a non-Error (Vite's follow-redirects), and
- * whose native mode ignores the aliases (bit 20). A checkout's aliases hold by the backend-source condition instead:
- * each must resolve to its source, never to an unbuilt or stale dist/.
- */
+// Bun: its own import, never jiti, which there retries a module that threw through its Babel (evaluating it twice),
+// whose Error.prepareStackTrace hook then breaks Bun's captureStackTrace on a non-Error (Vite's follow-redirects), and
+// whose native mode ignores the aliases (bit 20). A checkout's aliases hold by the backend-source condition instead:
+// each must resolve to its source, never to an unbuilt or stale dist/.
 function bunImporter(bun: BunResolver, path: string, aliases: Record<string, string>, ref: string): Importer {
-	const from = dirname(path)
-	for (const [specifier, source] of Object.entries(aliases)) {
-		let resolved: string | undefined
-		try {
-			resolved = bun.resolveSync(specifier, from)
-		} catch {
-			/* unresolvable without the condition (a checkout has no dist/): refused below, as one resolved elsewhere */
-		}
-		if (resolved !== realpathSync(source))
-			throw new Error(
-				`--app ${ref}: ${specifier} is a checkout, read from its source only under the backend-source condition: start Bun with --conditions=backend-source`,
-			)
-	}
-	return (specifier) => import(pathToFileURL(bun.resolveSync(specifier, from)).href) as Promise<Record<string, unknown>>
+  const from = dirname(path);
+
+  for (const [specifier, source] of Object.entries(aliases)) {
+    let resolved: string | undefined;
+
+    try {
+      resolved = bun.resolveSync(specifier, from);
+    } catch {
+      // unresolvable without the condition (a checkout has no dist/): refused below, as one resolved elsewhere
+    }
+
+    if (resolved !== realpathSync(source)) {
+      throw new Error(
+        `--app ${ref}: ${specifier} is a checkout, read from its source only under the backend-source condition: start Bun with --conditions=backend-source`,
+      );
+    }
+  }
+
+  return (specifier) =>
+    import(pathToFileURL(bun.resolveSync(specifier, from)).href) as Promise<Record<string, unknown>>;
 }
 
 /** The OpenAPI document of the app `ref` names, by the app's own core; `cwd` resolves it. One load at a time per process. */
 export async function loadAppDocument(ref: string, cwd: string): Promise<Record<string, unknown>> {
-	const { module, name } = appRef(ref)
-	const path = resolve(cwd, module)
-	if (!existsSync(path)) throw new Error(`--app ${ref}: ${relative(cwd, path)} does not exist`)
-	const root = coreRoot(path)
-	if (root === undefined)
-		throw new Error(`--app ${ref}: no ${CORE} is installed where ${relative(cwd, path)} resolves it`)
-	const bun = (globalThis as { Bun?: BunResolver }).Bun
-	const aliases = sourceAliases(root)
-	/* Bun resolves core's own imports under the backend-source condition, through core's package.json */
-	const load =
-		bun === undefined
-			? await jitiImporter(path, { ...aliases.exports, ...aliases.imports })
-			: bunImporter(bun, path, aliases.exports, ref)
-	const mod = await load(path)
-	const app = appOf(mod, ref, name)
-	const { generateOpenApi } = (await load(`${CORE}/http/openapi`)) as {
-		generateOpenApi: (app: unknown, options: unknown) => Record<string, unknown>
-	}
-	return generateOpenApi(app, mod.openApi ?? DEFAULT_OPTIONS)
+  const { module, name } = appRef(ref);
+  const path = resolve(cwd, module);
+
+  if (!existsSync(path)) throw new Error(`--app ${ref}: ${relative(cwd, path)} does not exist`);
+  const root = coreRoot(path);
+
+  if (root === undefined)
+    throw new Error(`--app ${ref}: no ${CORE} is installed where ${relative(cwd, path)} resolves it`);
+  const bun = (globalThis as { Bun?: BunResolver }).Bun;
+  const aliases = sourceAliases(root);
+
+  // Bun resolves core's own imports under the backend-source condition, through core's package.json
+  const load =
+    bun === undefined
+      ? await jitiImporter(path, { ...aliases.exports, ...aliases.imports })
+      : bunImporter(bun, path, aliases.exports, ref);
+
+  const mod = await load(path);
+  const app = appOf(mod, ref, name);
+
+  const { generateOpenApi } = (await load(`${CORE}/http/openapi`)) as {
+    generateOpenApi: (app: unknown, options: unknown) => Record<string, unknown>;
+  };
+
+  return generateOpenApi(app, mod.openApi ?? DEFAULT_OPTIONS);
 }

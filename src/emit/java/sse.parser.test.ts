@@ -4,26 +4,29 @@
  * the events a read completed come before a cap's error, as when fed apart (M5), and an endless line or event raises its
  * cap after at most one read past it; the data join is linear, timed by CPU time. The wire legs: `sse.parse.test.ts`.
  */
-import { describe, expect, it } from "vitest"
-import { type DrivenJavaSdk, drivenJavaSdk } from "./__fixtures__/driven.ts"
-import { withJava } from "./__fixtures__/java-env.ts"
+import { describe, expect, it } from "vitest";
+
+import { type DrivenJavaSdk, drivenJavaSdk } from "./__fixtures__/driven.ts";
+import { withJava } from "./__fixtures__/java-env.ts";
 
 /** Whether Java is pinned here: a missing toolchain fails where it is required and skips these legs elsewhere. */
-const JAVA = withJava()
-/** A cold gate compiles the SDK first. */
-const SLOW = { timeout: 600_000 }
+const JAVA = withJava();
 
-let compiled: DrivenJavaSdk | undefined
+/** A cold gate compiles the SDK first. */
+const SLOW = { timeout: 600_000 };
+
+let compiled: DrivenJavaSdk | undefined;
 
 /** The registry `sse` SDK, gated once per file; it must build. */
 function sdk(): DrivenJavaSdk {
-	compiled ??= drivenJavaSdk("sse")
-	expect(compiled.built, compiled.diagnostics.join("\n")).toBe(true)
-	return compiled
+  compiled ??= drivenJavaSdk("sse");
+  expect(compiled.built, compiled.diagnostics.join("\n")).toBe(true);
+
+  return compiled;
 }
 
 /** The `sse` SDK's package (the emitter's default), where the probes sit beside the package-private parser. */
-const PACKAGE = "com.example"
+const PACKAGE = "com.example";
 
 /**
  * Beside the probe, in the SDK's package: an InputStream handing out the given chunks one per read (a chunk larger than
@@ -58,7 +61,7 @@ const CHUNKS = `final class Chunks extends java.io.InputStream {
     }
     return n;
   }
-}`
+}`;
 
 /**
  * Each case's chunks through the parser: each event's data (over 16 characters, as its length) until the end (`end`)
@@ -102,7 +105,7 @@ const PARSER = `final class ParseProbe {
   }
 }
 ${CHUNKS}
-`
+`;
 
 /**
  * 1,024 events of 12,500 `data: x` lines and 64 of 200,000 (the same 12.8 M lines, 16x longer events), in memory in
@@ -150,7 +153,7 @@ const LINES = `final class ParseProbe {
   }
 }
 ${CHUNKS}
-`
+`;
 
 /**
  * Bounded reads (ruling 2): an endless line, and endless data lines with no blank line, each from a stream that counts
@@ -201,7 +204,7 @@ const ENDLESS = `final class ParseProbe {
     fed("event", new Endless("", "data: " + "x".repeat(1000) + "\\n"));
   }
 }
-`
+`;
 
 /**
  * The parser reads on demand (the premise M5's ordering rests on: a read happens only once the events before it are
@@ -238,49 +241,50 @@ const ON_DEMAND = `final class ParseProbe {
     }
   }
 }
-`
+`;
 
 /** `probe` (a `ParseProbe` and its `Chunks`) compiled in the SDK's package and run: its output lines. */
 function probed(probe: string): string[] {
-	const run = sdk().run(`${PACKAGE}.ParseProbe`, `package ${PACKAGE};\n\n${probe}`)
-	expect({ diagnostics: run.diagnostics, status: run.status }, run.stderr).toEqual({ diagnostics: [], status: 0 })
-	return run.stdout.split("\n").filter((line) => line !== "")
+  const run = sdk().run(`${PACKAGE}.ParseProbe`, `package ${PACKAGE};\n\n${probe}`);
+  expect({ diagnostics: run.diagnostics, status: run.status }, run.stderr).toEqual({ diagnostics: [], status: 0 });
+
+  return run.stdout.split("\n").filter((line) => line !== "");
 }
 
 describe.skipIf(!JAVA)("Java SSE framing: the shipped parser in process, caps and data lines", SLOW, () => {
-	/* new: C# sse.parse.test.ts:381 (M5, ruling 2: a cap checked after a read's events are dropped turns the together
-	 * cases red, as the cap's read also completed "ok") */
-	it("yields the event one read completed before an over-cap line or event, then the cap's error, as when fed apart", () => {
-		const line = "ok|DecodeException: an event-stream line exceeds 1 MiB"
-		const event = "ok|DecodeException: an event's data exceeds 8 MiB"
-		expect(probed(PARSER)).toEqual([`event ${event}`, `eventApart ${event}`, `line ${line}`, `lineApart ${line}`])
-	})
+  // new: C# sse.parse.test.ts:381 (M5, ruling 2: a cap checked after a read's events are dropped turns the together
+  // cases red, as the cap's read also completed "ok")
+  it("yields the event one read completed before an over-cap line or event, then the cap's error, as when fed apart", () => {
+    const line = "ok|DecodeException: an event-stream line exceeds 1 MiB";
+    const event = "ok|DecodeException: an event's data exceeds 8 MiB";
+    expect(probed(PARSER)).toEqual([`event ${event}`, `eventApart ${event}`, `line ${line}`, `lineApart ${line}`]);
+  });
 
-	/* new: the reviewer's premise for M5's ordering equivalence: a read only once the ready events are read */
-	it("reads on demand: one read's three events come from that one read, and only the fourth next() reads again", () => {
-		expect(probed(ON_DEMAND)).toEqual(["a after 1 reads", "b after 1 reads", "c after 1 reads", "end after 2 reads"])
-	})
+  // new: the reviewer's premise for M5's ordering equivalence: a read only once the ready events are read
+  it("reads on demand: one read's three events come from that one read, and only the fourth next() reads again", () => {
+    expect(probed(ON_DEMAND)).toEqual(["a after 1 reads", "b after 1 reads", "c after 1 reads", "end after 2 reads"]);
+  });
 
-	/* new: ruling 2 (bounded reads): a cap checked only at the end of its line or event reads to the 64 MiB refusal */
-	it("raises each cap having read at most one 64 KiB read past it: an endless line or event never reads on", () => {
-		expect(probed(ENDLESS)).toEqual([
-			"line DecodeException: an event-stream line exceeds 1 MiB after 2 MiB",
-			"event DecodeException: an event's data exceeds 8 MiB after 9 MiB",
-		])
-	})
+  // new: ruling 2 (bounded reads): a cap checked only at the end of its line or event reads to the 64 MiB refusal
+  it("raises each cap having read at most one 64 KiB read past it: an endless line or event never reads on", () => {
+    expect(probed(ENDLESS)).toEqual([
+      "line DecodeException: an event-stream line exceeds 1 MiB after 2 MiB",
+      "event DecodeException: an event's data exceeds 8 MiB after 9 MiB",
+    ]);
+  });
 
-	/* new: C# sse.parse.test.ts:394 (a per-line cost that holds at 16x the lines is linear, one that grows 16x is
-	 * quadratic, so 4x needs no machine's absolute speed; timed in process by CPU time, no HTTP hides it) */
-	it("accumulates data lines in linear time: 16x the lines cost a line under 4x more", () => {
-		const notes = probed(LINES)
-		const ratio = Number(/^ratio (\S+)$/.exec(notes.at(-1) ?? "")?.[1])
-		const cpu = (/^cpu (\d+) (\d+)$/.exec(notes.at(-2) ?? "") ?? []).slice(1).map(Number)
-		/* each window well above the CPU clock's resolution, or the short one quantizes */
-		expect(
-			cpu.map((ms) => ms >= 30),
-			notes.join("\n"),
-		).toEqual([true, true])
-		expect(notes.slice(0, 2)).toEqual(["12500 lines: [24999]", "200000 lines: [399999]"])
-		expect(ratio, notes.join("\n")).toBeLessThan(4)
-	})
-})
+  // new: C# sse.parse.test.ts:394 (a per-line cost that holds at 16x the lines is linear, one that grows 16x is
+  // quadratic, so 4x needs no machine's absolute speed; timed in process by CPU time, no HTTP hides it)
+  it("accumulates data lines in linear time: 16x the lines cost a line under 4x more", () => {
+    const notes = probed(LINES);
+    const ratio = Number(/^ratio (\S+)$/.exec(notes.at(-1) ?? "")?.[1]);
+    const cpu = (/^cpu (\d+) (\d+)$/.exec(notes.at(-2) ?? "") ?? []).slice(1).map(Number);
+    // each window well above the CPU clock's resolution, or the short one quantizes
+    expect(
+      cpu.map((ms) => ms >= 30),
+      notes.join("\n"),
+    ).toEqual([true, true]);
+    expect(notes.slice(0, 2)).toEqual(["12500 lines: [24999]", "200000 lines: [399999]"]);
+    expect(ratio, notes.join("\n")).toBeLessThan(4);
+  });
+});

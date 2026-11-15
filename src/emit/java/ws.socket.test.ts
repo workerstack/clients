@@ -8,47 +8,50 @@
  * under a pending send aborts it; one end event under a race; a receive pending on another thread ended by close(); a
  * server close while no read waits; the 16 MiB cap refused within one partial. The wire legs: `ws.test.ts`.
  */
-import { describe, expect, it } from "vitest"
-import { withJava } from "./__fixtures__/java-env.ts"
-import { type DrivenJavaSdk, drivenJavaSdk } from "./__fixtures__/driven.ts"
-import { OPEN, prober } from "./__fixtures__/socket-probe.ts"
+import { describe, expect, it } from "vitest";
+
+import { type DrivenJavaSdk, drivenJavaSdk } from "./__fixtures__/driven.ts";
+import { withJava } from "./__fixtures__/java-env.ts";
+import { OPEN, prober } from "./__fixtures__/socket-probe.ts";
 
 /** Whether Java is pinned here: a missing toolchain fails where it is required and skips these legs elsewhere. */
-const JAVA = withJava()
-/** A cold gate compiles the SDK first. */
-const SLOW = { timeout: 600_000 }
+const JAVA = withJava();
 
-let compiled: DrivenJavaSdk | undefined
+/** A cold gate compiles the SDK first. */
+const SLOW = { timeout: 600_000 };
+
+let compiled: DrivenJavaSdk | undefined;
 
 /** The `ws` SDK, gated once per file; it must build. */
 function sdk(): DrivenJavaSdk {
-	compiled ??= drivenJavaSdk("ws")
-	expect(compiled.built, compiled.diagnostics.join("\n")).toBe(true)
-	return compiled
+  compiled ??= drivenJavaSdk("ws");
+  expect(compiled.built, compiled.diagnostics.join("\n")).toBe(true);
+
+  return compiled;
 }
 
-const probed = prober(sdk)
+const probed = prober(sdk);
 
 describe.skipIf(!JAVA)("a socket's demand: no background reader (condition 1)", SLOW, () => {
-	/* new: condition 1 (C# Ws.cs: a message fires as receive delivers it); red under a reader that asks ahead */
-	it("asks for nothing more until receive() takes the message that waits", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: condition 1 (C# Ws.cs: a message fires as receive delivers it); red under a reader that asks ahead
+  it("asks for nothing more until receive() takes the message that waits", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 System.out.println("open " + fake.requested);
 socket.onText(fake, "a", true);
 socket.onText(fake, "b", true);
 System.out.println("delivered " + fake.requested);
 System.out.println("read " + w.receive().text() + " " + fake.requested);
 System.out.println("read " + w.receive().text() + " " + fake.requested);`),
-		).toEqual(["open 1", "delivered 1", "read a 2", "read b 3"])
-	})
-})
+    ).toEqual(["open 1", "delivered 1", "read a 2", "read b 3"]);
+  });
+});
 
 describe.skipIf(!JAVA)("the keepalive (K7): a ping each interval, a pong-less one ends the socket", SLOW, () => {
-	/* new: K7; a fast peer pongs before the ping's send completes (f's red: a clock begun on completion erased it) */
-	it("pings each interval while pongs answer, and the socket stays open", () => {
-		expect(
-			probed(`${OPEN(50)}
+  // new: K7; a fast peer pongs before the ping's send completes (f's red: a clock begun on completion erased it)
+  it("pings each interval while pongs answer, and the socket stays open", () => {
+    expect(
+      probed(`${OPEN(50)}
 fake.echo = socket;
 long end = System.nanoTime() + 10_000_000_000L;
 while (fake.count("ping") < 3 && System.nanoTime() < end) {
@@ -57,13 +60,13 @@ while (fake.count("ping") < 3 && System.nanoTime() < end) {
 Thread.sleep(120);
 System.out.println((fake.count("ping") >= 3) + " " + fake.aborted + " " + runs);
 w.close();`),
-		).toEqual(["true false []"])
-	})
+    ).toEqual(["true false []"]);
+  });
 
-	/* new: K7 (the ruling: no timeout check → the hang leg reds) */
-	it("aborts the socket and fires Error once when a ping goes unanswered for an interval", () => {
-		expect(
-			probed(`${OPEN(50)}
+  // new: K7 (the ruling: no timeout check → the hang leg reds)
+  it("aborts the socket and fires Error once when a ping goes unanswered for an interval", () => {
+    expect(
+      probed(`${OPEN(50)}
 Thread.sleep(400);
 System.out.println(fake.aborted + " " + runs);
 try {
@@ -73,22 +76,20 @@ try {
   System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
 }
 System.out.println(w.receive() + " " + runs);`),
-		).toEqual([
-			"true []",
-			"ApiConnectionException: the WebSocket stopped answering pings",
-			"null [error the WebSocket stopped answering pings]",
-		])
-	})
-})
+    ).toEqual([
+      "true []",
+      "ApiConnectionException: the WebSocket stopped answering pings",
+      "null [error the WebSocket stopped answering pings]",
+    ]);
+  });
+});
 
 describe.skipIf(!JAVA)("the keepalive (K7): it stops with the socket, and its production interval", SLOW, () => {
-	/*
-	 * new: K7 (the ruling: stop the scheduler on every close path); the pings before the end, each answered so the socket
-	 * is alive when it ends, prove the keepalive ran; the echo answers close()'s own frame, so the local end is the one
-	 */
-	it("pings until close(), a server close, a drop or the cap, and sends no ping after", () => {
-		expect(
-			probed(`String[] ends = {"close", "server", "drop", "cap"};
+  // new: K7 (the ruling: stop the scheduler on every close path); the pings before the end, each answered so the socket
+  // is alive when it ends, prove the keepalive ran; the echo answers close()'s own frame, so the local end is the one
+  it("pings until close(), a server close, a drop or the cap, and sends no ping after", () => {
+    expect(
+      probed(`String[] ends = {"close", "server", "drop", "cap"};
 for (String end : ends) {
   ${OPEN(100).split("\n").join("\n  ")}
   for (int i = 0; i < 15; i++) {
@@ -116,23 +117,21 @@ for (String end : ends) {
   Thread.sleep(200);
   System.out.println(end + " " + alive + " " + (before > 0) + " " + (fake.count("ping") - pings));
 }`),
-		).toEqual(["close true true 0", "server true true 0", "drop true true 0", "cap true true 0"])
-	})
+    ).toEqual(["close true true 0", "server true true 0", "drop true true 0", "cap true true 0"]);
+  });
 
-	/* new: K7 (the production interval the dial passes: C#'s KeepAliveInterval and KeepAliveTimeout) */
-	it("keeps alive every 20 s in production", () => {
-		expect(probed("System.out.println(Keepalive.EVERY);")).toEqual(["PT20S"])
-	})
-})
+  // new: K7 (the production interval the dial passes: C#'s KeepAliveInterval and KeepAliveTimeout)
+  it("keeps alive every 20 s in production", () => {
+    expect(probed("System.out.println(Keepalive.EVERY);")).toEqual(["PT20S"]);
+  });
+});
 
 describe.skipIf(!JAVA)("the one send gate and the pong clock (K8, W17/W19, the pong-clock ruling)", SLOW, () => {
-	/*
-	 * new: the ruling (every frame through the gate); red under a ping that bypasses it, the fake's "Send pending"; the
-	 * held ping goes out as the send frees the gate, 30 ms on, where the next tick is 150 ms away
-	 */
-	it("holds a keepalive ping behind a pending data send, then sends it as the send completes: the socket open", () => {
-		expect(
-			probed(`${OPEN(200)}
+  // new: the ruling (every frame through the gate); red under a ping that bypasses it, the fake's "Send pending"; the
+  // held ping goes out as the send frees the gate, 30 ms on, where the next tick is 150 ms away
+  it("holds a keepalive ping behind a pending data send, then sends it as the send completes: the socket open", () => {
+    expect(
+      probed(`${OPEN(200)}
 fake.hold = true;
 CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.sendText("x".repeat(64)));
 Thread.sleep(250);
@@ -144,14 +143,14 @@ long after = fake.count("ping");
 socket.onPong(fake, ByteBuffer.allocate(0));
 System.out.println(during + " " + after + " " + fake.violation + " " + fake.aborted + " " + runs);
 w.close();`),
-		).toEqual(["0 1 null false []"])
-	})
+    ).toEqual(["0 1 null false []"]);
+  });
 
-	/* new: the pong-clock ruling: a send pending for three intervals is no dead peer; red under the clock at schedule */
-	/* the ping answered on sight, so no tick's phase decides it; the send pending over three 100 ms intervals */
-	it("starts the pong clock when the ping is sent: a send pending three intervals, then a ping and its pong, stays open", () => {
-		expect(
-			probed(`${OPEN(100)}
+  // new: the pong-clock ruling: a send pending for three intervals is no dead peer; red under the clock at schedule
+  // the ping answered on sight, so no tick's phase decides it; the send pending over three 100 ms intervals
+  it("starts the pong clock when the ping is sent: a send pending three intervals, then a ping and its pong, stays open", () => {
+    expect(
+      probed(`${OPEN(100)}
 fake.hold = true;
 CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.sendText("x"));
 Thread.sleep(320);
@@ -165,29 +164,29 @@ socket.onPong(fake, ByteBuffer.allocate(0));
 Thread.sleep(30);
 System.out.println("answered " + (fake.count("ping") >= 1) + " " + fake.aborted + " " + runs);
 w.close();`),
-		).toEqual(["pending false []", "answered true false []"])
-	})
-})
+    ).toEqual(["pending false []", "answered true false []"]);
+  });
+});
 
 describe.skipIf(!JAVA)("the pong clock and a close under a pending send", SLOW, () => {
-	/* bit 19 d1: a tick that read no ping waiting, racing a release, deferred a second ping behind the first one's send;
-	 * it went out though the first still waited for its pong. Driven here without the race: a ping held in flight, then
-	 * a second asked for. One ping waits at a time, a deferred one included. */
-	it("sends no second ping while one waits for its pong, a deferred one included", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // bit 19 d1: a tick that read no ping waiting, racing a release, deferred a second ping behind the first one's send;
+  // it went out though the first still waited for its pong. Driven here without the race: a ping held in flight, then
+  // a second asked for. One ping waits at a time, a deferred one included.
+  it("sends no second ping while one waits for its pong, a deferred one included", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 fake.hold = true;
 socket.ping();
 socket.ping();
 fake.release();
 System.out.println(fake.count("ping") + " " + fake.aborted + " " + runs);`),
-		).toEqual(["1 false []"])
-	})
+    ).toEqual(["1 false []"]);
+  });
 
-	/* new: the pong-clock ruling's reverse: a ping that went out and no pong → the error path */
-	it("ends the socket when a ping that went out gets no pong within the interval", () => {
-		expect(
-			probed(`${OPEN(50)}
+  // new: the pong-clock ruling's reverse: a ping that went out and no pong → the error path
+  it("ends the socket when a ping that went out gets no pong within the interval", () => {
+    expect(
+      probed(`${OPEN(50)}
 fake.hold = true;
 CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.sendText("x"));
 Thread.sleep(100);
@@ -200,13 +199,13 @@ try {
 } catch (RuntimeException e) {
   System.out.println(e.getMessage() + " " + runs);
 }`),
-		).toEqual(["1 true []", "the WebSocket stopped answering pings [error the WebSocket stopped answering pings]"])
-	})
+    ).toEqual(["1 true []", "the WebSocket stopped answering pings [error the WebSocket stopped answering pings]"]);
+  });
 
-	/* new: condition 2 (C#'s abort mid-frame): red under a close that waits on the pending send */
-	it("aborts a pending send when close() runs on another thread: the send fails, Closed fires once with the client's code", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: condition 2 (C#'s abort mid-frame): red under a close that waits on the pending send
+  it("aborts a pending send when close() runs on another thread: the send fails, Closed fires once with the client's code", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 fake.hold = true;
 CompletableFuture<String> sending = CompletableFuture.supplyAsync(() -> {
   try {
@@ -221,15 +220,15 @@ w.close(4000, "bye");
 fake.fail();
 System.out.println(sending.get(2, TimeUnit.SECONDS));
 System.out.println(fake.aborted + " " + fake.count("close") + " " + runs);`),
-		).toEqual(["ApiConnectionException: the WebSocket send failed: IOException", "true 0 [closed 4000 bye]"])
-	})
-})
+    ).toEqual(["ApiConnectionException: the WebSocket send failed: IOException", "true 0 [closed 4000 bye]"]);
+  });
+});
 
 describe.skipIf(!JAVA)("a socket's ends: one event, a pending receive, a server close, the cap", SLOW, () => {
-	/* new: condition 3; red under an end that two threads both fire */
-	it("fires exactly one end when the server's close and a local close() race, closedBy stable, 200 rounds", () => {
-		expect(
-			probed(`int doubled = 0;
+  // new: condition 3; red under an end that two threads both fire
+  it("fires exactly one end when the server's close and a local close() race, closedBy stable, 200 rounds", () => {
+    expect(
+      probed(`int doubled = 0;
 int unstable = 0;
 for (int round = 0; round < 200; round++) {
   ${OPEN(60_000).split("\n").join("\n  ")}
@@ -263,13 +262,13 @@ for (int round = 0; round < 200; round++) {
   }
 }
 System.out.println(doubled + " " + unstable);`),
-		).toEqual(["0 0"])
-	})
+    ).toEqual(["0 0"]);
+  });
 
-	/* new: C# streams.close.test.ts:180; the echo answers close()'s own frame, so the local end is the one */
-	it("ends a receive pending on another thread with null when close() runs: one close, no Error", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: C# streams.close.test.ts:180; the echo answers close()'s own frame, so the local end is the one
+  it("ends a receive pending on another thread with null when close() runs: one close, no Error", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 CompletableFuture<WsMessage> reader = CompletableFuture.supplyAsync(w::receive);
 Thread.sleep(150);
 CompletableFuture<Void> echo = CompletableFuture.runAsync(() -> {
@@ -281,24 +280,24 @@ CompletableFuture<Void> echo = CompletableFuture.runAsync(() -> {
 w.close();
 echo.join();
 System.out.println(reader.get(2, TimeUnit.SECONDS) + " " + fake.count("close") + " " + runs);`),
-		).toEqual(["null 1 [closed 1000 ]"])
-	})
-})
+    ).toEqual(["null 1 [closed 1000 ]"]);
+  });
+});
 
 describe.skipIf(!JAVA)("a socket's ends: a server close, the cap", SLOW, () => {
-	/* new: C# streams.close.test.ts:187 (K6: the echo carries the code and reason) */
-	it("reads a server's close while no read waits as null, closedBy its code and reason, the echo sent with both", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: C# streams.close.test.ts:187 (K6: the echo carries the code and reason)
+  it("reads a server's close while no read waits as null, closedBy its code and reason, the echo sent with both", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 socket.onClose(fake, 4001, "bye");
 System.out.println(w.receive() + " " + w.closedBy() + " " + fake.frames + " " + runs);`),
-		).toEqual(["null WsClose[status=4001, reason=bye] [close 4001 bye] [closed 4001 bye]"])
-	})
+    ).toEqual(["null WsClose[status=4001, reason=bye] [close 4001 bye] [closed 4001 bye]"]);
+  });
 
-	/* new: the JDK's onError (a broken input, not W12's 1006 drop): the error path, no close frame, closedBy null */
-	it("ends on the JDK's onError as ApiConnectionException at the read, Error once, nothing sent", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: the JDK's onError (a broken input, not W12's 1006 drop): the error path, no close frame, closedBy null
+  it("ends on the JDK's onError as ApiConnectionException at the read, Error once, nothing sent", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 socket.onError(fake, new java.io.IOException("reset"));
 try {
   w.receive();
@@ -307,13 +306,13 @@ try {
   System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage() + " " + e.getCause().getMessage());
 }
 System.out.println(w.receive() + " " + w.closedBy() + " " + fake.frames + " " + runs);`),
-		).toEqual(["ApiConnectionException: the WebSocket failed reset", "null null [] [error the WebSocket failed]"])
-	})
+    ).toEqual(["ApiConnectionException: the WebSocket failed reset", "null null [] [error the WebSocket failed]"]);
+  });
 
-	/* new: the W13 ruling (refused within one partial of the cap, never after buffering it all): 1 MiB partials */
-	it("refuses a message crossing 16 MiB at the partial that crosses it, closing 1008 and asking for no more", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: the W13 ruling (refused within one partial of the cap, never after buffering it all): 1 MiB partials
+  it("refuses a message crossing 16 MiB at the partial that crosses it, closing 1008 and asking for no more", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 CompletableFuture<String> reader = CompletableFuture.supplyAsync(() -> {
   try {
     return String.valueOf(w.receive());
@@ -328,33 +327,33 @@ while (fake.count("close") == 0 && fed < 20) {
   fed++;
 }
 System.out.println(fed + " " + fake.requested + " " + fake.frames + " " + reader.get(2, TimeUnit.SECONDS));`),
-		).toEqual(["17 17 [close 1008 Message too big] the WebSocket ended: 1008 Message too big"])
-	})
-})
+    ).toEqual(["17 17 [close 1008 Message too big] the WebSocket ended: 1008 Message too big"]);
+  });
+});
 
 describe.skipIf(!JAVA)("the close codes a client may send (W20: 1000, 1001, 1008, 1011, 3000-4999)", SLOW, () => {
-	/* new: W20 (b): a server close a client can't send back is echoed 1000, its reason kept; closedBy the server's code */
-	it("echoes a server close of 1003 as 1000 with its reason, closedBy keeping 1003", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: W20 (b): a server close a client can't send back is echoed 1000, its reason kept; closedBy the server's code
+  it("echoes a server close of 1003 as 1000 with its reason, closedBy keeping 1003", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 socket.onClose(fake, 1003, "unsupported");
 System.out.println(w.receive() + " " + w.closedBy() + " " + fake.frames + " " + runs);`),
-		).toEqual(["null WsClose[status=1003, reason=unsupported] [close 1000 unsupported] [closed 1003 unsupported]"])
-	})
+    ).toEqual(["null WsClose[status=1003, reason=unsupported] [close 1000 unsupported] [closed 1003 unsupported]"]);
+  });
 
-	/* new: W20 (b): a close frame with no status reads as 1005, which no client may send: echoed 1000, empty */
-	it("echoes a server close with no status as 1000 with no reason, closedBy 1005", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: W20 (b): a close frame with no status reads as 1005, which no client may send: echoed 1000, empty
+  it("echoes a server close with no status as 1000 with no reason, closedBy 1005", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 socket.onClose(fake, 1005, "");
 System.out.println(w.receive() + " " + w.closedBy() + " " + fake.frames + " " + runs);`),
-		).toEqual(["null WsClose[status=1005, reason=] [close 1000 ] [closed 1005 ]"])
-	})
+    ).toEqual(["null WsClose[status=1005, reason=] [close 1000 ] [closed 1005 ]"]);
+  });
 
-	/* new: W20 (c): a status no client may send is refused before any frame, the socket left open */
-	it("refuses close(1005) as ConfigException, no frame sent and the socket still open", () => {
-		expect(
-			probed(`${OPEN(60_000)}
+  // new: W20 (c): a status no client may send is refused before any frame, the socket left open
+  it("refuses close(1005) as ConfigException, no frame sent and the socket still open", () => {
+    expect(
+      probed(`${OPEN(60_000)}
 try {
   w.close(1005, "x");
   System.out.println("closed");
@@ -363,9 +362,9 @@ try {
 }
 w.sendText("still open");
 System.out.println(fake.frames + " " + runs);`),
-		).toEqual([
-			"ConfigException: a WebSocket client can't close with status 1005: 1000, 1001, 1008, 1011 or 3000-4999",
-			"[text 10] []",
-		])
-	})
-})
+    ).toEqual([
+      "ConfigException: a WebSocket client can't close with status 1005: 1000, 1001, 1008, 1011 or 3000-4999",
+      "[text 10] []",
+    ]);
+  });
+});

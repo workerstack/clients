@@ -1,533 +1,549 @@
-import { describe, expect, test } from "vitest"
-import { defineConfig, TAG_SENTINEL, VERSION_SENTINEL, type InstallgenConfig } from "./define-config.ts"
-import { resolveConfig } from "./resolve.ts"
-import type { Segment } from "./types.ts"
+import { describe, expect, test } from "vitest";
 
-const V: Segment = { kind: "version" }
-const T: Segment = { kind: "tag" }
-const lit = (value: string): Segment => ({ kind: "literal", value })
-type PathArgs = Parameters<InstallgenConfig["assetPath"]>[0]
+import { defineConfig, TAG_SENTINEL, VERSION_SENTINEL, type InstallgenConfig } from "./define-config.ts";
+import { resolveConfig } from "./resolve.ts";
+import type { Segment } from "./types.ts";
+
+const V: Segment = { kind: "version" };
+const T: Segment = { kind: "tag" };
+const lit = (value: string): Segment => ({ kind: "literal", value });
+
+type PathArgs = Parameters<InstallgenConfig["assetPath"]>[0];
 
 const base = {
-	name: "my-cli",
-	baseUrl: "https://dl.example.com/my-cli",
-	assetPath: ({ version, os, arch }) => `${version}/my-cli-${os}-${arch}${os === "windows" ? ".exe" : ""}`,
-} satisfies InstallgenConfig
+  assetPath: ({ version, os, arch }) => `${version}/my-cli-${os}-${arch}${os === "windows" ? ".exe" : ""}`,
+  baseUrl: "https://dl.example.com/my-cli",
+  name: "my-cli",
+} satisfies InstallgenConfig;
 
 /** Loosely typed config, for the runtime checks a JS config reaches past the types. */
-const loose = (overrides: Record<string, unknown>): InstallgenConfig =>
-	({ ...base, ...overrides }) as unknown as InstallgenConfig
+const loose = (overrides: Record<string, unknown>): InstallgenConfig => ({ ...base, ...overrides });
 
 const formatOf = (file: string) =>
-	resolveConfig({ ...base, platforms: ["linux/amd64"], assetPath: ({ version }) => `${version}/${file}` }).platforms[0]
-		?.format
+  resolveConfig({ ...base, assetPath: ({ version }) => `${version}/${file}`, platforms: ["linux/amd64"] }).platforms[0]
+    ?.format;
 
 describe("defineConfig", () => {
-	test("returns the config unchanged", () => {
-		expect(defineConfig(base)).toBe(base)
-	})
-})
+  test("returns the config unchanged", () => {
+    expect(defineConfig(base)).toBe(base);
+  });
+});
 
 describe("defaults", () => {
-	test("fill every optional prop", () => {
-		const r = resolveConfig(base)
-		expect(r.name).toBe("my-cli")
-		expect(r.baseUrl).toBe("https://dl.example.com/my-cli")
-		expect(r.https).toBe(true)
-		expect(r.latestPath).toBe("latest")
-		expect(r.tagPrefix).toBe("v")
-		expect(r.installDir).toBe(".my-cli/bin")
-		expect(r.envPrefix).toBe("MY_CLI")
-		expect(r.modifyPath).toBe(true)
-		expect(r.message).toBeUndefined()
-		expect(r.outDir).toBe("installers")
-		expect(r.scriptUrls).toEqual({
-			sh: "https://dl.example.com/my-cli/install.sh",
-			ps1: "https://dl.example.com/my-cli/install.ps1",
-		})
-		expect(r.platforms.map((p) => p.platform)).toEqual([
-			"linux/amd64",
-			"linux/arm64",
-			"darwin/amd64",
-			"darwin/arm64",
-			"windows/amd64",
-			"windows/arm64",
-		])
-	})
+  test("fill every optional prop", () => {
+    const r = resolveConfig(base);
+    expect(r.name).toBe("my-cli");
+    expect(r.baseUrl).toBe("https://dl.example.com/my-cli");
+    expect(r.https).toBe(true);
+    expect(r.latestPath).toBe("latest");
+    expect(r.tagPrefix).toBe("v");
+    expect(r.installDir).toBe(".my-cli/bin");
+    expect(r.envPrefix).toBe("MY_CLI");
+    expect(r.modifyPath).toBe(true);
+    expect(r.message).toBeUndefined();
+    expect(r.outDir).toBe("installers");
+    expect(r.scriptUrls).toEqual({
+      ps1: "https://dl.example.com/my-cli/install.ps1",
+      sh: "https://dl.example.com/my-cli/install.sh",
+    });
+    expect(r.platforms.map((p) => p.platform)).toEqual([
+      "linux/amd64",
+      "linux/arm64",
+      "darwin/amd64",
+      "darwin/arm64",
+      "windows/amd64",
+      "windows/arm64",
+    ]);
+  });
 
-	test("envPrefix uppercases the name and maps non-alphanumerics to _", () => {
-		expect(resolveConfig({ ...base, name: "my.cli_x-2" }).envPrefix).toBe("MY_CLI_X_2")
-	})
+  test("envPrefix uppercases the name and maps non-alphanumerics to _", () => {
+    expect(resolveConfig({ ...base, name: "my.cli_x-2" }).envPrefix).toBe("MY_CLI_X_2");
+  });
 
-	test("a derived envPrefix that would start with a digit gets a leading _", () => {
-		expect(resolveConfig({ ...base, name: "7zip" }).envPrefix).toBe("_7ZIP")
-	})
+  test("a derived envPrefix that would start with a digit gets a leading _", () => {
+    expect(resolveConfig({ ...base, name: "7zip" }).envPrefix).toBe("_7ZIP");
+  });
 
-	test("a trailing slash on baseUrl is dropped", () => {
-		const r = resolveConfig({ ...base, baseUrl: "https://dl.example.com/my-cli///" })
-		expect(r.baseUrl).toBe("https://dl.example.com/my-cli")
-		expect(r.scriptUrls.sh).toBe("https://dl.example.com/my-cli/install.sh")
-	})
-})
+  test("a trailing slash on baseUrl is dropped", () => {
+    const r = resolveConfig({ ...base, baseUrl: "https://dl.example.com/my-cli///" });
+    expect(r.baseUrl).toBe("https://dl.example.com/my-cli");
+    expect(r.scriptUrls.sh).toBe("https://dl.example.com/my-cli/install.sh");
+  });
+});
 
 describe("defaults", () => {
-	test("explicit optional props are kept", () => {
-		const r = resolveConfig({
-			...base,
-			platforms: ["linux/amd64"],
-			latestPath: "channels/stable.txt",
-			tagPrefix: "",
-			installDir: "~/bin",
-			envPrefix: "MYCLI",
-			modifyPath: false,
-			message: "Run my-cli --help to start.",
-			scriptUrls: { sh: "https://get.example.com/sh", ps1: "https://get.example.com/ps1" },
-			outDir: "public",
-		})
-		expect(r).toMatchObject({
-			latestPath: "channels/stable.txt",
-			tagPrefix: "",
-			installDir: "bin",
-			envPrefix: "MYCLI",
-			modifyPath: false,
-			message: "Run my-cli --help to start.",
-			scriptUrls: { sh: "https://get.example.com/sh", ps1: "https://get.example.com/ps1" },
-			outDir: "public",
-		})
-		expect(r.platforms.map((p) => p.platform)).toEqual(["linux/amd64"])
-	})
+  test("explicit optional props are kept", () => {
+    const r = resolveConfig({
+      ...base,
+      envPrefix: "MYCLI",
+      installDir: "~/bin",
+      latestPath: "channels/stable.txt",
+      message: "Run my-cli --help to start.",
+      modifyPath: false,
+      outDir: "public",
+      platforms: ["linux/amd64"],
+      scriptUrls: { ps1: "https://get.example.com/ps1", sh: "https://get.example.com/sh" },
+      tagPrefix: "",
+    });
 
-	test("loopback http is allowed and marked non-https", () => {
-		for (const host of ["127.0.0.1:8080", "localhost:3000", "[::1]:9000"]) {
-			expect(resolveConfig({ ...base, baseUrl: `http://${host}` }).https).toBe(false)
-		}
-	})
-})
+    expect(r).toMatchObject({
+      envPrefix: "MYCLI",
+      installDir: "bin",
+      latestPath: "channels/stable.txt",
+      message: "Run my-cli --help to start.",
+      modifyPath: false,
+      outDir: "public",
+      scriptUrls: { ps1: "https://get.example.com/ps1", sh: "https://get.example.com/sh" },
+      tagPrefix: "",
+    });
+    expect(r.platforms.map((p) => p.platform)).toEqual(["linux/amd64"]);
+  });
+
+  test("loopback http is allowed and marked non-https", () => {
+    for (const host of ["127.0.0.1:8080", "localhost:3000", "[::1]:9000"])
+      expect(resolveConfig({ ...base, baseUrl: `http://${host}` }).https).toBe(false);
+  });
+});
 
 describe("per-platform evaluation", () => {
-	test("runs each path function once per platform with the real os and arch", () => {
-		const seen: string[] = []
-		resolveConfig({
-			...base,
-			assetPath: ({ version, os, arch }) => {
-				seen.push(`${os}/${arch}`)
-				return `${version}/${os}-${arch}`
-			},
-		})
-		expect(seen).toEqual([
-			"linux/amd64",
-			"linux/arm64",
-			"darwin/amd64",
-			"darwin/arm64",
-			"windows/amd64",
-			"windows/arm64",
-		])
-	})
+  test("runs each path function once per platform with the real os and arch", () => {
+    const seen: string[] = [];
+    resolveConfig({
+      ...base,
+      assetPath: ({ version, os, arch }) => {
+        seen.push(`${os}/${arch}`);
 
-	test("name maps and per-OS extensions", () => {
-		const osName = { linux: "Linux", darwin: "Darwin", windows: "Windows" } as const
-		const archName = { amd64: "x86_64", arm64: "arm64" } as const
-		const r = resolveConfig({
-			...base,
-			assetPath: ({ tag, version, os, arch }) =>
-				`${tag}/my-cli_${version}_${osName[os]}_${archName[arch]}${os === "windows" ? ".zip" : ".tar.gz"}`,
-		})
-		const linux = r.platforms.find((p) => p.platform === "linux/amd64")
-		const win = r.platforms.find((p) => p.platform === "windows/arm64")
-		expect(linux?.asset).toEqual([T, lit("/my-cli_"), V, lit("_Linux_x86_64.tar.gz")])
-		expect(linux?.format).toBe("tar.gz")
-		expect(linux?.os).toBe("linux")
-		expect(linux?.arch).toBe("amd64")
-		expect(win?.asset).toEqual([T, lit("/my-cli_"), V, lit("_Windows_arm64.zip")])
-		expect(win?.format).toBe("zip")
-	})
-})
+        return `${version}/${os}-${arch}`;
+      },
+    });
+    expect(seen).toEqual([
+      "linux/amd64",
+      "linux/arm64",
+      "darwin/amd64",
+      "darwin/arm64",
+      "windows/amd64",
+      "windows/arm64",
+    ]);
+  });
+
+  test("name maps and per-OS extensions", () => {
+    const osName = { darwin: "Darwin", linux: "Linux", windows: "Windows" } as const;
+    const archName = { amd64: "x86_64", arm64: "arm64" } as const;
+
+    const r = resolveConfig({
+      ...base,
+      assetPath: ({ tag, version, os, arch }) =>
+        `${tag}/my-cli_${version}_${osName[os]}_${archName[arch]}${os === "windows" ? ".zip" : ".tar.gz"}`,
+    });
+
+    const linux = r.platforms.find((p) => p.platform === "linux/amd64");
+    const win = r.platforms.find((p) => p.platform === "windows/arm64");
+    expect(linux?.asset).toEqual([T, lit("/my-cli_"), V, lit("_Linux_x86_64.tar.gz")]);
+    expect(linux?.format).toBe("tar.gz");
+    expect(linux?.os).toBe("linux");
+    expect(linux?.arch).toBe("amd64");
+    expect(win?.asset).toEqual([T, lit("/my-cli_"), V, lit("_Windows_arm64.zip")]);
+    expect(win?.format).toBe("zip");
+  });
+});
 
 describe("format inference", () => {
-	test.each([
-		["app.tar.gz", "tar.gz"],
-		["app.TGZ", "tar.gz"],
-		["app.tgz", "tar.gz"],
-		["app.zip", "zip"],
-		["app.exe", "raw"],
-		["app", "raw"],
-		["app.gz", "raw"],
-	])("%s is %s", (file, format) => {
-		expect(formatOf(file)).toBe(format)
-	})
+  test.each([
+    ["app.tar.gz", "tar.gz"],
+    ["app.TGZ", "tar.gz"],
+    ["app.tgz", "tar.gz"],
+    ["app.zip", "zip"],
+    ["app.exe", "raw"],
+    ["app", "raw"],
+    ["app.gz", "raw"],
+  ])("%s is %s", (file, format) => {
+    expect(formatOf(file)).toBe(format);
+  });
 
-	test("an asset ending in a token is raw", () => {
-		const r = resolveConfig({ ...base, platforms: ["linux/amd64"], assetPath: ({ version }) => `app-${version}` })
-		expect(r.platforms[0]?.format).toBe("raw")
-	})
-})
+  test("an asset ending in a token is raw", () => {
+    const r = resolveConfig({ ...base, assetPath: ({ version }) => `app-${version}`, platforms: ["linux/amd64"] });
+    expect(r.platforms[0]?.format).toBe("raw");
+  });
+});
 
 describe("version and tag splitting", () => {
-	test("multiple occurrences of both tokens split into segments", () => {
-		const r = resolveConfig({
-			...base,
-			platforms: ["darwin/arm64"],
-			assetPath: ({ version, tag, os }) => `${tag}/${version}/${os}-${version}-${tag}`,
-		})
-		expect(r.platforms[0]?.asset).toEqual([T, lit("/"), V, lit("/darwin-"), V, lit("-"), T])
-	})
+  test("multiple occurrences of both tokens split into segments", () => {
+    const r = resolveConfig({
+      ...base,
+      assetPath: ({ version, tag, os }) => `${tag}/${version}/${os}-${version}-${tag}`,
+      platforms: ["darwin/arm64"],
+    });
 
-	test("a tag-only asset path is accepted", () => {
-		const r = resolveConfig({ ...base, platforms: ["linux/amd64"], assetPath: ({ tag }) => `${tag}/app` })
-		expect(r.platforms[0]?.asset).toEqual([T, lit("/app")])
-	})
+    expect(r.platforms[0]?.asset).toEqual([T, lit("/"), V, lit("/darwin-"), V, lit("-"), T]);
+  });
 
-	test("the tokens stringify to their sentinels", () => {
-		let out = ""
-		resolveConfig({
-			...base,
-			platforms: ["linux/amd64"],
-			assetPath: ({ version, tag }) => (out = `${version}|${tag}|${String(version)}|${version as unknown as string}`),
-		})
-		expect(out).toBe(`${VERSION_SENTINEL}|${TAG_SENTINEL}|${VERSION_SENTINEL}|${VERSION_SENTINEL}`)
-	})
-})
+  test("a tag-only asset path is accepted", () => {
+    const r = resolveConfig({ ...base, assetPath: ({ tag }) => `${tag}/app`, platforms: ["linux/amd64"] });
+    expect(r.platforms[0]?.asset).toEqual([T, lit("/app")]);
+  });
+
+  test("the tokens stringify to their sentinels", () => {
+    let out = "";
+    resolveConfig({
+      ...base,
+      assetPath: ({ version, tag }) => (out = `${version}|${tag}|${String(version)}|${version as unknown as string}`),
+      platforms: ["linux/amd64"],
+    });
+    expect(out).toBe(`${VERSION_SENTINEL}|${TAG_SENTINEL}|${VERSION_SENTINEL}|${VERSION_SENTINEL}`);
+  });
+});
 
 describe("checksums and binaryInArchive", () => {
-	test("checksumsPath receives the asset, per platform", () => {
-		const assets: string[] = []
-		const r = resolveConfig({
-			...base,
-			platforms: ["linux/amd64", "windows/amd64"],
-			checksumsPath: ({ asset }) => {
-				assets.push(asset)
-				return `${asset}.sha256`
-			},
-		})
-		expect(assets).toEqual([`${VERSION_SENTINEL}/my-cli-linux-amd64`, `${VERSION_SENTINEL}/my-cli-windows-amd64.exe`])
-		expect(r.platforms[1]?.checksums).toEqual([V, lit("/my-cli-windows-amd64.exe.sha256")])
-	})
+  test("checksumsPath receives the asset, per platform", () => {
+    const assets: string[] = [];
 
-	test("a shared checksums file", () => {
-		const r = resolveConfig({ ...base, checksumsPath: ({ version }) => `${version}/checksums.txt` })
-		for (const p of r.platforms) expect(p.checksums).toEqual([V, lit("/checksums.txt")])
-	})
+    const r = resolveConfig({
+      ...base,
+      checksumsPath: ({ asset }) => {
+        assets.push(asset);
 
-	test("unset checksumsPath and binaryInArchive resolve to undefined", () => {
-		const r = resolveConfig(base)
-		for (const p of r.platforms) {
-			expect(p.checksums).toBeUndefined()
-			expect(p.binaryInArchive).toBeUndefined()
-		}
-	})
+        return `${asset}.sha256`;
+      },
+      platforms: ["linux/amd64", "windows/amd64"],
+    });
 
-	test("binaryInArchive is split per platform", () => {
-		const r = resolveConfig({
-			...base,
-			platforms: ["linux/arm64"],
-			assetPath: ({ version }) => `${version}/app.tar.gz`,
-			binaryInArchive: ({ version, os, arch }) => `app-${version}-${os}-${arch}/app`,
-		})
-		expect(r.platforms[0]?.binaryInArchive).toEqual([lit("app-"), V, lit("-linux-arm64/app")])
-	})
-})
+    expect(assets).toEqual([`${VERSION_SENTINEL}/my-cli-linux-amd64`, `${VERSION_SENTINEL}/my-cli-windows-amd64.exe`]);
+    expect(r.platforms[1]?.checksums).toEqual([V, lit("/my-cli-windows-amd64.exe.sha256")]);
+  });
 
-describe("validation errors", () => {
-	test.each([
-		["", /name/],
-		["-cli", /name/],
-		["my cli", /name/],
-		["a/b", /name/],
-	])("an invalid name %j", (name, message) => {
-		expect(() => resolveConfig({ ...base, name })).toThrow(message)
-	})
+  test("a shared checksums file", () => {
+    const r = resolveConfig({ ...base, checksumsPath: ({ version }) => `${version}/checksums.txt` });
 
-	test.each([
-		"http://dl.example.com",
-		"ftp://dl.example.com",
-		"dl.example.com",
-		"http://127.0.0.2.example.com",
-		"https://",
-	])("a non-https baseUrl %j", (baseUrl) => {
-		expect(() => resolveConfig({ ...base, baseUrl })).toThrow(/baseUrl/)
-	})
+    for (const p of r.platforms) expect(p.checksums).toEqual([V, lit("/checksums.txt")]);
+  });
 
-	test.each([
-		["assetPath", { assetPath: () => "https://x.example.com/a" }],
-		["assetPath", { assetPath: () => "/abs/path" }],
-		["assetPath", { assetPath: () => "" }],
-		["checksumsPath", { checksumsPath: () => "s3://bucket/checksums.txt" }],
-		["checksumsPath", { checksumsPath: () => "/checksums.txt" }],
-		["binaryInArchive", { binaryInArchive: () => "/bin/app" }],
-		["latestPath", { latestPath: "https://dl.example.com/latest" }],
-		["latestPath", { latestPath: "/latest" }],
-		["latestPath", { latestPath: "" }],
-	])("%s that starts with a scheme or / or is empty", (field, overrides) => {
-		const config = { ...base, ...overrides } as InstallgenConfig
-		expect(() => resolveConfig(config)).toThrow(new RegExp(field))
-	})
-})
+  test("unset checksumsPath and binaryInArchive resolve to undefined", () => {
+    const r = resolveConfig(base);
+
+    for (const p of r.platforms) {
+      expect(p.checksums).toBeUndefined();
+      expect(p.binaryInArchive).toBeUndefined();
+    }
+  });
+
+  test("binaryInArchive is split per platform", () => {
+    const r = resolveConfig({
+      ...base,
+      assetPath: ({ version }) => `${version}/app.tar.gz`,
+      binaryInArchive: ({ version, os, arch }) => `app-${version}-${os}-${arch}/app`,
+      platforms: ["linux/arm64"],
+    });
+
+    expect(r.platforms[0]?.binaryInArchive).toEqual([lit("app-"), V, lit("-linux-arm64/app")]);
+  });
+});
 
 describe("validation errors", () => {
-	test("an assetPath without a version or tag token", () => {
-		expect(() => resolveConfig({ ...base, assetPath: ({ os, arch }) => `latest/${os}-${arch}` })).toThrow(
-			/assetPath.*linux\/amd64.*version or tag/,
-		)
-	})
+  test.each([
+    ["", /name/],
+    ["-cli", /name/],
+    ["my cli", /name/],
+    ["a/b", /name/],
+  ])("an invalid name %j", (name, message) => {
+    expect(() => resolveConfig({ ...base, name })).toThrow(message);
+  });
 
-	test("duplicate asset paths across platforms", () => {
-		expect(() => resolveConfig({ ...base, assetPath: ({ version, os }) => `${version}/app-${os}` })).toThrow(
-			/linux\/amd64 and linux\/arm64.*same asset/,
-		)
-	})
+  test.each([
+    "http://dl.example.com",
+    "ftp://dl.example.com",
+    "dl.example.com",
+    "http://127.0.0.2.example.com",
+    "https://",
+  ])("a non-https baseUrl %j", (baseUrl) => {
+    expect(() => resolveConfig({ ...base, baseUrl })).toThrow(/baseUrl/);
+  });
 
-	test("a duplicate across OSes is an error", () => {
-		expect(() =>
-			resolveConfig({
-				...base,
-				platforms: ["darwin/arm64", "windows/arm64"],
-				assetPath: ({ version }) => `${version}/app`,
-			}),
-		).toThrow(/darwin\/arm64 and windows\/arm64.*same asset/)
-	})
-
-	test("a universal binary shared by darwin/amd64 and darwin/arm64 is allowed", () => {
-		const r = resolveConfig({
-			...base,
-			assetPath: ({ version, os, arch }) => `${version}/app-${os}-${os === "darwin" ? "all" : arch}`,
-		})
-		const darwin = r.platforms.filter((p) => p.os === "darwin")
-		expect(darwin.map((p) => p.asset)).toEqual([
-			[V, lit("/app-darwin-all")],
-			[V, lit("/app-darwin-all")],
-		])
-	})
-
-	test.each([
-		["toUpperCase", ({ version, os, arch }: PathArgs) => `${version}`.toUpperCase() + `/${os}-${arch}`],
-		["toLowerCase", ({ version, os, arch }: PathArgs) => `${version}`.toLowerCase() + `/${os}-${arch}`],
-		['replace(/_/g, "-")', ({ tag, os, arch }: PathArgs) => `${tag}`.replace(/_/g, "-") + `/${os}-${arch}`],
-		["slice", ({ tag, os, arch }: PathArgs) => `${tag}`.slice(1) + `/${os}-${arch}`],
-	])("a sentinel mangled by %s fails, naming the prop and platform", (_how, assetPath) => {
-		expect(() => resolveConfig({ ...base, assetPath })).toThrow(/assetPath.*linux\/amd64.*mangled/)
-	})
-
-	test("a mangled sentinel in checksumsPath", () => {
-		expect(() =>
-			resolveConfig({ ...base, checksumsPath: ({ version }) => `${version}`.toLowerCase() + "/checksums.txt" }),
-		).toThrow(/checksumsPath.*linux\/amd64.*mangled/)
-	})
-
-	test("a mangled sentinel in binaryInArchive", () => {
-		expect(() => resolveConfig({ ...base, binaryInArchive: ({ tag }) => `${tag}`.toUpperCase() })).toThrow(
-			/binaryInArchive.*linux\/amd64.*mangled/,
-		)
-	})
-})
+  test.each([
+    ["assetPath", { assetPath: () => "https://x.example.com/a" }],
+    ["assetPath", { assetPath: () => "/abs/path" }],
+    ["assetPath", { assetPath: () => "" }],
+    ["checksumsPath", { checksumsPath: () => "s3://bucket/checksums.txt" }],
+    ["checksumsPath", { checksumsPath: () => "/checksums.txt" }],
+    ["binaryInArchive", { binaryInArchive: () => "/bin/app" }],
+    ["latestPath", { latestPath: "https://dl.example.com/latest" }],
+    ["latestPath", { latestPath: "/latest" }],
+    ["latestPath", { latestPath: "" }],
+  ])("%s that starts with a scheme or / or is empty", (field, overrides) => {
+    const config = { ...base, ...overrides } as InstallgenConfig;
+    expect(() => resolveConfig(config)).toThrow(new RegExp(field));
+  });
+});
 
 describe("validation errors", () => {
-	test("legit paths containing installgen are not mangled", () => {
-		const r = resolveConfig({
-			...base,
-			name: "installgen",
-			platforms: ["linux/amd64"],
-			assetPath: ({ tag, version, os, arch }) => `${tag}/installgen_${version}_${os}_${arch}.tar.gz`,
-			binaryInArchive: ({ tag }) => `installgen-${tag}-version/installgen`,
-		})
-		expect(r.platforms[0]?.asset).toEqual([T, lit("/installgen_"), V, lit("_linux_amd64.tar.gz")])
-		expect(r.platforms[0]?.binaryInArchive).toEqual([lit("installgen-"), T, lit("-version/installgen")])
-	})
+  test("an assetPath without a version or tag token", () => {
+    expect(() => resolveConfig({ ...base, assetPath: ({ os, arch }) => `latest/${os}-${arch}` })).toThrow(
+      /assetPath.*linux\/amd64.*version or tag/,
+    );
+  });
 
-	test.each([
-		["message", { message: `see ${VERSION_SENTINEL}` }],
-		["latestPath", { latestPath: `channels/${TAG_SENTINEL}` }],
-		["outDir", { outDir: VERSION_SENTINEL }],
-		["tagPrefix", { tagPrefix: TAG_SENTINEL }],
-		[
-			"scriptUrls.sh",
-			{ scriptUrls: { sh: `https://x.example.com/${VERSION_SENTINEL}`, ps1: "https://x.example.com/p" } },
-		],
-	])("a sentinel in the non-path field %s", (field, overrides) => {
-		expect(() => resolveConfig({ ...base, ...overrides })).toThrow(new RegExp(`${field}.*version or tag token`))
-	})
+  test("duplicate asset paths across platforms", () => {
+    expect(() => resolveConfig({ ...base, assetPath: ({ version, os }) => `${version}/app-${os}` })).toThrow(
+      /linux\/amd64 and linux\/arm64.*same asset/,
+    );
+  });
 
-	test.each(["MY-CLI", "1ABC", "my_cli", ""])("an invalid envPrefix %j", (envPrefix) => {
-		expect(() => resolveConfig({ ...base, envPrefix })).toThrow(/envPrefix/)
-	})
+  test("a duplicate across OSes is an error", () => {
+    expect(() =>
+      resolveConfig({
+        ...base,
+        assetPath: ({ version }) => `${version}/app`,
+        platforms: ["darwin/arm64", "windows/arm64"],
+      }),
+    ).toThrow(/darwin\/arm64 and windows\/arm64.*same asset/);
+  });
 
-	test.each([
-		"/opt/my-cli",
-		"~",
-		"~/",
-		"bin",
-		"$HOME/bin",
-		"~user/bin",
-		"~//x",
-		"~/bin/",
-		"~/../etc",
-		"~/./bin",
-		"~/a/../b",
-		"~/a\\b",
-		"~/$x",
-		'~/a"b',
-		"~/a'b",
-		"~/a`b",
-	])("an invalid installDir %j", (installDir) => {
-		expect(() => resolveConfig({ ...base, installDir })).toThrow(/installDir/)
-	})
+  test("a universal binary shared by darwin/amd64 and darwin/arm64 is allowed", () => {
+    const r = resolveConfig({
+      ...base,
+      assetPath: ({ version, os, arch }) => `${version}/app-${os}-${os === "darwin" ? "all" : arch}`,
+    });
 
-	test.each([
-		["~/.local/bin", ".local/bin"],
-		["~/My Tools/bin", "My Tools/bin"],
-		["~/a.b_c-d/..x", "a.b_c-d/..x"],
-	])("a valid installDir %j", (installDir, rel) => {
-		expect(resolveConfig({ ...base, installDir }).installDir).toBe(rel)
-	})
-})
+    const darwin = r.platforms.filter((p) => p.os === "darwin");
+    expect(darwin.map((p) => p.asset)).toEqual([
+      [V, lit("/app-darwin-all")],
+      [V, lit("/app-darwin-all")],
+    ]);
+  });
+
+  test.each([
+    ["toUpperCase", ({ version, os, arch }: PathArgs) => `${`${version}`.toUpperCase()}/${os}-${arch}`],
+    ["toLowerCase", ({ version, os, arch }: PathArgs) => `${`${version}`.toLowerCase()}/${os}-${arch}`],
+    ['replace(/_/g, "-")', ({ tag, os, arch }: PathArgs) => `${`${tag}`.replaceAll("_", "-")}/${os}-${arch}`],
+    ["slice", ({ tag, os, arch }: PathArgs) => `${`${tag}`.slice(1)}/${os}-${arch}`],
+  ])("a sentinel mangled by %s fails, naming the prop and platform", (_how, assetPath) => {
+    expect(() => resolveConfig({ ...base, assetPath })).toThrow(/assetPath.*linux\/amd64.*mangled/);
+  });
+
+  test("a mangled sentinel in checksumsPath", () => {
+    expect(() =>
+      resolveConfig({ ...base, checksumsPath: ({ version }) => `${`${version}`.toLowerCase()}/checksums.txt` }),
+    ).toThrow(/checksumsPath.*linux\/amd64.*mangled/);
+  });
+
+  test("a mangled sentinel in binaryInArchive", () => {
+    expect(() => resolveConfig({ ...base, binaryInArchive: ({ tag }) => `${tag}`.toUpperCase() })).toThrow(
+      /binaryInArchive.*linux\/amd64.*mangled/,
+    );
+  });
+});
 
 describe("validation errors", () => {
-	test.each(["v*", "$", "'", "v ", " ", "v/"])("an invalid tagPrefix %j", (tagPrefix) => {
-		expect(() => resolveConfig({ ...base, tagPrefix })).toThrow(/tagPrefix/)
-	})
+  test("legit paths containing installgen are not mangled", () => {
+    const r = resolveConfig({
+      ...base,
+      assetPath: ({ tag, version, os, arch }) => `${tag}/installgen_${version}_${os}_${arch}.tar.gz`,
+      binaryInArchive: ({ tag }) => `installgen-${tag}-version/installgen`,
+      name: "installgen",
+      platforms: ["linux/amd64"],
+    });
 
-	test.each(["", "v", "release-", "app_v1."])("a valid tagPrefix %j", (tagPrefix) => {
-		expect(resolveConfig({ ...base, tagPrefix }).tagPrefix).toBe(tagPrefix)
-	})
+    expect(r.platforms[0]?.asset).toEqual([T, lit("/installgen_"), V, lit("_linux_amd64.tar.gz")]);
+    expect(r.platforms[0]?.binaryInArchive).toEqual([lit("installgen-"), T, lit("-version/installgen")]);
+  });
 
-	test.each([
-		["http://example.com/install.sh", "sh"],
-		["not a url", "ps1"],
-	])("a non-https scriptUrls entry %j", (url, key) => {
-		const scriptUrls = { sh: "https://x.example.com/sh", ps1: "https://x.example.com/ps1", [key]: url }
-		expect(() => resolveConfig({ ...base, scriptUrls })).toThrow(new RegExp(`scriptUrls.${key}`))
-	})
+  test.each([
+    ["message", { message: `see ${VERSION_SENTINEL}` }],
+    ["latestPath", { latestPath: `channels/${TAG_SENTINEL}` }],
+    ["outDir", { outDir: VERSION_SENTINEL }],
+    ["tagPrefix", { tagPrefix: TAG_SENTINEL }],
+    [
+      "scriptUrls.sh",
+      { scriptUrls: { ps1: "https://x.example.com/p", sh: `https://x.example.com/${VERSION_SENTINEL}` } },
+    ],
+  ])("a sentinel in the non-path field %s", (field, overrides) => {
+    expect(() => resolveConfig({ ...base, ...overrides })).toThrow(new RegExp(`${field}.*version or tag token`));
+  });
 
-	test("an empty outDir", () => {
-		expect(() => resolveConfig({ ...base, outDir: "" })).toThrow(/outDir/)
-	})
+  test.each(["MY-CLI", "1ABC", "my_cli", ""])("an invalid envPrefix %j", (envPrefix) => {
+    expect(() => resolveConfig({ ...base, envPrefix })).toThrow(/envPrefix/);
+  });
 
-	test("an empty platforms list", () => {
-		expect(() => resolveConfig({ ...base, platforms: [] })).toThrow(/platforms/)
-	})
+  test.each([
+    "/opt/my-cli",
+    "~",
+    "~/",
+    "bin",
+    "$HOME/bin",
+    "~user/bin",
+    "~//x",
+    "~/bin/",
+    "~/../etc",
+    "~/./bin",
+    "~/a/../b",
+    "~/a\\b",
+    "~/$x",
+    '~/a"b',
+    "~/a'b",
+    "~/a`b",
+  ])("an invalid installDir %j", (installDir) => {
+    expect(() => resolveConfig({ ...base, installDir })).toThrow(/installDir/);
+  });
 
-	test("an unknown platform from an untyped config", () => {
-		expect(() => resolveConfig(loose({ platforms: ["linux/386"] }))).toThrow(/platforms.*linux\/386/)
-	})
+  test.each([
+    ["~/.local/bin", ".local/bin"],
+    ["~/My Tools/bin", "My Tools/bin"],
+    ["~/a.b_c-d/..x", "a.b_c-d/..x"],
+  ])("a valid installDir %j", (installDir, rel) => {
+    expect(resolveConfig({ ...base, installDir }).installDir).toBe(rel);
+  });
+});
 
-	test("a repeated platform", () => {
-		expect(() => resolveConfig({ ...base, platforms: ["linux/amd64", "linux/amd64"] })).toThrow(/platforms.*twice/)
-	})
+describe("validation errors", () => {
+  test.each(["v*", "$", "'", "v ", " ", "v/"])("an invalid tagPrefix %j", (tagPrefix) => {
+    expect(() => resolveConfig({ ...base, tagPrefix })).toThrow(/tagPrefix/);
+  });
 
-	test.each([
-		["config", null],
-		["config", "nope"],
-	])("a non-object %s", (_field, value) => {
-		expect(() => resolveConfig(value as unknown as InstallgenConfig)).toThrow(/config must be an object/)
-	})
+  test.each(["", "v", "release-", "app_v1."])("a valid tagPrefix %j", (tagPrefix) => {
+    expect(resolveConfig({ ...base, tagPrefix }).tagPrefix).toBe(tagPrefix);
+  });
 
-	test.each([
-		["name", { name: 1 }, /name must be a string/],
-		["baseUrl", { baseUrl: undefined }, /baseUrl must be a string/],
-		["assetPath", { assetPath: "x" }, /assetPath must be a function/],
-		["checksumsPath", { checksumsPath: "x" }, /checksumsPath must be a function/],
-		["binaryInArchive", { binaryInArchive: 1 }, /binaryInArchive must be a function/],
-		["latestPath", { latestPath: 1 }, /latestPath must be a string/],
-		["modifyPath", { modifyPath: "yes" }, /modifyPath must be a boolean/],
-		["message", { message: 1 }, /message must be a string/],
-		["platforms", { platforms: "linux/amd64" }, /platforms must be an array/],
-		["scriptUrls", { scriptUrls: "x" }, /scriptUrls must be an object/],
-		["scriptUrls", { scriptUrls: null }, /scriptUrls must be an object/],
-		["scriptUrls.ps1", { scriptUrls: { sh: "https://x.example.com/sh" } }, /scriptUrls.ps1 must be a string/],
-		["assetPath result", { assetPath: () => 1 }, /assetPath must return a string.*linux\/amd64/],
-	])("a wrong type for %s", (_field, overrides, message) => {
-		expect(() => resolveConfig(loose(overrides))).toThrow(message)
-	})
-})
+  test.each([
+    ["http://example.com/install.sh", "sh"],
+    ["not a url", "ps1"],
+  ])("a non-https scriptUrls entry %j", (url, key) => {
+    const scriptUrls = { sh: "https://x.example.com/sh", ps1: "https://x.example.com/ps1", [key]: url };
+    expect(() => resolveConfig({ ...base, scriptUrls })).toThrow(new RegExp(`scriptUrls.${key}`));
+  });
 
-const ISSUER = "https://token.actions.githubusercontent.com"
+  test("an empty outDir", () => {
+    expect(() => resolveConfig({ ...base, outDir: "" })).toThrow(/outDir/);
+  });
+
+  test("an empty platforms list", () => {
+    expect(() => resolveConfig({ ...base, platforms: [] })).toThrow(/platforms/);
+  });
+
+  test("an unknown platform from an untyped config", () => {
+    expect(() => resolveConfig(loose({ platforms: ["linux/386"] }))).toThrow(/platforms.*linux\/386/);
+  });
+
+  test("a repeated platform", () => {
+    expect(() => resolveConfig({ ...base, platforms: ["linux/amd64", "linux/amd64"] })).toThrow(/platforms.*twice/);
+  });
+
+  test.each([
+    ["config", null],
+    ["config", "nope"],
+  ])("a non-object %s", (_field, value) => {
+    expect(() => resolveConfig(value as unknown as InstallgenConfig)).toThrow(/config must be an object/);
+  });
+
+  test.each([
+    ["name", { name: 1 }, /name must be a string/],
+    ["baseUrl", { baseUrl: undefined }, /baseUrl must be a string/],
+    ["assetPath", { assetPath: "x" }, /assetPath must be a function/],
+    ["checksumsPath", { checksumsPath: "x" }, /checksumsPath must be a function/],
+    ["binaryInArchive", { binaryInArchive: 1 }, /binaryInArchive must be a function/],
+    ["latestPath", { latestPath: 1 }, /latestPath must be a string/],
+    ["modifyPath", { modifyPath: "yes" }, /modifyPath must be a boolean/],
+    ["message", { message: 1 }, /message must be a string/],
+    ["platforms", { platforms: "linux/amd64" }, /platforms must be an array/],
+    ["scriptUrls", { scriptUrls: "x" }, /scriptUrls must be an object/],
+    ["scriptUrls", { scriptUrls: null }, /scriptUrls must be an object/],
+    ["scriptUrls.ps1", { scriptUrls: { sh: "https://x.example.com/sh" } }, /scriptUrls.ps1 must be a string/],
+    ["assetPath result", { assetPath: () => 1 }, /assetPath must return a string.*linux\/amd64/],
+  ])("a wrong type for %s", (_field, overrides, message) => {
+    expect(() => resolveConfig(loose(overrides))).toThrow(message);
+  });
+});
+
+const ISSUER = "https://token.actions.githubusercontent.com";
+
 const signed = {
-	...base,
-	checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
-	signature: {
-		identity: ({ tag }) => `https://github.com/acme/my-cli/.github/workflows/release.yml@refs/tags/${tag}`,
-	},
-} satisfies InstallgenConfig
+  ...base,
+  checksumsPath: ({ tag }) => `${tag}/checksums.txt`,
+  signature: {
+    identity: ({ tag }) => `https://github.com/acme/my-cli/.github/workflows/release.yml@refs/tags/${tag}`,
+  },
+} satisfies InstallgenConfig;
 
 describe("signature", () => {
-	test("the bundle defaults to the checksums path + .sigstore.json, the issuer to GitHub Actions'", () => {
-		const r = resolveConfig(signed)
-		for (const p of r.platforms) {
-			expect(p.signature).toEqual({
-				bundle: [T, lit("/checksums.txt.sigstore.json")],
-				identity: [lit("https://github.com/acme/my-cli/.github/workflows/release.yml@refs/tags/"), T],
-				issuer: ISSUER,
-			})
-		}
-	})
+  test("the bundle defaults to the checksums path + .sigstore.json, the issuer to GitHub Actions'", () => {
+    const r = resolveConfig(signed);
 
-	test("bundlePath gets the checksums path and the asset; issuer overrides", () => {
-		const r = resolveConfig({
-			...signed,
-			platforms: ["linux/arm64"],
-			signature: {
-				...signed.signature,
-				issuer: "https://issuer.example.com",
-				bundlePath: ({ checksums, asset, version }) =>
-					`${version}/sig/${checksums.split("/").at(-1)}-${asset.split("/").at(-1)}.json`,
-			},
-		})
-		expect(r.platforms[0]?.signature).toMatchObject({
-			bundle: [V, lit("/sig/checksums.txt-my-cli-linux-arm64.json")],
-			issuer: "https://issuer.example.com",
-		})
-	})
+    for (const p of r.platforms) {
+      expect(p.signature).toEqual({
+        bundle: [T, lit("/checksums.txt.sigstore.json")],
+        identity: [lit("https://github.com/acme/my-cli/.github/workflows/release.yml@refs/tags/"), T],
+        issuer: ISSUER,
+      });
+    }
+  });
 
-	test("unset signature resolves to undefined", () => {
-		for (const p of resolveConfig(base).platforms) expect(p.signature).toBeUndefined()
-	})
-})
+  test("bundlePath gets the checksums path and the asset; issuer overrides", () => {
+    const r = resolveConfig({
+      ...signed,
+      platforms: ["linux/arm64"],
+      signature: {
+        ...signed.signature,
+        bundlePath: ({ checksums, asset, version }) =>
+          `${version}/sig/${checksums.split("/").at(-1)}-${asset.split("/").at(-1)}.json`,
+        issuer: "https://issuer.example.com",
+      },
+    });
+
+    expect(r.platforms[0]?.signature).toMatchObject({
+      bundle: [V, lit("/sig/checksums.txt-my-cli-linux-arm64.json")],
+      issuer: "https://issuer.example.com",
+    });
+  });
+
+  test("unset signature resolves to undefined", () => {
+    for (const p of resolveConfig(base).platforms) expect(p.signature).toBeUndefined();
+  });
+});
 
 describe("signature", () => {
-	test.each([
-		["not an object", { signature: "x" }, /signature must be an object/],
-		["null", { signature: null }, /signature must be an object/],
-		["no checksumsPath", { checksumsPath: undefined }, /signature needs config\.checksumsPath/],
-		["identity missing", { signature: {} }, /signature\.identity must be a function/],
-		["identity a string", { signature: { identity: "https://x" } }, /signature\.identity must be a function/],
-		["identity result", { signature: { identity: () => 1 } }, /signature\.identity must return a string.*linux\/amd64/],
-		[
-			"identity not https",
-			{ signature: { identity: () => "http://ci.example.com/x" } },
-			/signature\.identity.*https URL/,
-		],
-		["identity no URL", { signature: { identity: () => "acme release" } }, /signature\.identity.*https URL/],
-		[
-			"identity mangled",
-			{ signature: { identity: ({ tag }: PathArgs) => `https://ci.example.com/${String(tag).toLowerCase()}` } },
-			/signature\.identity.*linux\/amd64.*mangled/,
-		],
-		[
-			"bundlePath a string",
-			{ signature: { ...signed.signature, bundlePath: "x" } },
-			/signature\.bundlePath must be a function/,
-		],
-		[
-			"bundlePath absolute",
-			{ signature: { ...signed.signature, bundlePath: () => "/sig.json" } },
-			/signature\.bundlePath must be a path relative to baseUrl/,
-		],
-		["issuer a number", { signature: { ...signed.signature, issuer: 1 } }, /signature\.issuer must be a string/],
-		[
-			"issuer not https",
-			{ signature: { ...signed.signature, issuer: "http://issuer.example.com" } },
-			/signature\.issuer must be an https URL/,
-		],
-		[
-			"issuer on loopback http",
-			{ signature: { ...signed.signature, issuer: "http://127.0.0.1:8080" } },
-			/signature\.issuer must be an https URL/,
-		],
-		[
-			"issuer with a token",
-			{ signature: { ...signed.signature, issuer: `https://x.example.com/${TAG_SENTINEL}` } },
-			/signature\.issuer cannot hold a version or tag token/,
-		],
-	])("%s throws", (_case, overrides, message) => {
-		expect(() => resolveConfig({ ...signed, ...loose(overrides) } as InstallgenConfig)).toThrow(message)
-	})
-})
+  test.each([
+    ["not an object", { signature: "x" }, /signature must be an object/],
+    ["null", { signature: null }, /signature must be an object/],
+    ["no checksumsPath", { checksumsPath: undefined }, /signature needs config\.checksumsPath/],
+    ["identity missing", { signature: {} }, /signature\.identity must be a function/],
+    ["identity a string", { signature: { identity: "https://x" } }, /signature\.identity must be a function/],
+    ["identity result", { signature: { identity: () => 1 } }, /signature\.identity must return a string.*linux\/amd64/],
+    [
+      "identity not https",
+      { signature: { identity: () => "http://ci.example.com/x" } },
+      /signature\.identity.*https URL/,
+    ],
+    ["identity no URL", { signature: { identity: () => "acme release" } }, /signature\.identity.*https URL/],
+    [
+      "identity mangled",
+      { signature: { identity: ({ tag }: PathArgs) => `https://ci.example.com/${String(tag).toLowerCase()}` } },
+      /signature\.identity.*linux\/amd64.*mangled/,
+    ],
+    [
+      "bundlePath a string",
+      { signature: { ...signed.signature, bundlePath: "x" } },
+      /signature\.bundlePath must be a function/,
+    ],
+    [
+      "bundlePath absolute",
+      { signature: { ...signed.signature, bundlePath: () => "/sig.json" } },
+      /signature\.bundlePath must be a path relative to baseUrl/,
+    ],
+    ["issuer a number", { signature: { ...signed.signature, issuer: 1 } }, /signature\.issuer must be a string/],
+    [
+      "issuer not https",
+      { signature: { ...signed.signature, issuer: "http://issuer.example.com" } },
+      /signature\.issuer must be an https URL/,
+    ],
+    [
+      "issuer on loopback http",
+      { signature: { ...signed.signature, issuer: "http://127.0.0.1:8080" } },
+      /signature\.issuer must be an https URL/,
+    ],
+    [
+      "issuer with a token",
+      { signature: { ...signed.signature, issuer: `https://x.example.com/${TAG_SENTINEL}` } },
+      /signature\.issuer cannot hold a version or tag token/,
+    ],
+  ])("%s throws", (_case, overrides, message) => {
+    expect(() => resolveConfig({ ...signed, ...loose(overrides) })).toThrow(message);
+  });
+});

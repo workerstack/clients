@@ -1,5 +1,6 @@
 ---
 description: Release public packages
+order: 145
 ---
 
 # Releasing a product's public packages

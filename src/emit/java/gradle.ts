@@ -7,141 +7,144 @@
  * what Maven Central requires of a POM (its URL, license, developers and scm) comes from options, each validated and
  * written the same way, and is left out when not given.
  */
-import { escapeText } from "../shared/escape.ts"
-import { AUTHOR, authorOf, checked, HTTPS_URL, SPDX_ID, TEXT } from "../shared/metadata.ts"
+import { escapeText } from "../shared/escape.ts";
+import { AUTHOR, authorOf, checked, HTTPS_URL, SPDX_ID, TEXT } from "../shared/metadata.ts";
 
 /** The package's identity, each part validated. */
 export type JavaPackage = {
-	readonly artifactId: string
-	readonly clientName: string
-	readonly groupId: string
-	readonly packageName: string
-	readonly version: string
-}
+  readonly artifactId: string;
+  readonly clientName: string;
+  readonly groupId: string;
+  readonly packageName: string;
+  readonly version: string;
+};
 
 /** The one runtime dependency, its coordinates pinned with the test classpath's (java-pins.json). */
-export const JACKSON = "tools.jackson.core:jackson-databind:3.2.4"
+const JACKSON = "tools.jackson.core:jackson-databind:3.2.4";
 
-/* Java's keywords and literals (JLS 3.9, 3.10.3, 3.10.7): no package segment may be one, and `_` is one since 9 */
+// Java's keywords and literals (JLS 3.9, 3.10.3, 3.10.7): no package segment may be one, and `_` is one since 9
 const RESERVED = [
-	"abstract",
-	"assert",
-	"boolean",
-	"break",
-	"byte",
-	"case",
-	"catch",
-	"char",
-	"class",
-	"const",
-	"continue",
-	"default",
-	"do",
-	"double",
-	"else",
-	"enum",
-	"extends",
-	"final",
-	"finally",
-	"float",
-	"for",
-	"goto",
-	"if",
-	"implements",
-	"import",
-	"instanceof",
-	"int",
-	"interface",
-	"long",
-	"native",
-	"new",
-	"package",
-	"private",
-	"protected",
-	"public",
-	"return",
-	"short",
-	"static",
-	"strictfp",
-	"super",
-	"switch",
-	"synchronized",
-	"this",
-	"throw",
-	"throws",
-	"transient",
-	"try",
-	"void",
-	"volatile",
-	"while",
-	"true",
-	"false",
-	"null",
-	"_",
-]
+  "abstract",
+  "assert",
+  "boolean",
+  "break",
+  "byte",
+  "case",
+  "catch",
+  "char",
+  "class",
+  "const",
+  "continue",
+  "default",
+  "do",
+  "double",
+  "else",
+  "enum",
+  "extends",
+  "final",
+  "finally",
+  "float",
+  "for",
+  "goto",
+  "if",
+  "implements",
+  "import",
+  "instanceof",
+  "int",
+  "interface",
+  "long",
+  "native",
+  "new",
+  "package",
+  "private",
+  "protected",
+  "public",
+  "return",
+  "short",
+  "static",
+  "strictfp",
+  "super",
+  "switch",
+  "synchronized",
+  "this",
+  "throw",
+  "throws",
+  "transient",
+  "try",
+  "void",
+  "volatile",
+  "while",
+  "true",
+  "false",
+  "null",
+  "_",
+];
 
-/* the type names the client file spells or imports, and its nested Builder: a client of one of these clashes */
-const SPELLED = ["Builder", "IllegalStateException", "String", "Transport", "URI"]
+// the type names the client file spells or imports, and its nested Builder: a client of one of these clashes
+const SPELLED = ["Builder", "IllegalStateException", "String", "Transport", "URI"];
 
-/* a Maven group: lowercase dotted words; an artifact: lowercase words joined by `-`; a package segment: a lowercase
- * identifier; a client: a PascalCase type */
-const GROUP_ID = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/
-const ARTIFACT_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
-const SEGMENT = /^[a-z_][a-z0-9_]*$/
-const CLIENT_NAME = /^[A-Z][A-Za-z0-9_]*$/
-/* SemVer 2 (semver.org's recommended pattern), as the C# and Rust packages take it */
+// a Maven group: lowercase dotted words; an artifact: lowercase words joined by `-`; a package segment: a lowercase
+// identifier; a client: a PascalCase type
+const GROUP_ID = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/;
+const ARTIFACT_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const SEGMENT = /^[a-z_][a-z0-9_]*$/;
+const CLIENT_NAME = /^[A-Z][A-Za-z0-9_]*$/;
+
+// SemVer 2 (semver.org's recommended pattern), as the C# and Rust packages take it
 const SEMVER =
-	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 const refuse = (option: string, value: string): never => {
-	throw new Error(`Invalid ${option}: ${JSON.stringify(value)}`)
-}
+  throw new Error(`Invalid ${option}: ${JSON.stringify(value)}`);
+};
 
 /** A Maven group id: lowercase dotted words. */
-export const validateGroupId = (value: string): string => (GROUP_ID.test(value) ? value : refuse("groupId", value))
+export const validateGroupId = (value: string): string => (GROUP_ID.test(value) ? value : refuse("groupId", value));
 
 /** A Maven artifact id: lowercase words joined by `-`. */
 export const validateArtifactId = (value: string): string =>
-	ARTIFACT_ID.test(value) ? value : refuse("artifactId", value)
+  ARTIFACT_ID.test(value) ? value : refuse("artifactId", value);
 
 /** A package: dotted lowercase identifiers, none a keyword, not under `java` or `javax`. */
 export function validatePackageName(value: string): string {
-	const segments = value.split(".")
-	const valid = segments.every((segment) => SEGMENT.test(segment) && !RESERVED.includes(segment))
-	return valid && segments[0] !== "java" && segments[0] !== "javax" ? value : refuse("packageName", value)
+  const segments = value.split(".");
+  const valid = segments.every((segment) => SEGMENT.test(segment) && !RESERVED.includes(segment));
+
+  return valid && segments[0] !== "java" && segments[0] !== "javax" ? value : refuse("packageName", value);
 }
 
 /** A client class name: PascalCase, and none of the types its own file spells. */
 export const validateClientName = (value: string): string =>
-	CLIENT_NAME.test(value) && !SPELLED.includes(value) ? value : refuse("clientName", value)
+  CLIENT_NAME.test(value) && !SPELLED.includes(value) ? value : refuse("clientName", value);
 
 /** A SemVer 2 version. */
-export const validateVersion = (value: string): string => (SEMVER.test(value) ? value : refuse("version", value))
+export const validateVersion = (value: string): string => (SEMVER.test(value) ? value : refuse("version", value));
 
 /** What Maven Central requires of a POM beyond its name and description, each part the caller gave, validated. */
 export type JavaPomMetadata = {
-	/** the POM's description, over the document's */
-	readonly description?: string
-	/** the project's https home page, the POM's `url` */
-	readonly homepage?: string
-	/** one SPDX license id */
-	readonly license?: string
-	/** the https URL of its git repository, without a trailing `/` or `.git` */
-	readonly repository?: string
-	/** the POM's developers, comma separated: each a name, or `Name <email>` */
-	readonly developers?: string
-}
+  /** the POM's description, over the document's */
+  readonly description?: string | undefined;
+  /** the project's https home page, the POM's `url` */
+  readonly homepage?: string | undefined;
+  /** one SPDX license id */
+  readonly license?: string | undefined;
+  /** the https URL of its git repository, without a trailing `/` or `.git` */
+  readonly repository?: string | undefined;
+  /** the POM's developers, comma separated: each a name, or `Name <email>` */
+  readonly developers?: string | undefined;
+};
 
 /** The POM metadata validated: the developers one entry each. */
-type PomFields = Omit<JavaPomMetadata, "developers"> & { readonly developers?: readonly string[] }
+type PomFields = Omit<JavaPomMetadata, "developers"> & { readonly developers?: readonly string[] | undefined };
 
-/* a repository is a path on its host: `https://host/owner/name` */
-const REPOSITORY_PATH = /^https:\/\/[^/]+\/[^/]/
+// a repository is a path on its host: `https://host/owner/name`
+const REPOSITORY_PATH = /^https:\/\/[^/]+\/[^/]/;
 
 /** The developers option as one author each, or a refusal of the whole value when any is not a name or `Name <email>`. */
 function developersOf(value: string | undefined): readonly string[] | undefined {
-	const authors = value?.split(",").map((author) => author.trim())
-	return authors?.every((author) => AUTHOR.test(author)) === false ? refuse("developers", value as string) : authors
+  const authors = value?.split(",").map((author) => author.trim());
+
+  return authors?.every((author) => AUTHOR.test(author)) === false ? refuse("developers", value as string) : authors;
 }
 
 /**
@@ -149,85 +152,89 @@ function developersOf(value: string | undefined): readonly string[] | undefined 
  * to its connections and shows the rest as its web URL.
  */
 function pomMetadata(options: JavaPomMetadata): PomFields {
-	const repository = checked("repository", options.repository, HTTPS_URL)
-	return {
-		description: checked("description", options.description, TEXT),
-		developers: developersOf(options.developers),
-		homepage: checked("homepage", options.homepage, HTTPS_URL),
-		license: checked("license", options.license, SPDX_ID),
-		repository: checked("repository", repository, REPOSITORY_PATH)
-			?.replace(/\/+$/, "")
-			.replace(/\.git$/, ""),
-	}
+  const repository = checked("repository", options.repository, HTTPS_URL);
+
+  return {
+    description: checked("description", options.description, TEXT),
+    developers: developersOf(options.developers),
+    homepage: checked("homepage", options.homepage, HTTPS_URL),
+    license: checked("license", options.license, SPDX_ID),
+    repository: checked("repository", repository, REPOSITORY_PATH)
+      ?.replace(/\/+$/, "")
+      .replace(/\.git$/, ""),
+  };
 }
 
 /** The POM's words: the document's name and description (spec text, written only through `groovyString`), the rest. */
-export type JavaPom = PomFields & { readonly name?: string }
+export type JavaPom = PomFields & { readonly name?: string | undefined };
 
 /** The POM for `options` over the document's `info`: the metadata validated, its description over the document's. */
 export function pomOf(
-	options: JavaPomMetadata,
-	info: { readonly title?: string; readonly description?: string },
+  options: JavaPomMetadata,
+  info: { readonly title?: string; readonly description?: string },
 ): JavaPom {
-	const metadata = pomMetadata(options)
-	return { ...metadata, description: metadata.description ?? info.description, name: info.title }
+  const metadata = pomMetadata(options);
+
+  return { ...metadata, description: metadata.description ?? info.description, name: info.title };
 }
 
 /**
  * `text` as a single-quoted Groovy string: Java's escapes (Groovy reads the same ones) and the apostrophe's, so spec
  * text neither interpolates (no `$` in `'…'`) nor ends the string.
  */
-const groovyString = (text: string) => `'${escapeText(text, "java").replaceAll("'", "\\'")}'`
+const groovyString = (text: string) => `'${escapeText(text, "java").replaceAll("'", "\\'")}'`;
 
-/* the indent of the `pom { … }` block's members, and of one level in */
-const POM = "                "
-const IN = "    "
+// the indent of the `pom { … }` block's members, and of one level in
+const POM = "                ";
+const IN = "    ";
 
 /** `key = '…'` lines at `indent`, each value a Groovy string. */
 const assignments = (indent: string, entries: readonly (readonly [key: string, value: string])[]) =>
-	entries.map(([key, value]) => `${indent}${key} = ${groovyString(value)}\n`).join("")
+  entries.map(([key, value]) => `${indent}${key} = ${groovyString(value)}\n`).join("");
 
 /** A `key { … }` block at `indent` around `body`. */
-const nested = (indent: string, key: string, body: string) => `${indent}${key} {\n${body}${indent}}\n`
+const nested = (indent: string, key: string, body: string) => `${indent}${key} {\n${body}${indent}}\n`;
 
 /** A `key { … }` block one level into the POM, its entries as Groovy strings. */
 const member = (key: string, entries: readonly (readonly [key: string, value: string])[]) =>
-	nested(POM + IN, key, assignments(POM + IN + IN, entries))
+  nested(POM + IN, key, assignments(POM + IN + IN, entries));
 
 /** One author's `developer { … }` block: its name, and its email when it gives one. */
 function developerBlock(author: string): string {
-	const { email, name } = authorOf(author)
-	return member("developer", [["name", name], ...(email === undefined ? [] : [["email", email] as const])])
+  const { email, name } = authorOf(author);
+
+  return member("developer", [["name", name], ...(email === undefined ? [] : [["email", email] as const])]);
 }
 
 /** The POM's url, license, developers and scm lines, each only when its option was given. */
 function pomMetadataLines(pom: PomFields): string {
-	const connection = `scm:git:${pom.repository}.git`
-	return [
-		pom.homepage === undefined ? "" : assignments(POM, [["url", pom.homepage]]),
-		pom.license === undefined
-			? ""
-			: nested(
-					POM,
-					"licenses",
-					member("license", [
-						["name", pom.license],
-						["url", `https://spdx.org/licenses/${pom.license}.html`],
-					]),
-				),
-		pom.developers === undefined ? "" : nested(POM, "developers", pom.developers.map(developerBlock).join("")),
-		pom.repository === undefined
-			? ""
-			: nested(
-					POM,
-					"scm",
-					assignments(POM + IN, [
-						["url", pom.repository],
-						["connection", connection],
-						["developerConnection", connection],
-					]),
-				),
-	].join("")
+  const connection = `scm:git:${pom.repository}.git`;
+
+  return [
+    pom.homepage === undefined ? "" : assignments(POM, [["url", pom.homepage]]),
+    pom.license === undefined
+      ? ""
+      : nested(
+          POM,
+          "licenses",
+          member("license", [
+            ["name", pom.license],
+            ["url", `https://spdx.org/licenses/${pom.license}.html`],
+          ]),
+        ),
+    pom.developers === undefined ? "" : nested(POM, "developers", pom.developers.map(developerBlock).join("")),
+    pom.repository === undefined
+      ? ""
+      : nested(
+          POM,
+          "scm",
+          assignments(POM + IN, [
+            ["url", pom.repository],
+            ["connection", connection],
+            ["developerConnection", connection],
+          ]),
+        ),
+  ].join("");
 }
 
 /**
@@ -238,9 +245,10 @@ function pomMetadataLines(pom: PomFields): string {
  * build waives CS1591 alone); signing is the publisher's.
  */
 export const buildGradle = (pkg: JavaPackage, pom: JavaPom): string => {
-	const name = pom.name ?? pkg.artifactId
-	const metadata = pomMetadataLines(pom)
-	return `plugins {
+  const name = pom.name ?? pkg.artifactId;
+  const metadata = pomMetadataLines(pom);
+
+  return `plugins {
     id 'java-library'
     id 'maven-publish'
 }
@@ -282,8 +290,8 @@ ${metadata}            }
         }
     }
 }
-`
-}
+`;
+};
 
 /** The `settings.gradle`: the artifact id as the root project's name. */
-export const settingsGradle = (pkg: JavaPackage): string => `rootProject.name = '${pkg.artifactId}'\n`
+export const settingsGradle = (pkg: JavaPackage): string => `rootProject.name = '${pkg.artifactId}'\n`;

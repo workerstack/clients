@@ -46,9 +46,8 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - id: resolve
         run: bun tests/build/node-current.ts
-  commitlint:
-    name: commitlint
-    if: github.event_name == 'pull_request'
+  commits:
+    name: commits
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -59,12 +58,10 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - name: Lint commit messages
-        run: |
-          bunx commitlint \
-            --from ${{ github.event.pull_request.base.sha }} \
-            --to ${{ github.event.pull_request.head.sha }} \
-            --verbose
+      - name: Check every pushed commit
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bun repo commit-msg --range "$BASE..HEAD"
 
   check:
     name: lint
@@ -77,8 +74,10 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bun run fmt:check
-      - run: bun run lint
+      # repo check: sync drift, tsconfig bases, manifests, lint held to .repo/lint-baseline.json, knip, actionlint
+      - run: bun repo check
       - run: bun run typecheck
+      - run: bun run typecheck:src
 
   # the unit and go projects. The rust and python projects run beside it in gen-rust and gen-python, and
   # gen-coverage holds the shards' merged coverage to the thresholds (contract 28 §8.3).
@@ -275,7 +274,7 @@ jobs:
       # gen runs every dotnet through its csharp-env fixture, installed as in gen-csharp (which says why)
       - name: .NET (global.json's SDK, and the seed restore)
         run: |
-          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
+          V="$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
@@ -445,7 +444,7 @@ jobs:
       # one NuGet fetch (none when the cache above holds its package): the command a missing SDK names locally
       - name: .NET (global.json's SDK, and the seed restore)
         run: |
-          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
+          V="$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
       - run: mkdir -p ~/.cache/backend-tmp/dotnet/sdk && touch "$RUNNER_TEMP/csharp-sdk-start"
       - run: bun install --frozen-lockfile
       - name: gen (csharp)
@@ -599,7 +598,7 @@ jobs:
       # gen runs every dotnet through its csharp-env fixture, installed as in gen-csharp (which says why)
       - name: .NET (global.json's SDK, and the seed restore)
         run: |
-          V="$(sed -n 's/.*"version": "\(.*\)",/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
+          V="$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' global.json)" && D="$HOME/.cache/backend-tmp/dotnet" && F="$(git rev-parse --show-toplevel)/src/emit/csharp/__fixtures__" && T="$D/toolchain/$V" && mkdir -p "$D/dl" "$D/home" "$D/tmp" && curl -fsSL -o "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" "https://builds.dotnet.microsoft.com/dotnet/Sdk/$V/dotnet-sdk-$V-linux-x64.tar.gz" && (cd "$D/dl" && sha512sum -c "$F/dotnet-sdk.sha512") && rm -rf "$T" "$T.partial" && mkdir -p "$T.partial" && tar -xzf "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" -C "$T.partial" && mv "$T.partial" "$T" && rm "$D/dl/dotnet-sdk-$V-linux-x64.tar.gz" && DOTNET_CLI_HOME="$D/home" DOTNET_ROOT="$D/toolchain/$V" NUGET_HTTP_CACHE_PATH="$D/nuget-http" NUGET_PACKAGES="$D/nuget" NUGET_PLUGINS_CACHE_PATH="$D/nuget-plugins" TMPDIR="$D/tmp" HOME="$D/home" DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="false" DOTNET_CLI_TELEMETRY_OPTOUT="1" DOTNET_CLI_UI_LANGUAGE="en" DOTNET_CLI_USE_MSBUILD_SERVER="0" DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE="1" DOTNET_GENERATE_ASPNET_CERTIFICATE="false" DOTNET_NOLOGO="1" DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1" MSBUILDDISABLENODEREUSE="1" NUGET_XMLDOC_MODE="skip" UseSharedCompilation="false" "$T/dotnet" restore "$F/seed/Seed.csproj" --source https://api.nuget.org/v3/index.json --artifacts-path "$D/tmp/seed"
       # restored, never saved: gen-csharp owns it; the served SDK builds here each run
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:

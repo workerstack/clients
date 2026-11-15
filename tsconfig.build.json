@@ -1,13 +1,20 @@
 {
-	"extends": "./tsconfig.json",
-	"compilerOptions": {
-		"allowImportingTsExtensions": false,
-		"declaration": true,
-		"noEmit": false,
-		"outDir": "./dist",
-		"rewriteRelativeImportExtensions": true,
-		"rootDir": "./src"
-	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["src/**/*.test.ts", "src/**/__fixtures__/**", "src/runtime/**", "src/_tokenizer/**"]
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "noEmit": false,
+    "outDir": "./dist",
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "./src"
+  },
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.typetest.ts",
+    "src/**/__fixtures__/**",
+    "src/runtime/**",
+    "src/_tokenizer/**"
+  ],
+  // exclude replaces tsconfig.src.json's own: relist its entries, then the runtime templates and the vendored tokenizer
+  "extends": "./tsconfig.src.json",
+  "include": ["src/**/*.ts"]
 }

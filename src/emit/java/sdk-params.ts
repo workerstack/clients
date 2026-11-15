@@ -3,39 +3,40 @@
  * header param, then the idempotency key; the builder has exactly one setter per field, and `build()` refuses a required
  * field left unset. A multipart body is a record of its own, `<Op>Body`, one component per part (C#'s parity).
  */
-import type { IRMultipartPart, IRSchema } from "../../ir/model.ts"
-import type { SdkOp } from "../../ir/sdk-model.ts"
-import { compareCodeUnits, javaIdentifier, javaTypeName, NameScope } from "../shared/lang.ts"
-import { type JavaTypeContext, javaTypeOf } from "./models.ts"
-import { CURSOR, isLastEventIdHeader, LAST_EVENT_ID } from "./sse.ts"
-import { carriesRealtime, REALTIME_FIELDS } from "./realtime.ts"
-import { isReconnectTokenQuery, PROTOCOLS, RECONNECT_TOKEN, TOKEN } from "./ws.ts"
+import type { IRMultipartPart, IRSchema } from "../../ir/model.ts";
+import type { SdkOp } from "../../ir/sdk-model.ts";
+import { compareCodeUnits, javaIdentifier, javaTypeName, NameScope } from "../shared/lang.ts";
+import { type JavaTypeContext, javaTypeOf } from "./models.ts";
+import { carriesRealtime, REALTIME_FIELDS } from "./realtime.ts";
+import { CURSOR, isLastEventIdHeader, LAST_EVENT_ID } from "./sse.ts";
+import { isReconnectTokenQuery, PROTOCOLS, RECONNECT_TOKEN, TOKEN } from "./ws.ts";
 
 /** One record field: its spec name, its Java identifier and type, where it goes, and whether it is required. */
 export type Field = {
-	readonly name: string
-	readonly field: string
-	readonly type: string
-	readonly where: "path" | "body" | "query" | "header" | "key" | "cursor" | "protocols" | "token" | "realtime"
-	readonly required: boolean
-}
+  readonly name: string;
+  readonly field: string;
+  readonly type: string;
+  readonly where: "path" | "body" | "query" | "header" | "key" | "cursor" | "protocols" | "token" | "realtime";
+  readonly required: boolean;
+};
 
 /** The record's own members, which a component may not take (`builder()` is static). */
-const RECORD_RESERVED = ["builder", "equals", "hashCode", "toString"]
+const RECORD_RESERVED = ["builder", "equals", "hashCode", "toString"];
 
 /** The idempotency header's spec name: a declared one is the key field itself. */
-const KEY_HEADER = "Idempotency-Key"
+const KEY_HEADER = "Idempotency-Key";
 
 /** A type's text at the param named `name` of `op`. */
 const typeAt = (schema: IRSchema, op: SdkOp, name: string, ctx: JavaTypeContext) =>
-	javaTypeOf(schema, { ...ctx, fieldName: name, parentName: op.id })
+  javaTypeOf(schema, { ...ctx, fieldName: name, parentName: op.id });
 
 /** Whether a declared param is a stream field's resume channel, which folds into that field (J7, K2, R8). */
 function folds(op: SdkOp, name: string, where: "query" | "header"): boolean {
-	if (op.stream === "realtime") return carriesRealtime(name, where)
-	return where === "query"
-		? op.stream === "ws" && isReconnectTokenQuery(name)
-		: op.stream === "sse" && isLastEventIdHeader(name)
+  if (op.stream === "realtime") return carriesRealtime(name, where);
+
+  return where === "query"
+    ? op.stream === "ws" && isReconnectTokenQuery(name)
+    : op.stream === "sse" && isLastEventIdHeader(name);
 }
 
 /**
@@ -44,63 +45,74 @@ function folds(op: SdkOp, name: string, where: "query" | "header"): boolean {
  * Last-Event-ID header folds into it. A stream takes no idempotency key.
  */
 export function fieldsOf(op: SdkOp, ctx: JavaTypeContext): Field[] {
-	const own = streamFields(op)
-	const scope = new NameScope([...RECORD_RESERVED, ...own.map((f) => f.field)])
-	const segments = op.pathSegments.flatMap((segment) => (segment.kind === "param" ? [segment.name] : []))
-	const path = segments.flatMap((name) => op.pathParams.filter((p) => p.name === name))
-	const query = [...op.query]
-		.filter((param) => !folds(op, param.name, "query"))
-		.sort((a, b) => compareCodeUnits(a.name, b.name))
-	const headers = [...op.headers]
-		.filter((param) => !folds(op, param.name, "header"))
-		.sort((a, b) => compareCodeUnits(a.name, b.name))
-	const fields: Field[] = []
-	for (const param of path) {
-		fields.push({
-			field: scope.claim(javaIdentifier(param.name)),
-			name: param.name,
-			required: true,
-			type: "String",
-			where: "path",
-		})
-	}
-	const body = op.body
-	if (body !== undefined) {
-		const type = bodyType(body, op, ctx)
-		fields.push({ field: scope.claim("body"), name: "body", required: body.required, type, where: "body" })
-	}
-	for (const param of query) {
-		const type = typeAt(param.schema, op, param.name, ctx)
-		fields.push({
-			field: scope.claim(javaIdentifier(param.name)),
-			name: param.name,
-			required: param.required === true,
-			type,
-			where: "query",
-		})
-	}
-	for (const param of headers) {
-		const type = typeAt(param.schema, op, param.name, ctx)
-		fields.push({
-			field: scope.claim(javaIdentifier(param.name)),
-			name: param.name,
-			required: param.required === true,
-			type,
-			where: "header",
-		})
-	}
-	const declared = headers.some((param) => param.name.toLowerCase() === KEY_HEADER.toLowerCase())
-	fields.push(...own)
-	if (op.idempotent && !declared && op.stream === null) {
-		fields.push({
-			field: scope.claim("idempotencyKey"),
-			name: KEY_HEADER,
-			required: false,
-			type: "String",
-			where: "key",
-		})
-	}
-	return fields
+  const own = streamFields(op);
+  const scope = new NameScope([...RECORD_RESERVED, ...own.map((f) => f.field)]);
+  const segments = op.pathSegments.flatMap((segment) => (segment.kind === "param" ? [segment.name] : []));
+  const path = segments.flatMap((name) => op.pathParams.filter((p) => p.name === name));
+
+  const query = [...op.query]
+    .filter((param) => !folds(op, param.name, "query"))
+    .sort((a, b) => compareCodeUnits(a.name, b.name));
+
+  const headers = [...op.headers]
+    .filter((param) => !folds(op, param.name, "header"))
+    .sort((a, b) => compareCodeUnits(a.name, b.name));
+
+  const fields: Field[] = [];
+
+  for (const param of path) {
+    fields.push({
+      field: scope.claim(javaIdentifier(param.name)),
+      name: param.name,
+      required: true,
+      type: "String",
+      where: "path",
+    });
+  }
+
+  const body = op.body;
+
+  if (body !== undefined) {
+    const type = bodyType(body, op, ctx);
+    fields.push({ field: scope.claim("body"), name: "body", required: body.required, type, where: "body" });
+  }
+
+  for (const param of query) {
+    const type = typeAt(param.schema, op, param.name, ctx);
+    fields.push({
+      field: scope.claim(javaIdentifier(param.name)),
+      name: param.name,
+      required: param.required === true,
+      type,
+      where: "query",
+    });
+  }
+
+  for (const param of headers) {
+    const type = typeAt(param.schema, op, param.name, ctx);
+    fields.push({
+      field: scope.claim(javaIdentifier(param.name)),
+      name: param.name,
+      required: param.required === true,
+      type,
+      where: "header",
+    });
+  }
+
+  const declared = headers.some((param) => param.name.toLowerCase() === KEY_HEADER.toLowerCase());
+  fields.push(...own);
+
+  if (op.idempotent && !declared && op.stream === null) {
+    fields.push({
+      field: scope.claim("idempotencyKey"),
+      name: KEY_HEADER,
+      required: false,
+      type: "String",
+      where: "key",
+    });
+  }
+
+  return fields;
 }
 
 /**
@@ -108,55 +120,69 @@ export function fieldsOf(op: SdkOp, ctx: JavaTypeContext): Field[] {
  * op's cursor, protocols and reconnect policy (R8), which the runtime puts on each dial rather than the Call.
  */
 function streamFields(op: SdkOp): Field[] {
-	if (op.stream === "sse")
-		return [{ field: CURSOR, name: LAST_EVENT_ID, required: false, type: "String", where: "cursor" }]
-	if (op.stream === "realtime")
-		return REALTIME_FIELDS.map((f) => ({
-			field: f.field,
-			name: f.field,
-			required: false,
-			type: f.type,
-			where: "realtime",
-		}))
-	if (op.stream !== "ws") return []
-	return [
-		{ field: PROTOCOLS, name: PROTOCOLS, required: false, type: "List<String>", where: "protocols" },
-		{ field: TOKEN, name: RECONNECT_TOKEN, required: false, type: "String", where: "token" },
-	]
+  if (op.stream === "sse")
+    return [{ field: CURSOR, name: LAST_EVENT_ID, required: false, type: "String", where: "cursor" }];
+
+  if (op.stream === "realtime") {
+    return REALTIME_FIELDS.map((f) => ({
+      field: f.field,
+      name: f.field,
+      required: false,
+      type: f.type,
+      where: "realtime",
+    }));
+  }
+
+  if (op.stream !== "ws") return [];
+
+  return [
+    { field: PROTOCOLS, name: PROTOCOLS, required: false, type: "List<String>", where: "protocols" },
+    { field: TOKEN, name: RECONNECT_TOKEN, required: false, type: "String", where: "token" },
+  ];
 }
 
 /** A body's Java type: a schema's, `String` for text, `BinaryBody` for binary, `<Op>Body` for multipart. */
 function bodyType(body: NonNullable<SdkOp["body"]>, op: SdkOp, ctx: JavaTypeContext): string {
-	if (body.kind === "json" || body.kind === "form") return typeAt(body.schema, op, "Body", ctx)
-	if (body.kind === "text") return "String"
-	if (body.kind === "binary") return "BinaryBody"
-	return opTypeName(op, "Body", ctx)
+  if (body.kind === "json" || body.kind === "form") return typeAt(body.schema, op, "Body", ctx);
+
+  if (body.kind === "text") return "String";
+
+  if (body.kind === "binary") return "BinaryBody";
+
+  return opTypeName(op, "Body", ctx);
 }
 
 /**
  * The operation's own `<Op><Kind>` type, claimed from the model scope after the components (C#'s order), so a component
  * spelled the same keeps its name and this one is `…2`; one operation and kind, one name.
  */
-export const opTypeName = (op: SdkOp, kind: "Body" | "Headers" | "Params", ctx: JavaTypeContext) =>
-	ctx.names.hoist(`op:${op.id}:${kind}`, `${javaTypeName(op.id)}${kind}`)
+export const opTypeName = (op: SdkOp, kind: "Body" | "Headers" | "Params", ctx: JavaTypeContext): string =>
+  ctx.names.hoist(`op:${op.id}:${kind}`, `${javaTypeName(op.id)}${kind}`);
 
 /** The record's name: `<Op>Params`. */
-export const paramsName = (op: SdkOp, ctx: JavaTypeContext) => opTypeName(op, "Params", ctx)
+export const paramsName = (op: SdkOp, ctx: JavaTypeContext): string => opTypeName(op, "Params", ctx);
 
 /** Each multipart part as a record component: a file's `FilePart` or a list of them, a text part's type. */
 export function multipartRecord(
-	op: SdkOp,
-	parts: readonly IRMultipartPart[],
-	ctx: JavaTypeContext,
-	isArray: (s: IRSchema) => boolean,
-) {
-	const scope = new NameScope(["equals", "hashCode", "toString"])
-	const sorted = [...parts].sort((a, b) => compareCodeUnits(a.name, b.name))
-	const components = sorted.map((part) => {
-		const schema = part.schema as IRSchema
-		const type =
-			part.type === "file" ? (isArray(schema) ? "List<FilePart>" : "FilePart") : typeAt(schema, op, part.name, ctx)
-		return { field: scope.claim(javaIdentifier(part.name)), name: part.name, type }
-	})
-	return { components, name: opTypeName(op, "Body", ctx) }
+  op: SdkOp,
+  parts: readonly IRMultipartPart[],
+  ctx: JavaTypeContext,
+  isArray: (s: IRSchema) => boolean,
+): {
+  readonly components: { readonly field: string; readonly name: string; readonly type: string }[];
+  readonly name: string;
+} {
+  const scope = new NameScope(["equals", "hashCode", "toString"]);
+  const sorted = [...parts].sort((a, b) => compareCodeUnits(a.name, b.name));
+
+  const components = sorted.map((part) => {
+    const schema = part.schema as IRSchema;
+
+    const type =
+      part.type === "file" ? (isArray(schema) ? "List<FilePart>" : "FilePart") : typeAt(schema, op, part.name, ctx);
+
+    return { field: scope.claim(javaIdentifier(part.name)), name: part.name, type };
+  });
+
+  return { components, name: opTypeName(op, "Body", ctx) };
 }

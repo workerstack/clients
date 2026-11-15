@@ -8,28 +8,33 @@
  * (`../ts/sdk.ts`), and the emitted file needs those names from `./<stem>.runtime.gen`, so the specifier is
  * rewritten rather than dropped.
  */
-import { readFileSync } from "node:fs"
-import type { IR, IRNamespace } from "../../ir/model.ts"
-import { compareCodeUnits } from "../shared/lang.ts"
-import { quoteKey } from "../shared/literals.ts"
-import { memberTree } from "./service-map.ts"
+import { readFileSync } from "node:fs";
+
+import type { IR, IRNamespace } from "../../ir/model.ts";
+import { compareCodeUnits } from "../shared/lang.ts";
+import { quoteKey } from "../shared/literals.ts";
+import { memberTree } from "./service-map.ts";
 
 /** The adapter's modules, each after the ones it imports, as `RUNTIME_MODULES` is ordered. */
-const QUERY_MODULES: readonly string[] = ["invalidate", "query"]
+const QUERY_MODULES: readonly string[] = ["invalidate", "query"];
 
-/* an import of a module beside this one: now the same file, so the names are already in scope */
-const SIBLING_IMPORT = /^import\s+(?:type\s+)?\{[^}]*\}\s+from\s+"\.\/[\w-]+\.ts"\n/gm
-/* an import of clients' own runtime, which the emitted file reads from `<stem>.runtime.gen` */
-const RUNTIME_IMPORT = /^import\s+(type\s+)?\{([^}]*)\}\s+from\s+"\.\.\/ts\/[\w-]+\.ts"\n/gm
-/* query-core, which stays exactly as written: type-only, so nothing has to resolve at run time */
-const QUERY_CORE_IMPORT = /^import\s+type\s+\{([^}]*)\}\s+from\s+"@tanstack\/query-core"\n/gm
+// an import of a module beside this one: now the same file, so the names are already in scope
+const SIBLING_IMPORT = /^import\s+(?:type\s+)?\{[^}]*\}\s+from\s+"\.\/[\w-]+\.ts"\n/gm;
+
+// an import of clients' own runtime, which the emitted file reads from `<stem>.runtime.gen`
+const RUNTIME_IMPORT = /^import\s+(type\s+)?\{([^}]*)\}\s+from\s+"\.\.\/ts\/[\w-]+\.ts"\n/gm;
+
+// query-core, which stays exactly as written: type-only, so nothing has to resolve at run time
+const QUERY_CORE_IMPORT = /^import\s+type\s+\{([^}]*)\}\s+from\s+"@tanstack\/query-core"\n/gm;
 
 /** The names a `{ a, type b }` clause lists, in code-unit order and once each. */
 function namesOf(clauses: readonly string[]): string[] {
-	const names = new Set<string>()
-	for (const clause of clauses)
-		for (const name of clause.split(",")) if (name.trim() !== "") names.add(name.trim().replace(/^type\s+/, ""))
-	return [...names].sort(compareCodeUnits)
+  const names = new Set<string>();
+
+  for (const clause of clauses)
+    for (const name of clause.split(",")) if (name.trim() !== "") names.add(name.trim().replace(/^type\s+/, ""));
+
+  return [...names].sort(compareCodeUnits);
 }
 
 /**
@@ -38,65 +43,82 @@ function namesOf(clauses: readonly string[]): string[] {
  * the types below wrap.
  */
 export function tanstackQuerySource(runtime: string): string {
-	const core: string[] = []
-	const runtimeNames: string[] = []
-	const bodies = QUERY_MODULES.map((name) => {
-		const text = readFileSync(new URL(`../../runtime/ts-tanstack-query/${name}.ts`, import.meta.url), "utf8")
-		return text
-			.replace(QUERY_CORE_IMPORT, (_, named: string) => {
-				core.push(named)
-				return ""
-			})
-			.replace(RUNTIME_IMPORT, (_, __, named: string) => {
-				runtimeNames.push(named)
-				return ""
-			})
-			.replace(SIBLING_IMPORT, "")
-			.trim()
-	})
-	const imports = [
-		`import type { ${namesOf(core).join(", ")} } from "@tanstack/query-core"`,
-		`import type { ${namesOf(runtimeNames).join(", ")} } from "./${runtime}.js"`,
-	]
-	return `${imports.join("\n")}\n\n${bodies.join("\n\n")}\n`
+  const core: string[] = [];
+  const runtimeNames: string[] = [];
+
+  const bodies = QUERY_MODULES.map((name) => {
+    const text = readFileSync(new URL(`../../runtime/ts-tanstack-query/${name}.ts`, import.meta.url), "utf8");
+
+    return text
+      .replaceAll(QUERY_CORE_IMPORT, (_, named: string) => {
+        core.push(named);
+
+        return "";
+      })
+      .replaceAll(RUNTIME_IMPORT, (_, __, named: string) => {
+        runtimeNames.push(named);
+
+        return "";
+      })
+      .replaceAll(SIBLING_IMPORT, "")
+      .trim();
+  });
+
+  const imports = [
+    `import type { ${namesOf(core).join(", ")} } from "@tanstack/query-core"`,
+    `import type { ${namesOf(runtimeNames).join(", ")} } from "./${runtime}.js"`,
+  ];
+
+  return `${imports.join("\n")}\n\n${bodies.join("\n\n")}\n`;
 }
 
-type Tree = { [key: string]: Tree | 1 }
+type Tree = { [key: string]: Tree | 1 };
 
 /** The member tree of the operations `keep` admits, branches with nothing in them left out. */
 function treeOf(ns: IRNamespace, keep: (op: { id: string }) => boolean, ops: Map<string, boolean>): Tree {
-	const out: Tree = {}
-	for (const [name, entry] of ns.entries) {
-		if (entry.kind === "namespace") {
-			const nested = treeOf(entry.ns, keep, ops)
-			if (Object.keys(nested).length > 0) out[name] = nested
-			continue
-		}
-		if (keep(entry.op) && ops.get(entry.op.id) !== undefined) out[name] = 1
-	}
-	return out
+  const out: Tree = {};
+
+  for (const [name, entry] of ns.entries) {
+    if (entry.kind === "namespace") {
+      const nested = treeOf(entry.ns, keep, ops);
+
+      if (Object.keys(nested).length > 0) out[name] = nested;
+      continue;
+    }
+
+    if (keep(entry.op) && ops.get(entry.op.id) !== undefined) out[name] = 1;
+  }
+
+  return out;
 }
 
 /** A tree as a type literal; `{}` when it holds nothing, which no surface then offers. */
 function treeText(tree: Tree, indent = "\t"): string {
-	const keys = Object.keys(tree)
-	if (keys.length === 0) return "{}"
-	const lines = keys.map((key) => {
-		const value = tree[key]
-		return `${indent}${quoteKey(key)}: ${value === 1 ? "1" : treeText(value as Tree, `${indent}\t`)}`
-	})
-	return `{\n${lines.join("\n")}\n${indent.slice(1)}}`
+  const keys = Object.keys(tree);
+
+  if (keys.length === 0) return "{}";
+
+  const lines = keys.map((key) => {
+    const value = tree[key];
+
+    return `${indent}${quoteKey(key)}: ${value === 1 ? "1" : treeText(value as Tree, `${indent}\t`)}`;
+  });
+
+  return `{\n${lines.join("\n")}\n${indent.slice(1)}}`;
 }
 
 /** Whether each operation can be cached: a `GET` that is not a stream or a connection. */
 function readable(ir: IR): Map<string, boolean> {
-	const out = new Map<string, boolean>()
-	for (const op of ir.operations) {
-		const stream = op.extensions.sse === true || op.extensions.websocket === true || op.extensions.realtime === true
-		if (stream) continue
-		out.set(op.id, op.method === "GET")
-	}
-	return out
+  const out = new Map<string, boolean>();
+
+  for (const op of ir.operations) {
+    const stream = op.extensions.sse === true || op.extensions.websocket === true || op.extensions.realtime === true;
+
+    if (stream) continue;
+    out.set(op.id, op.method === "GET");
+  }
+
+  return out;
 }
 
 /**
@@ -104,11 +126,12 @@ function readable(ir: IR): Map<string, boolean> {
  * mapped types that turn them into exact surfaces over the client's own operations.
  */
 export function tanstackQueryText(ir: IR, name: string, stem: string): string {
-	const ops = readable(ir)
-	const tree = memberTree(ir.tree)
-	const queries = treeOf(tree, (op) => ops.get(op.id) === true, ops)
-	const mutations = treeOf(tree, (op) => ops.get(op.id) === false, ops)
-	return `${tanstackQuerySource(`${stem}.runtime.gen`)}
+  const ops = readable(ir);
+  const tree = memberTree(ir.tree);
+  const queries = treeOf(tree, (op) => ops.get(op.id) === true, ops);
+  const mutations = treeOf(tree, (op) => ops.get(op.id) === false, ops);
+
+  return `${tanstackQuerySource(`${stem}.runtime.gen`)}
 import { serviceMap } from "./${stem}.map.gen.js"
 import type { ${name} } from "./${stem}.client.gen.js"
 
@@ -157,5 +180,5 @@ export function createQueryHelpers(
 		queryKey: Surfaced<${name}, TanstackQueryTree, 3>
 	}
 }
-`
+`;
 }

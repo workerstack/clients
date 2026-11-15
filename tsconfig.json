@@ -1,22 +1,13 @@
 {
-	"compilerOptions": {
-		"allowImportingTsExtensions": true,
-		"customConditions": ["clients-source", "backend-source"],
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"isolatedModules": true,
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"noEmit": true,
-		"resolveJsonModule": true,
-		"skipLibCheck": true,
-		"strict": true,
-		"paths": {
-			"@workerstack/clients/installers": ["./src/installers/index.ts"],
-			"@workerstack/clients/release": ["./src/release/index.ts"]
-		},
-		"target": "ESNext",
-		"types": ["@total-typescript/ts-reset", "node"]
-	},
-	"include": ["src/**/*", "tests/**/*", "scripts/**/*", "assets/**/*.ts"]
+  "compilerOptions": {
+    "customConditions": ["clients-source", "backend-source"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@workerstack/clients/installers": ["./src/installers/index.ts"],
+      "@workerstack/clients/release": ["./src/release/index.ts"]
+    },
+    "target": "ESNext"
+  },
+  "extends": "@workerstack/repo/tsconfig/bun",
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*", "assets/**/*.ts"]
 }

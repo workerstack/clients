@@ -184,7 +184,7 @@ export function ciInstalls(): Readonly<Record<string, readonly string[]>> {
 			pythonInstall(['"$(cat .python-version)"', PY_FLOOR]),
 		],
 		"src/emit/csharp/__fixtures__/csharp-env.ts": [
-			dotnetInstall(`"$(sed -n 's/.*"version": "\\(.*\\)",/\\1/p' global.json)"`),
+			dotnetInstall(`"$(sed -n 's/.*"version": "\\([^"]*\\)".*/\\1/p' global.json)"`),
 		],
 		"src/emit/java/__fixtures__/java-env.ts": [javaInstall()],
 		"src/emit/rust/__fixtures__/rust-env.ts": [

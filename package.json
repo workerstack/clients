@@ -1,118 +1,116 @@
 {
-	"name": "@workerstack/clients",
-	"version": "1.0.0-rc.29",
-	"description": "Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a CLI and an MCP server from any OpenAPI 3.x document.",
-	"keywords": [
-		"codegen",
-		"mcp",
-		"openapi",
-		"sdk",
-		"workerstack"
-	],
-	"homepage": "https://github.com/workerstack/clients#readme",
-	"bugs": {
-		"url": "https://github.com/workerstack/clients/issues"
-	},
-	"license": "MIT",
-	"author": "lovrozagar",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/workerstack/clients.git"
-	},
-	"bin": {
-		"clients": "bin/clients.js",
-		"installgen": "bin/installgen.js"
-	},
-	"files": [
-		"assets",
-		"bin",
-		"dist"
-	],
-	"type": "module",
-	"exports": {
-		".": {
-			"clients-source": "./src/index.ts",
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		},
-		"./cli": {
-			"clients-source": "./src/cli.ts",
-			"types": "./dist/cli.d.ts",
-			"default": "./dist/cli.js"
-		},
-		"./installers": {
-			"clients-source": "./src/installers/index.ts",
-			"types": "./dist/installers/index.d.ts",
-			"default": "./dist/installers/index.js"
-		},
-		"./release": {
-			"clients-source": "./src/release/index.ts",
-			"types": "./dist/release/index.d.ts",
-			"default": "./dist/release/index.js"
-		},
-		"./package.json": "./package.json"
-	},
-	"publishConfig": {
-		"access": "public",
-		"provenance": true
-	},
-	"scripts": {
-		"fmt": "oxfmt",
-		"fmt:check": "oxfmt --check",
-		"lint": "oxlint",
-		"lint:fix": "oxlint --fix",
-		"postinstall": "repo sync --postinstall",
-		"prepack": "bun scripts/build.ts",
-		"prepare": "lefthook install --reset-hooks-path",
-		"test": "vitest run --coverage",
-		"test:harness": "vitest run --mode harness",
-		"typecheck": "tsc --noEmit -p tsconfig.json"
-	},
-	"dependencies": {
-		"jiti": "2.7.0",
-		"oxc-transform": "0.155.0",
-		"zod": "4.3.6"
-	},
-	"devDependencies": {
-		"@clack/prompts": "^0.11.0",
-		"@commitlint/cli": "21.2.4",
-		"@commitlint/config-conventional": "21.2.4",
-		"@tanstack/query-core": "5.104.5",
-		"@total-typescript/ts-reset": "0.6.1",
-		"@types/node": "26.1.1",
-		"@vitest/coverage-v8": "4.1.10",
-		"@workerstack/backend": "1.0.0-rc.29",
-		"@workerstack/repo": "0.2.0-rc.2",
-		"@workerstack/system": "0.3.0",
-		"ajv": "8.20.0",
-		"ajv-formats": "3.0.1",
-		"js-yaml": "5.3.0",
-		"lefthook": "2.2.2",
-		"miniflare": "4.20260730.0",
-		"oxc-parser": "0.152.0",
-		"oxfmt": "0.78.0",
-		"oxlint": "1.93.0",
-		"smol-toml": "^1.8.0",
-		"standardwebhooks": "1.1.1",
-		"ts-morph": "28.0.0",
-		"typescript": "7.0.2",
-		"vite": "8.1.4",
-		"vitest": "4.1.10"
-	},
-	"peerDependencies": {
-		"oxfmt": ">=0.63.0",
-		"ts-morph": ">=28.0.0"
-	},
-	"peerDependenciesMeta": {
-		"oxfmt": {
-			"optional": true
-		},
-		"ts-morph": {
-			"optional": true
-		}
-	},
-	"engines": {
-		"node": ">=22.12.0"
-	},
-	"packageManager": "bun@1.4.4"
+  "name": "@workerstack/clients",
+  "version": "1.0.0-rc.29",
+  "private": false,
+  "description": "Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a CLI and an MCP server from any OpenAPI 3.x document.",
+  "keywords": [
+    "codegen",
+    "mcp",
+    "openapi",
+    "sdk",
+    "workerstack"
+  ],
+  "homepage": "https://github.com/workerstack/clients#readme",
+  "bugs": {
+    "url": "https://github.com/workerstack/clients/issues"
+  },
+  "license": "MIT",
+  "author": "lovrozagar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/workerstack/clients.git"
+  },
+  "bin": {
+    "clients": "bin/clients.js",
+    "installgen": "bin/installgen.js"
+  },
+  "files": [
+    "assets",
+    "bin",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "clients-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cli": {
+      "clients-source": "./src/cli.ts",
+      "types": "./dist/cli.d.ts",
+      "default": "./dist/cli.js"
+    },
+    "./installers": {
+      "clients-source": "./src/installers/index.ts",
+      "types": "./dist/installers/index.d.ts",
+      "default": "./dist/installers/index.js"
+    },
+    "./release": {
+      "clients-source": "./src/release/index.ts",
+      "types": "./dist/release/index.d.ts",
+      "default": "./dist/release/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build:types": "tsc -p tsconfig.build.json",
+    "fmt": "repo fmt",
+    "fmt:check": "repo fmt --check",
+    "lint": "repo lint",
+    "lint:fix": "repo lint --fix",
+    "postinstall": "repo sync --postinstall",
+    "prepack": "bun scripts/build.ts",
+    "test": "vitest run --coverage",
+    "test:harness": "vitest run --mode harness",
+    "typecheck": "tsc -p tsconfig.json",
+    "typecheck:src": "tsc -p tsconfig.src.json"
+  },
+  "dependencies": {
+    "jiti": "2.7.0",
+    "oxc-transform": "0.155.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@tanstack/query-core": "5.104.5",
+    "@total-typescript/ts-reset": "0.6.1",
+    "@types/node": "26.1.1",
+    "@vitest/coverage-v8": "5.1.0",
+    "@workerstack/backend": "1.0.0-rc.29",
+    "@workerstack/repo": "0.2.0-rc.2",
+    "@workerstack/system": "0.3.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "js-yaml": "5.3.0",
+    "miniflare": "4.20260730.0",
+    "oxc-parser": "0.152.0",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "standardwebhooks": "1.1.1",
+    "ts-morph": "28.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.1.4",
+    "vitest": "5.1.0"
+  },
+  "peerDependencies": {
+    "oxfmt": ">=0.63.0",
+    "ts-morph": ">=28.0.0"
+  },
+  "peerDependenciesMeta": {
+    "oxfmt": {
+      "optional": true
+    },
+    "ts-morph": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "packageManager": "bun@1.4.4"
 }

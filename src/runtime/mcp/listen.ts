@@ -25,7 +25,7 @@ export const bearer = (authorization: string | null, token: string): boolean =>
 /** `incoming` as a Request to `url`, every header kept as sent (a repeated one joined), `closed` its signal. */
 function requestOf(incoming: IncomingMessage, headers: Headers, url: string, closed: AbortSignal) {
 	const post = incoming.method === "POST"
-	const body = post ? (Readable.toWeb(incoming) as ReadableStream) : null
+	const body = post ? Readable.toWeb(incoming) : null
 	return new Request(url, { body, duplex: "half", headers, method: incoming.method, signal: closed } as RequestInit)
 }
 

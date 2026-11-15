@@ -1,4 +1,47 @@
 {
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  },
+  "editor.defaultFormatter": "wdomitrz.simple-lsp-client",
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.watcherExclude": {
+    "**/.turbo/**": true,
+    "**/.worktrees/**": true
+  },
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/typescript",
+  "oxc.enable.oxfmt": false,
+  "search.exclude": {
+    "**/.turbo": true,
+    "**/.worktrees": true,
+    "**/coverage": true
+  },
+  "simpleLspClient.formatters": {
+    "bun": {
+      "cmd": [
+        "bun",
+        "fmt",
+        "--no-script",
+        "--stdin-filepath",
+        "${file}"
+      ],
+      "filetypes": [
+        "javascript",
+        "javascriptreact",
+        "typescript",
+        "typescriptreact",
+        "json",
+        "jsonc",
+        "css",
+        "tailwindcss",
+        "scss"
+      ]
+    }
+  },
   "files.readonlyInclude": {
     ".agents/agents/implementer-deep.md": true,
     ".agents/agents/implementer-fast.md": true,
@@ -23,6 +66,10 @@
     ".cursor/agents/researcher.md": true,
     ".cursor/agents/scout.md": true,
     ".cursor/hooks.json": true,
+    ".githooks/commit-msg": true,
+    ".githooks/pre-commit": true,
+    ".githooks/pre-push": true,
+    ".githooks/reference-transaction": true,
     ".grok/agents/implementer-deep.md": true,
     ".grok/agents/implementer-fast.md": true,
     ".grok/agents/orchestrator.md": true,
@@ -32,9 +79,13 @@
     ".grok/hooks/orchestrate-parent.json": true,
     ".grok/hooks/rtk.json": true,
     ".grok/roles/scout.toml": true,
+    ".oxfmtrc.jsonc": true,
+    ".oxlintrc.jsonc": true,
     ".repo/.gitkeep": true,
     ".repo/lessons/INDEX.md": true,
     ".vscode/tasks.json": true,
-    "bunfig.toml": true
+    "README.md": true,
+    "bunfig.toml": true,
+    "knip.jsonc": true
   }
 }

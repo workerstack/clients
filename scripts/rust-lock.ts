@@ -8,19 +8,29 @@
  *
  *     bun scripts/rust-lock.ts
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { runCargo, rustCacheDir } from "../src/emit/rust/__fixtures__/rust-env.ts"
-import { cargoToml } from "../src/emit/rust/sdk-cargo.ts"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-const dir = rustCacheDir("tmp", "lock")
-mkdirSync(join(dir, "src"), { recursive: true })
-writeFileSync(join(dir, "Cargo.toml"), cargoToml({ name: "http-sdk", version: "0.1.0" }, true))
-writeFileSync(join(dir, "src/lib.rs"), "")
-const target = new URL("../src/runtime/rust/Cargo.lock", import.meta.url)
-writeFileSync(join(dir, "Cargo.lock"), readFileSync(target, "utf8"))
-/* metadata resolves against the lock it finds and rewrites it: unreachable packages pruned, nothing upgraded */
-const run = runCargo(["metadata", "--format-version", "1"], { cwd: dir })
-if (run.status !== 0) throw new Error(`cargo metadata failed:\n${run.stderr}`)
-writeFileSync(target, readFileSync(join(dir, "Cargo.lock"), "utf8"))
-process.stdout.write(`wrote ${target.pathname}\n`)
+import { runCargo, rustCacheDir } from "../src/emit/rust/__fixtures__/rust-env.ts";
+import { cargoToml } from "../src/emit/rust/sdk-cargo.ts";
+
+const dir = rustCacheDir("tmp", "lock");
+
+mkdirSync(join(dir, "src"), { recursive: true });
+
+writeFileSync(join(dir, "Cargo.toml"), cargoToml({ name: "http-sdk", version: "0.1.0" }, true));
+
+writeFileSync(join(dir, "src/lib.rs"), "");
+
+const target = new URL("../src/runtime/rust/Cargo.lock", import.meta.url);
+
+writeFileSync(join(dir, "Cargo.lock"), readFileSync(target, "utf8"));
+
+// metadata resolves against the lock it finds and rewrites it: unreachable packages pruned, nothing upgraded
+const run = runCargo(["metadata", "--format-version", "1"], { cwd: dir });
+
+if (run.status !== 0) throw new Error(`cargo metadata failed:\n${run.stderr}`);
+
+writeFileSync(target, readFileSync(join(dir, "Cargo.lock"), "utf8"));
+
+process.stdout.write(`wrote ${target.pathname}\n`);

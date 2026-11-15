@@ -46,7 +46,6 @@ export type QueryHelperOptions = {
 }
 
 /* an SDK method, whatever its shape: `unknown` collapses call signatures, which is what this must not do */
-// oxlint-disable-next-line typescript/no-explicit-any
 type AnyMethod = (...args: any[]) => any
 
 type Req<M> = M extends (req: infer R, ...rest: never[]) => unknown ? R : never
@@ -110,7 +109,6 @@ export type KeyFactory<M> = (req?: Req<M>) => QueryKey
  * disappears behind them; a consumer never sees it.
  */
 export interface Surface {
-	// oxlint-disable-next-line typescript/no-explicit-any
 	(...args: any[]): any
 	readonly [key: string]: Surface
 }

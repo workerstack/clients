@@ -2,6 +2,16 @@
 {
   "tasks": [
     {
+      "label": "build:types",
+      "type": "shell",
+      "command": "bun run build:types",
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
       "label": "fmt",
       "type": "shell",
       "command": "bun run fmt",
@@ -62,16 +72,6 @@
       }
     },
     {
-      "label": "prepare",
-      "type": "shell",
-      "command": "bun run prepare",
-      "problemMatcher": [],
-      "presentation": {
-        "panel": "new",
-        "reveal": "always"
-      }
-    },
-    {
       "label": "test",
       "type": "shell",
       "command": "bun run test",
@@ -95,6 +95,16 @@
       "label": "typecheck",
       "type": "shell",
       "command": "bun run typecheck",
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "typecheck:src",
+      "type": "shell",
+      "command": "bun run typecheck:src",
       "problemMatcher": [],
       "presentation": {
         "panel": "new",

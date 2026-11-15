@@ -1,4 +1,4 @@
-/* copied from @workerstack/backend's tests/build/fixture/workflows.ts: the CI workflows read as data (roadmap 5 D7) */
+/* copied from @workerstack/backend's tests/build/__fixtures__/workflows.ts: the CI workflows read as data (roadmap 5 D7) */
 /**
  * The repo's GitHub workflows parsed (js-yaml, test-only), for the release's provenance and conformance-gate legs: a
  * workflow's jobs, a job's upstream through `needs`, and the jobs or steps that run a command.

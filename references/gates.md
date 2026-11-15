@@ -1,5 +1,6 @@
 ---
 description: Gates, push, CI and release
+order: 800
 ---
 
 # Gates
@@ -8,36 +9,36 @@ description: Gates, push, CI and release
 
 This repo has these `package.json` scripts. Hooks and CI call only these names, so a tool change is one line in `package.json`.
 
-| script              | runs                                                                    |
-| ------------------- | ----------------------------------------------------------------------- |
-| `fmt` / `fmt:check` | oxfmt                                                                   |
-| `lint` / `lint:fix` | oxlint, with `.oxlintrc.json` and the repo's own rule plugin in `lint/` |
-| `typecheck`         | the repo's type check (moving to `bun check`)                           |
-| `test`              | the repo's suite                                                        |
+| script                       | runs                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `fmt` / `fmt:check`          | `repo fmt`: oxfmt with the standards pack's generated `.oxfmtrc.jsonc`                    |
+| `lint` / `lint:fix`          | `repo lint`: oxlint with the generated `.oxlintrc.jsonc`, the repo's own plugin in `lint/` |
+| `typecheck`                  | `tsc -p tsconfig.json`: src, tests and scripts                                            |
+| `typecheck:src`              | `tsc -p tsconfig.src.json`: the source under the strict preset                            |
+| `test`                       | the repo's suite                                                                          |
+
+The lint and format configs, `knip.jsonc` and the git hooks are written by `bun repo sync` from `repo.config.ts`. The
+repo's own lint rules are `lint.plugins` and `lint.rules` there; a rule that does not fit a file is a `lint.skip` entry
+with its reason, and a use knip cannot see is a `knip.ignore` entry with its reason.
 
 ## Where each gate runs
 
-| when       | what                                                                                                               | blocks                |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ | --------------------- |
-| pre-commit | `oxlint --fix`, then `oxfmt` on staged files (restaged); `oxfmt --check` and `oxlint` on them; `bun run typecheck` | the commit            |
-| commit-msg | commitlint (Conventional Commits)                                                                                  | the commit            |
-| pre-push   | `fmt:check`, `lint` on the whole tree                                                                              | the push              |
-| CI         | the full gates on every push to `main`: `fmt:check`, `lint`, `typecheck`, `test`, `test:harness`                   | new work, until fixed |
+| when       | what                                                                                                                         | blocks                |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| pre-commit | `repo precommit`: fmt and `lint --fix` on the staged files (restaged), lint held to the baseline, typecheck, sync, the related tests, `repo check` | the commit            |
+| commit-msg | `repo commit-msg`: Conventional Commits and the change-size rule                                                             | the commit            |
+| pre-push   | `repo link --pre-push`, then `repo commit-msg --pre-push` on each pushed commit                                              | the push              |
+| CI         | on every push to `main`: the `commits` job (`repo commit-msg --range`), `fmt:check`, `repo check`, `typecheck`, `typecheck:src`, `test`, `test:harness` | new work, until fixed |
+
+`bun repo sync` points `core.hooksPath` at `.githooks/`, so the hooks come with `bun install`.
 
 ## Push and CI
 
-No full suite runs locally. Each commit runs the tests its change reaches: the touched test files and the tests of the code it changed. Then push, and run `bun scripts/ci-wait.ts`. It waits for CI's push run on HEAD and prints one line:
-
-- passed, with the run's URL: done
-- failed, naming the failed jobs and the path under `.tmp/ci/` that holds their logs: read the log, fix, commit, push, and run ci-wait again
-- superseded, when a newer push canceled the run: wait on that commit, as the line says
-- canceled with no newer push, or no run within the grace (the commit was never pushed): the line names the next command
-
-Exit 0 is passed, 2 superseded, 1 everything else. A push cancels the run before it, so batch the commits and push once.
+No full suite runs locally. Each commit runs the tests its change reaches: the touched test files and the tests of the code it changed. Then push, and run `bun repo ci wait` in the background. It waits for CI's run on the pushed commit and names any failed job and its log. A push cancels the run before it, so batch the commits and push once.
 
 ## Release
 
-The version bump rides in the final push. Only a commit ci-wait passed on `main` gets the `v*` tag. The release workflow runs no tests: it waits for that commit's `ci.yml` push run and publishes on its success, so a bump made after the green push is a new commit and costs another CI run.
+The version bump rides in the final push. Only a commit CI passed on `main` gets the `v*` tag. The release workflow runs no tests: it waits for that commit's `ci.yml` push run and publishes on its success, so a bump made after the green push is a new commit and costs another CI run. The tag's notes are the `## [Unreleased]` entry of `CHANGELOG.md` for a prerelease and the dated `## [x.y.z] - YYYY-MM-DD` entry for a final release; `scripts/changelog.ts` refuses a tag without them.
 
 ## Browsers
 

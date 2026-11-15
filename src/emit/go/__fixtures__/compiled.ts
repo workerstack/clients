@@ -199,7 +199,7 @@ function driverSources(module: string, plans: Readonly<Record<string, GoCallPlan
 	const dir = join(import.meta.dirname, "driver")
 	const files = readdirSync(dir)
 		.filter((name) => name.endsWith(".go"))
-		.map((name) => [name, readFileSync(join(dir, name), "utf8")])
+		.map((name): [string, string] => [name, readFileSync(join(dir, name), "utf8")])
 	files.push(["targets.go", headerTargets(plans)])
 	return Object.fromEntries(files.map(([name, text]) => [name, text.replaceAll(DRIVER_IMPORT, JSON.stringify(module))]))
 }

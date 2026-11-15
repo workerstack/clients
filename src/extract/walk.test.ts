@@ -1,166 +1,178 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as tsMorph from "ts-morph"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { type FixtureProject, fixtureProject, lines } from "./__fixtures__/project.ts"
-import { findTsConfig, loadEntry, registrations } from "./walk.ts"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-const SLOW = 60_000
+import * as tsMorph from "ts-morph";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { type FixtureProject, fixtureProject, lines } from "./__fixtures__/project.ts";
+import { findTsConfig, loadEntry, registrations } from "./walk.ts";
+
+const SLOW = 60_000;
 
 /** A registration walk says nothing here: every mount path is a literal. */
 const report = (message: string) => {
-	throw new Error(`unexpected report: ${message}`)
-}
+  throw new Error(`unexpected report: ${message}`);
+};
 
 describe("findTsConfig: the project's own tsconfig", () => {
-	it("is the nearest one walking up, never one past the package root, and none when there is none", () => {
-		const root = mkdtempSync(join(tmpdir(), "clients-tsconfig-"))
-		try {
-			const put = (rel: string) => {
-				mkdirSync(join(root, rel, ".."), { recursive: true })
-				writeFileSync(join(root, rel), "{}")
-			}
-			put("tsconfig.json")
-			put("pkg/package.json")
-			put("app/deep/x.ts")
-			put("pkg/src/x.ts")
-			put("solo/src/x.ts")
-			put("solo/tsconfig.json")
-			expect([
-				findTsConfig(join(root, "app/deep/x.ts")),
-				findTsConfig(join(root, "pkg/src/x.ts")),
-				findTsConfig(join(root, "solo/src/x.ts")),
-				findTsConfig("/x.ts"),
-			]).toEqual([join(root, "tsconfig.json"), undefined, join(root, "solo/tsconfig.json"), undefined])
-		} finally {
-			rmSync(root, { force: true, recursive: true })
-		}
-	})
-})
+  it("is the nearest one walking up, never one past the package root, and none when there is none", () => {
+    const root = mkdtempSync(join(tmpdir(), "clients-tsconfig-"));
+
+    try {
+      const put = (rel: string) => {
+        mkdirSync(join(root, rel, ".."), { recursive: true });
+        writeFileSync(join(root, rel), "{}");
+      };
+
+      put("tsconfig.json");
+      put("pkg/package.json");
+      put("app/deep/x.ts");
+      put("pkg/src/x.ts");
+      put("solo/src/x.ts");
+      put("solo/tsconfig.json");
+      expect([
+        findTsConfig(join(root, "app/deep/x.ts")),
+        findTsConfig(join(root, "pkg/src/x.ts")),
+        findTsConfig(join(root, "solo/src/x.ts")),
+        findTsConfig("/x.ts"),
+      ]).toEqual([join(root, "tsconfig.json"), undefined, join(root, "solo/tsconfig.json"), undefined]);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
 
 describe("loadEntry: the app under its export", () => {
-	let project: FixtureProject
-	beforeAll(() => {
-		project = fixtureProject()
-	})
-	afterAll(() => project.dispose())
+  let project: FixtureProject;
+  beforeAll(() => {
+    project = fixtureProject();
+  });
+  afterAll(() => project.dispose());
 
-	it(
-		"finds the app through an export list, an unexported declaration of the name, and a default export",
-		() => {
-			const sources = {
-				"entry/default.ts": "export default httpApp<{ D: 1 }>()",
-				"entry/list.ts": "const inner = httpApp<{ L: 1 }>()\nexport { inner as app }",
-				"entry/local.ts": "const app = httpApp<{ U: 1 }>()\nexport const other = 1",
-			}
-			const names: Record<string, string> = { "entry/default.ts": "default" }
-			const envs = Object.entries(sources).map(([rel, body]) => {
-				const entryPath = project.write(rel, lines('import { httpApp } from "@workerstack/backend/http"', body))
-				const entry = loadEntry(tsMorph, { entryPath, exportName: names[rel] ?? "app" })
-				const env = entry.appType.getProperty("$env")
-				return env === undefined ? null : entry.checker.typeToString(entry.checker.getTypeOfSymbol(env))
-			})
-			expect(envs).toEqual(["{ D: 1; }", "{ L: 1; }", "{ U: 1; }"])
-		},
-		SLOW,
-	)
+  it(
+    "finds the app through an export list, an unexported declaration of the name, and a default export",
+    () => {
+      const sources = {
+        "entry/default.ts": "export default httpApp<{ D: 1 }>()",
+        "entry/list.ts": "const inner = httpApp<{ L: 1 }>()\nexport { inner as app }",
+        "entry/local.ts": "const app = httpApp<{ U: 1 }>()\nexport const other = 1",
+      };
 
-	it(
-		"reads an entry that no tsconfig governs",
-		() => {
-			const root = mkdtempSync(join(tmpdir(), "clients-no-tsconfig-"))
-			try {
-				writeFileSync(join(root, "package.json"), JSON.stringify({ name: "bare" }))
-				const entryPath = join(root, "app.ts")
-				writeFileSync(entryPath, "export const app = { $env: null as unknown as { K: string } }")
-				const entry = loadEntry(tsMorph, { entryPath, exportName: "app" })
-				const env = entry.appType.getProperty("$env")
-				expect(env && entry.checker.typeToString(entry.checker.getTypeOfSymbol(env))).toBe("{ K: string; }")
-			} finally {
-				rmSync(root, { force: true, recursive: true })
-			}
-		},
-		SLOW,
-	)
-})
+      const names: Record<string, string> = { "entry/default.ts": "default" };
+
+      const envs = Object.entries(sources).map(([rel, body]) => {
+        const entryPath = project.write(rel, lines('import { httpApp } from "@workerstack/backend/http"', body));
+        const entry = loadEntry(tsMorph, { entryPath, exportName: names[rel] ?? "app" });
+        const env = entry.appType.getProperty("$env");
+
+        return env === undefined ? null : entry.checker.typeToString(entry.checker.getTypeOfSymbol(env));
+      });
+
+      expect(envs).toEqual(["{ D: 1; }", "{ L: 1; }", "{ U: 1; }"]);
+    },
+    SLOW,
+  );
+
+  it(
+    "reads an entry that no tsconfig governs",
+    () => {
+      const root = mkdtempSync(join(tmpdir(), "clients-no-tsconfig-"));
+
+      try {
+        writeFileSync(join(root, "package.json"), JSON.stringify({ name: "bare" }));
+        const entryPath = join(root, "app.ts");
+        writeFileSync(entryPath, "export const app = { $env: null as unknown as { K: string } }");
+        const entry = loadEntry(tsMorph, { entryPath, exportName: "app" });
+        const env = entry.appType.getProperty("$env");
+        expect(env && entry.checker.typeToString(entry.checker.getTypeOfSymbol(env))).toBe("{ K: string; }");
+      } finally {
+        rmSync(root, { force: true, recursive: true });
+      }
+    },
+    SLOW,
+  );
+});
 
 describe("registrations: the routes the program's own files register", () => {
-	let project: FixtureProject
-	beforeAll(() => {
-		project = fixtureProject()
-	})
-	afterAll(() => project.dispose())
+  let project: FixtureProject;
+  beforeAll(() => {
+    project = fixtureProject();
+  });
+  afterAll(() => project.dispose());
 
-	it(
-		"walks every program file but declaration files and packages, and takes only a builder's .handler()",
-		() => {
-			project.write(
-				"walk/node_modules/dep/index.ts",
-				lines(
-					'import { httpApp } from "@workerstack/backend/http"',
-					'export const dep = httpApp<{}>().get("/dep").handler((c) => c.res.text("ok", "ok"))',
-				),
-			)
-			project.write("walk/node_modules/dep/package.json", JSON.stringify({ main: "index.ts", name: "dep" }))
-			project.write(
-				"walk/more.ts",
-				lines(
-					'import type { HttpApp } from "@workerstack/backend/http"',
-					'export const more = (app: HttpApp<{}>) => app.on(["GET", "PUT"], "/more").handler((c) => c.res.text("ok", "ok"))',
-				),
-			)
-			const entryPath = project.write(
-				"walk/app.ts",
-				lines(
-					'import { httpApp } from "@workerstack/backend/http"',
-					'import { ws } from "@workerstack/backend/ws"',
-					'import "dep"',
-					'import { more } from "./more.ts"',
-					"export const app = httpApp<{}>()",
-					'app.get("/a").handler((c) => c.res.text("ok", "ok"))',
-					'ws(app, "/socket").handler({ onMessage: () => {} })',
-					"const fake = { handler: (f: unknown) => f }",
-					"fake.handler(() => 1)",
-					"more(app)",
-				),
-			)
-			const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }), report)
-			expect(
-				found.map(({ at, methods, paths }) => ({ at: at.slice(project.root.length + 1), methods, paths })),
-			).toEqual([
-				{ at: "walk/app.ts:6", methods: ["GET"], paths: ["/a"] },
-				{ at: "walk/more.ts:2", methods: ["GET", "PUT"], paths: ["/more"] },
-			])
-		},
-		SLOW,
-	)
-})
+  it(
+    "walks every program file but declaration files and packages, and takes only a builder's .handler()",
+    () => {
+      project.write(
+        "walk/node_modules/dep/index.ts",
+        lines(
+          'import { httpApp } from "@workerstack/backend/http"',
+          'export const dep = httpApp<{}>().get("/dep").handler((c) => c.res.text("ok", "ok"))',
+        ),
+      );
+      project.write("walk/node_modules/dep/package.json", JSON.stringify({ main: "index.ts", name: "dep" }));
+      project.write(
+        "walk/more.ts",
+        lines(
+          'import type { HttpApp } from "@workerstack/backend/http"',
+          'export const more = (app: HttpApp<{}>) => app.on(["GET", "PUT"], "/more").handler((c) => c.res.text("ok", "ok"))',
+        ),
+      );
+
+      const entryPath = project.write(
+        "walk/app.ts",
+        lines(
+          'import { httpApp } from "@workerstack/backend/http"',
+          'import { ws } from "@workerstack/backend/ws"',
+          'import "dep"',
+          'import { more } from "./more.ts"',
+          "export const app = httpApp<{}>()",
+          'app.get("/a").handler((c) => c.res.text("ok", "ok"))',
+          'ws(app, "/socket").handler({ onMessage: () => {} })',
+          "const fake = { handler: (f: unknown) => f }",
+          "fake.handler(() => 1)",
+          "more(app)",
+        ),
+      );
+
+      const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }), report);
+      expect(
+        found.map(({ at, methods, paths }) => ({ at: at.slice(project.root.length + 1), methods, paths })),
+      ).toEqual([
+        { at: "walk/app.ts:6", methods: ["GET"], paths: ["/a"] },
+        { at: "walk/more.ts:2", methods: ["GET", "PUT"], paths: ["/more"] },
+      ]);
+    },
+    SLOW,
+  );
+});
 
 describe("registrations: a route on a mounted sub", () => {
-	let project: FixtureProject
-	beforeAll(() => {
-		project = fixtureProject()
-	})
-	afterAll(() => project.dispose())
+  let project: FixtureProject;
+  beforeAll(() => {
+    project = fixtureProject();
+  });
+  afterAll(() => project.dispose());
 
-	it(
-		"gives it the paths its mounts serve it at",
-		() => {
-			const entryPath = project.write(
-				"walk/mounted.ts",
-				lines(
-					'import { httpApp } from "@workerstack/backend/http"',
-					"const sub = httpApp<{}>()",
-					'sub.get("/a").handler((c) => c.res.text("ok", "ok"))',
-					"export const app = httpApp<{}>()",
-					'app.route("/m", sub)',
-					'app.route("/n/", sub)',
-				),
-			)
-			const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }), report)
-			expect(found.map(({ paths }) => paths)).toEqual([["/m/a", "/n//a"]])
-		},
-		SLOW,
-	)
-})
+  it(
+    "gives it the paths its mounts serve it at",
+    () => {
+      const entryPath = project.write(
+        "walk/mounted.ts",
+        lines(
+          'import { httpApp } from "@workerstack/backend/http"',
+          "const sub = httpApp<{}>()",
+          'sub.get("/a").handler((c) => c.res.text("ok", "ok"))',
+          "export const app = httpApp<{}>()",
+          'app.route("/m", sub)',
+          'app.route("/n/", sub)',
+        ),
+      );
+
+      const found = registrations(loadEntry(tsMorph, { entryPath, exportName: "app" }), report);
+      expect(found.map(({ paths }) => paths)).toEqual([["/m/a", "/n//a"]]);
+    },
+    SLOW,
+  );
+});

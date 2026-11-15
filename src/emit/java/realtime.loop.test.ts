@@ -6,22 +6,25 @@
  * the next receive is that cancel (the SDK never clears an interrupt it did not set); 200 rounds whose opens straddle
  * the bound leave no stray interrupt after a success and lose no caller interrupt; and a fire after the open is nothing.
  */
-import { describe, expect, it } from "vitest"
-import { type DrivenJavaSdk, drivenJavaSdk } from "./__fixtures__/driven.ts"
-import { withJava } from "./__fixtures__/java-env.ts"
+import { describe, expect, it } from "vitest";
+
+import { type DrivenJavaSdk, drivenJavaSdk } from "./__fixtures__/driven.ts";
+import { withJava } from "./__fixtures__/java-env.ts";
 
 /** Whether Java is pinned here: a missing toolchain fails where it is required and skips these legs elsewhere. */
-const JAVA = withJava()
-/** A cold gate compiles the SDK first. */
-const SLOW = { timeout: 600_000 }
+const JAVA = withJava();
 
-let compiled: DrivenJavaSdk | undefined
+/** A cold gate compiles the SDK first. */
+const SLOW = { timeout: 600_000 };
+
+let compiled: DrivenJavaSdk | undefined;
 
 /** The `realtime` SDK, gated once per file; it must build. */
 function sdk(): DrivenJavaSdk {
-	compiled ??= drivenJavaSdk("realtime")
-	expect(compiled.built, compiled.diagnostics.join("\n")).toBe(true)
-	return compiled
+  compiled ??= drivenJavaSdk("realtime");
+  expect(compiled.built, compiled.diagnostics.join("\n")).toBe(true);
+
+  return compiled;
 }
 
 /**
@@ -188,14 +191,14 @@ final class Held implements TransportAdapter {
     return new Conn();
   }
 }
-`
+`;
 
 /**
  * `body` as the probe's main beside DECLS, under a watchdog of `seconds` (20 by default); `open(adapter, ms)` a
  * connection bounded at `ms`.
  */
 function probed(body: string, seconds = 20): string[] {
-	const source = `package com.example;
+  const source = `package com.example;
 
 import java.time.Duration;
 import java.util.List;
@@ -221,23 +224,25 @@ final class LoopProbe {
     watchdog.setDaemon(true);
     watchdog.start();
 ${body
-	.split("\n")
-	.map((line) => `    ${line}`)
-	.join("\n")}
+  .split("\n")
+  .map((line) => `    ${line}`)
+  .join("\n")}
     System.exit(0);
   }
 }
-${DECLS}`
-	const run = sdk().run("com.example.LoopProbe", source)
-	expect({ diagnostics: run.diagnostics, status: run.status }, run.stderr).toEqual({ diagnostics: [], status: 0 })
-	return run.stdout.split("\n").filter((line) => line !== "")
+${DECLS}`;
+
+  const run = sdk().run("com.example.LoopProbe", source);
+  expect({ diagnostics: run.diagnostics, status: run.status }, run.stderr).toEqual({ diagnostics: [], status: 0 });
+
+  return run.stdout.split("\n").filter((line) => line !== "");
 }
 
 describe.skipIf(!JAVA)("the open bound (R4): no transport within it is ApiTimeoutException", SLOW, () => {
-	/* new: RealtimeLoop.cs:16 (C#'s OpenLimit), shortened in process; red with the bound removed (the watchdog) */
-	it("ends a chain that opens nothing within the bound: ApiTimeoutException, the adapter interrupted, no interrupt left", () => {
-		expect(
-			probed(`Held held = new Held();
+  // new: RealtimeLoop.cs:16 (C#'s OpenLimit), shortened in process; red with the bound removed (the watchdog)
+  it("ends a chain that opens nothing within the bound: ApiTimeoutException, the adapter interrupted, no interrupt left", () => {
+    expect(
+      probed(`Held held = new Held();
 ResumableConnection<JsonNode, JsonNode> rc = open(held, 100);
 long started = System.nanoTime();
 try {
@@ -248,13 +253,13 @@ try {
   System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage() + " " + (ms >= 90 && ms < 2000));
 }
 System.out.println(held.interrupted + " " + Thread.currentThread().isInterrupted() + " " + rc.state());`),
-		).toEqual(["ApiTimeoutException: no transport opened within 100 ms true", "true false DISCONNECTED"])
-	})
+    ).toEqual(["ApiTimeoutException: no transport opened within 100 ms true", "true false DISCONNECTED"]);
+  });
 
-	/* new: the refinement (1): an open that returned past the bound closes what it opened and is the timeout */
-	it("closes what an open returned past the bound and throws the timeout, no interrupt left", () => {
-		expect(
-			probed(`Spin spin = new Spin(400);
+  // new: the refinement (1): an open that returned past the bound closes what it opened and is the timeout
+  it("closes what an open returned past the bound and throws the timeout, no interrupt left", () => {
+    expect(
+      probed(`Spin spin = new Spin(400);
 ResumableConnection<JsonNode, JsonNode> rc = open(spin, 50);
 try {
   rc.open();
@@ -263,9 +268,9 @@ try {
   System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
 }
 System.out.println(spin.conns.size() + " " + spin.conns.get(0).closed + " " + Thread.currentThread().isInterrupted() + " " + rc.state());`),
-		).toEqual(["ApiTimeoutException: no transport opened within 50 ms", "1 true false DISCONNECTED"])
-	})
-})
+    ).toEqual(["ApiTimeoutException: no transport opened within 50 ms", "1 true false DISCONNECTED"]);
+  });
+});
 
 /**
  * The 200 rounds: bound 50 ms, opens of 45–55 ms, a caller's interrupt inside the open on odd rounds; the misses
@@ -353,13 +358,13 @@ for (int round = 0; round < 200; round++) {
   rc.close();
 }
 /* non-vacuity: every odd round probes, its interrupt landing inside the open */
-System.out.println(stray + " " + lost + " " + (succeeded > 0) + " " + (timedOut > 0) + " " + probed);`
+System.out.println(stray + " " + lost + " " + (succeeded > 0) + " " + (timedOut > 0) + " " + probed);`;
 
 describe.skipIf(!JAVA)("the backoff is capped at the open bound (C#'s OpenLimit)", SLOW, () => {
-	/* new: RealtimeLoop.cs:131 (Math.Min(…, OpenLimit)); red under an uncapped backoff, which sleeps a 1 h delay's half */
-	it("reconnects within the bound after a clean end, whatever the delay: a 1 h delay under a 100 ms bound", () => {
-		expect(
-			probed(`Spin spin = new Spin(0);
+  // new: RealtimeLoop.cs:131 (Math.Min(…, OpenLimit)); red under an uncapped backoff, which sleeps a 1 h delay's half
+  it("reconnects within the bound after a clean end, whatever the delay: a 1 h delay under a 100 ms bound", () => {
+    expect(
+      probed(`Spin spin = new Spin(0);
 TransportOptions slow = TransportOptions.builder().reconnectDelay(Duration.ofHours(1)).build();
 ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(spin), new TypeReference<JsonNode>() {}, slow, Duration.ofMillis(100), false);
 rc.connect();
@@ -368,15 +373,15 @@ long started = System.nanoTime();
 JsonNode next = rc.receive();
 long ms = (System.nanoTime() - started) / 1_000_000;
 System.out.println(next + " " + (ms < 2000) + " " + spin.conns.size() + " " + rc.state());`),
-		).toEqual(["{} true 2 CONNECTED"])
-	})
-})
+    ).toEqual(["{} true 2 CONNECTED"]);
+  });
+});
 
 describe.skipIf(!JAVA)("a for-each over the connection (R1): not read once", SLOW, () => {
-	/* new: R1 (C#'s await foreach keeps the connection when a loop is left); each conn holds one message, then ends */
-	it("reads by for-each through receive, and a loop left by break keeps the connection for the next read", () => {
-		expect(
-			probed(`Spin spin = new Spin(0);
+  // new: R1 (C#'s await foreach keeps the connection when a loop is left); each conn holds one message, then ends
+  it("reads by for-each through receive, and a loop left by break keeps the connection for the next read", () => {
+    expect(
+      probed(`Spin spin = new Spin(0);
 TransportOptions quick = TransportOptions.builder().reconnectDelay(Duration.ofMillis(1)).build();
 ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(spin), new TypeReference<JsonNode>() {}, quick, Duration.ofSeconds(5), false);
 rc.connect();
@@ -388,9 +393,9 @@ for (JsonNode message : rc) {
   }
 }
 System.out.println(read + " " + rc.receive() + " " + spin.conns.size() + " " + rc.state());`),
-		).toEqual(["3 {} 4 CONNECTED"])
-	})
-})
+    ).toEqual(["3 {} 4 CONNECTED"]);
+  });
+});
 
 /**
  * A reconnect reached on another thread: the first conn delivers one message, then ends; the next connect blocks until
@@ -425,34 +430,34 @@ try {
   got = "stalled";
 }
 long ms = (System.nanoTime() - started) / 1_000_000;
-System.out.println(got + " " + (ms < 2000) + " " + rc.state() + " " + twice.connects.get() + " " + kept);`
+System.out.println(got + " " + (ms < 2000) + " " + rc.state() + " " + twice.connects.get() + " " + kept);`;
 
 describe.skipIf(!JAVA)("close() ends a pending reconnect's open (the close-cancel ruling)", SLOW, () => {
-	/* new: the ruling (C# links _closing into each reconnect's token, RealtimeLoop.cs:61/134); red under a close() that
-	 * leaves the dial to finish: the read stalls past the 5 s wait, inside the probe's 20 s watchdog and the 30 s bound */
-	it("ends a receive whose reconnect's dial is pending with null, at once: DISCONNECTED, its flag clear, no further dial", () => {
-		expect(probed(reconnecting(true))).toEqual(["null false true DISCONNECTED 2 false"])
-	})
+  // new: the ruling (C# links _closing into each reconnect's token, RealtimeLoop.cs:61/134); red under a close() that
+  // leaves the dial to finish: the read stalls past the 5 s wait, inside the probe's 20 s watchdog and the 30 s bound
+  it("ends a receive whose reconnect's dial is pending with null, at once: DISCONNECTED, its flag clear, no further dial", () => {
+    expect(probed(reconnecting(true))).toEqual(["null false true DISCONNECTED 2 false"]);
+  });
 
-	/* new: the ruling's (b): close() never takes the closing thread's own interrupt */
-	it("keeps the closing thread's own interrupt: set before close(), still set after it", () => {
-		expect(probed(reconnecting(true, "Thread.currentThread().interrupt();\n"))).toEqual([
-			"null false true DISCONNECTED 2 true",
-		])
-	})
+  // new: the ruling's (b): close() never takes the closing thread's own interrupt
+  it("keeps the closing thread's own interrupt: set before close(), still set after it", () => {
+    expect(probed(reconnecting(true, "Thread.currentThread().interrupt();\n"))).toEqual([
+      "null false true DISCONNECTED 2 true",
+    ]);
+  });
 
-	/* new: the ruling's cancel guard: a close() after the reconnect's open finished interrupts no one; red under a cancel
-	 * without the opening check, which interrupts the reader in its held read */
-	it("interrupts no reader when close() comes after the reconnect's open finished: the held read ends with null", () => {
-		expect(probed(reconnecting(false))).toEqual(["null false true DISCONNECTED 2 false"])
-	})
-})
+  // new: the ruling's cancel guard: a close() after the reconnect's open finished interrupts no one; red under a cancel
+  // without the opening check, which interrupts the reader in its held read
+  it("interrupts no reader when close() comes after the reconnect's open finished: the held read ends with null", () => {
+    expect(probed(reconnecting(false))).toEqual(["null false true DISCONNECTED 2 false"]);
+  });
+});
 
 describe.skipIf(!JAVA)("the open bound never takes a caller's interrupt (R4 refinement 2–4)", SLOW, () => {
-	/* new: refinement (3); red under a disarm that clears the flag unconditionally */
-	it("keeps a caller's interrupt that lands during an open that succeeds: still set after it, and the next receive is the cancel", () => {
-		expect(
-			probed(`Spin spin = new Spin(60);
+  // new: refinement (3); red under a disarm that clears the flag unconditionally
+  it("keeps a caller's interrupt that lands during an open that succeeds: still set after it, and the next receive is the cancel", () => {
+    expect(
+      probed(`Spin spin = new Spin(60);
 ResumableConnection<JsonNode, JsonNode> rc = open(spin, 1_000);
 Thread self = Thread.currentThread();
 CompletableFuture.delayedExecutor(15, TimeUnit.MILLISECONDS).execute(self::interrupt);
@@ -464,12 +469,12 @@ try {
 } catch (CancellationException e) {
   System.out.println("canceled " + Thread.interrupted() + " " + rc.state());
 }`),
-		).toEqual(["CONNECTED true", "canceled true RECONNECTING"])
-	})
+    ).toEqual(["CONNECTED true", "canceled true RECONNECTING"]);
+  });
 
-	/* new: refinement (3)'s 200 rounds at the boundary: bound 50 ms, opens of 45–55 ms, a caller interrupt on odd rounds */
-	it("leaves no stray interrupt after a successful open and loses no caller interrupt, 200 rounds at the boundary", () => {
-		/* 200 rounds of about 110 ms each: a 60 s watchdog; a starved interrupter ends the probe at its first capped round */
-		expect(probed(ROUNDS, 60)).toEqual(["0 0 true true 100"])
-	})
-})
+  // new: refinement (3)'s 200 rounds at the boundary: bound 50 ms, opens of 45–55 ms, a caller interrupt on odd rounds
+  it("leaves no stray interrupt after a successful open and loses no caller interrupt, 200 rounds at the boundary", () => {
+    // 200 rounds of about 110 ms each: a 60 s watchdog; a starved interrupter ends the probe at its first capped round
+    expect(probed(ROUNDS, 60)).toEqual(["0 0 true true 100"]);
+  });
+});

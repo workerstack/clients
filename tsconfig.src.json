@@ -1,0 +1,14 @@
+{
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.typetest.ts",
+    "**/__fixtures__/**",
+    "tests/**",
+    // the SDK runtimes, copied as text into generated SDKs and held to each SDK's own build, as tsconfig.build.json
+    // leaves them out of the package; and the installgen config templates `installgen init` copies into a project
+    "src/runtime/**",
+    "assets/installers/examples/**"
+  ],
+  // exclude replaces tsconfig.json's own: its entries, then the tests and their helpers
+  "extends": ["./tsconfig.json", "@workerstack/repo/tsconfig/strict"]
+}

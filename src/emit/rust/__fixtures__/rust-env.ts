@@ -32,7 +32,7 @@ export function rustCacheDir(...parts: string[]): string {
  * repo, where `rust-toolchain.toml` does not apply; the empty values keep a caller's `RUSTFLAGS` or a
  * compiler wrapper (sccache) out of every build.
  */
-export function rustEnv(toolchain = pinnedRust()): NodeJS.ProcessEnv {
+export function rustEnv(toolchain: string = pinnedRust()): NodeJS.ProcessEnv {
 	return {
 		...process.env,
 		CARGO_BUILD_RUSTC_WRAPPER: "",
@@ -51,7 +51,11 @@ export function rustEnv(toolchain = pinnedRust()): NodeJS.ProcessEnv {
 }
 
 /** How a Rust command runs: in `cwd`, with `input` on stdin, under the pin or `toolchain`. */
-type RunOptions = { readonly cwd?: string; readonly input?: string; readonly toolchain?: string }
+type RunOptions = {
+	readonly cwd?: string | undefined
+	readonly input?: string | undefined
+	readonly toolchain?: string | undefined
+}
 
 /** `command args` under `rustEnv`. */
 function run(command: string, args: readonly string[], options: RunOptions): SpawnSyncReturns<string> {
@@ -90,7 +94,7 @@ export function runRustfmt(args: readonly string[], options: RunOptions = {}): S
 }
 
 /** Whether `toolchain` (the pin by default) is installed: rustup never fetches one here. */
-export function hasRust(toolchain = pinnedRust()): boolean {
+export function hasRust(toolchain: string = pinnedRust()): boolean {
 	return runRustc(["--version"], { toolchain }).status === 0
 }
 
@@ -104,7 +108,7 @@ export function rustRequired(): boolean {
  * where it is required (CI, the pre-push battery), naming the install, and skips the Rust half anywhere else.
  * Callers gate with `describe.skipIf` or `it.skipIf`, never an early return.
  */
-export function withRust(toolchain = pinnedRust()): boolean {
+export function withRust(toolchain: string = pinnedRust()): boolean {
 	const rust = hasRust(toolchain)
 	if (!rust && rustRequired())
 		throw new Error(

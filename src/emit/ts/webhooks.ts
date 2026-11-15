@@ -3,68 +3,78 @@
  * narrows (`known` first, then `type`), and `${stem}.webhook.gen.ts`, a receiver's whole import: `verifyWebhook`, which
  * marks whether a delivery's type is one of them, its error, and the event types. Written only for a document that declares one.
  */
-import type { IR, IRWebhookEvent } from "../../ir/model.ts"
-import { blockCommentText, tsString } from "../shared/escape.ts"
-import { compareCodeUnits, pascalWords } from "../shared/lang.ts"
-import { irToTs, type TypeOptions } from "../shared/type-emitter.ts"
-import { webhookSource } from "./http.ts"
+import type { IR, IRWebhookEvent } from "../../ir/model.ts";
+import { blockCommentText, tsString } from "../shared/escape.ts";
+import { compareCodeUnits, pascalWords } from "../shared/lang.ts";
+import { irToTs, type TypeOptions } from "../shared/type-emitter.ts";
+import { webhookSource } from "./http.ts";
 
 /** The catch-all event and the union, declared beside the events. */
-export const WEBHOOK_TYPES = ["UnknownWebhookEvent", "WebhookEvent"] as const
+const WEBHOOK_TYPES = ["UnknownWebhookEvent", "WebhookEvent"] as const;
 
-type NamedEvent = { readonly doc: string | undefined; readonly event: IRWebhookEvent; readonly name: string }
+type NamedEvent = { readonly doc: string | undefined; readonly event: IRWebhookEvent; readonly name: string };
 
 /** `ir`'s events in code-unit order of their type, each named; two that name one type throw, naming both. */
 function namedEvents(ir: IR): NamedEvent[] {
-	const named = ir.webhooks
-		.flatMap(({ description, event, summary }) => (event ? [{ doc: summary ?? description, event }] : []))
-		.sort((a, b) => compareCodeUnits(a.event.type, b.event.type))
-		.map((entry) => {
-			const base = pascalWords(entry.event.type)
-			return { ...entry, name: `${/^[A-Za-z]/.test(base) ? "" : "Event"}${base}WebhookEvent` }
-		})
-	const byName = new Map<string, string>()
-	for (const { event, name } of named) {
-		const type = JSON.stringify(event.type)
-		if ((WEBHOOK_TYPES as readonly string[]).includes(name))
-			throw new Error(`webhook event ${type} names the type ${name}, which the SDK declares itself`)
-		const taken = byName.get(name)
-		if (taken !== undefined)
-			throw new Error(`webhook events ${JSON.stringify(taken)} and ${type} both name the type ${name}`)
-		byName.set(name, event.type)
-	}
-	return named
+  const named = ir.webhooks
+    .flatMap(({ description, event, summary }) => (event ? [{ doc: summary ?? description, event }] : []))
+    .sort((a, b) => compareCodeUnits(a.event.type, b.event.type))
+    .map((entry) => {
+      const base = pascalWords(entry.event.type);
+
+      return { ...entry, name: `${/^[A-Za-z]/.test(base) ? "" : "Event"}${base}WebhookEvent` };
+    });
+
+  const byName = new Map<string, string>();
+
+  for (const { event, name } of named) {
+    const type = JSON.stringify(event.type);
+
+    if ((WEBHOOK_TYPES as readonly string[]).includes(name))
+      throw new Error(`webhook event ${type} names the type ${name}, which the SDK declares itself`);
+    const taken = byName.get(name);
+
+    if (taken !== undefined)
+      throw new Error(`webhook events ${JSON.stringify(taken)} and ${type} both name the type ${name}`);
+    byName.set(name, event.type);
+  }
+
+  return named;
 }
 
 /** The type names `ir`'s events declare, for the component names to stay clear of; none without events. */
 export function webhookTypeNames(ir: IR): string[] {
-	const names = namedEvents(ir).map(({ name }) => name)
-	return names.length === 0 ? [] : [...names, ...WEBHOOK_TYPES]
+  const names = namedEvents(ir).map(({ name }) => name);
+
+  return names.length === 0 ? [] : [...names, ...WEBHOOK_TYPES];
 }
 
 /** The event types and their union, for `types.gen.ts`; empty for a document without events. */
 export function webhookTypesText(ir: IR, types: TypeOptions): string {
-	const named = namedEvents(ir)
-	if (named.length === 0) return ""
-	const events = named.map(
-		({
-			doc,
-			event,
-			name,
-		}) => `/** The ${blockCommentText(event.type)} webhook event${doc ? `: ${blockCommentText(doc)}` : ""} */
+  const named = namedEvents(ir);
+
+  if (named.length === 0) return "";
+
+  const events = named.map(
+    ({
+      doc,
+      event,
+      name,
+    }) => `/** The ${blockCommentText(event.type)} webhook event${doc ? `: ${blockCommentText(doc)}` : ""} */
 export type ${name} = { id: string; known: true; type: ${tsString(event.type)}; timestamp: string; data: ${irToTs(event.data, types)} }`,
-	)
-	return `${events.join("\n")}
+  );
+
+  return `${events.join("\n")}
 /** An event of a type this SDK's document does not declare: a newer API's, its data as sent. */
 export type UnknownWebhookEvent = { id: string; known: false; type: string; timestamp: string; data: unknown }
 /** A verified delivery: check \`known\`, then switch on \`type\` for its typed \`data\`. */
 export type WebhookEvent = ${[...named.map(({ name }) => name), "UnknownWebhookEvent"].join(" | ")}
 
-`
+`;
 }
 
-/* the runtime verifier's untyped core, which `verifyWebhook` wraps: kept inside the file, out of a receiver's imports */
-const INTERNAL = /^export ((?:async function verifyStandardWebhook|type VerifiedWebhook)\b)/gm
+// the runtime verifier's untyped core, which `verifyWebhook` wraps: kept inside the file, out of a receiver's imports
+const INTERNAL = /^export ((?:async function verifyStandardWebhook|type VerifiedWebhook)\b)/gm;
 
 /**
  * The `${stem}.webhook.gen.ts` text of `ir`: the runtime's verifier, its untyped core unexported, then `verifyWebhook`
@@ -72,14 +82,15 @@ const INTERNAL = /^export ((?:async function verifyStandardWebhook|type Verified
  * imports it bundles no client.
  */
 export function webhooksText(ir: IR, stem: string): string {
-	const named = namedEvents(ir)
-	const known = named.map(({ event }) => tsString(event.type))
-	const types = [...named.map(({ name }) => name), ...WEBHOOK_TYPES].sort(compareCodeUnits)
-	return `import type { WebhookEvent } from "./${stem}.types.gen.js"
+  const named = namedEvents(ir);
+  const known = named.map(({ event }) => tsString(event.type));
+  const types = [...named.map(({ name }) => name), ...WEBHOOK_TYPES].sort(compareCodeUnits);
+
+  return `import type { WebhookEvent } from "./${stem}.types.gen.js"
 
 export type { ${types.join(", ")} } from "./${stem}.types.gen.js"
 
-${webhookSource().replace(INTERNAL, "$1")}
+${webhookSource().replaceAll(INTERNAL, "$1")}
 
 const KNOWN: ReadonlySet<string> = new Set([${known.join(", ")}])
 
@@ -96,5 +107,5 @@ export async function verifyWebhook(
 	const event = await verifyStandardWebhook(body, headers, secret)
 	return { ...event, known: KNOWN.has(event.type) } as WebhookEvent
 }
-`
+`;
 }

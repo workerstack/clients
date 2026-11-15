@@ -1,125 +1,138 @@
+import { createMiddleware } from "@workerstack/backend/http";
 /**
  * The conformance app's `/secure` group: users CRUD and uploads behind a bearer check. Only
  * `Bearer valid-token` passes; anything else, `Bearer expired-token` included, is `unauthorized`,
  * which is what the TS harness's onAuthExpired cases retry against.
  */
-import * as z from "zod"
-import { createMiddleware } from "@workerstack/backend/http"
-import type { ConformanceApp, errors } from "./app.ts"
-import { sha256 } from "./digest.ts"
+import * as z from "zod";
 
-type User = { readonly email: string; readonly id: string; readonly name: string }
+import type { ConformanceApp, errors } from "./app.ts";
+import { sha256 } from "./digest.ts";
 
-const UserSchema = z.object({ email: z.string(), id: z.string(), name: z.string() })
-const Fields = z.object({ email: z.string().optional(), name: z.string().optional() })
+type User = { readonly email: string; readonly id: string; readonly name: string };
+
+const UserSchema = z.object({ email: z.string(), id: z.string(), name: z.string() });
+const Fields = z.object({ email: z.string().optional(), name: z.string().optional() });
 
 /** One `required` field error at `path`. */
-const required = (path: string) => [{ error_key: "required", message: `${path} is required`, path }]
+const required = (path: string) => [{ error_key: "required", message: `${path} is required`, path }];
 
 /** The field errors of a create body missing its name or email; null when both are there. */
 function missingFields(body: { email?: string; name?: string }) {
-	const missing = (["name", "email"] as const).filter((key) => !body[key])
-	if (missing.length === 0) return null
-	return Object.fromEntries(missing.map((key) => [key, required(key)]))
+  const missing = (["name", "email"] as const).filter((key) => !body[key]);
+
+  if (missing.length === 0) return null;
+
+  return Object.fromEntries(missing.map((key) => [key, required(key)]));
 }
 
 /** The `/secure` handle: every route behind the bearer check. */
 function secured(root: ConformanceApp, factory: typeof errors) {
-	const auth = createMiddleware(
-		(ctx: { readonly req: Request }, proceed) => {
-			if (ctx.req.headers.get("authorization") !== "Bearer valid-token") throw factory.unauthorized()
-			return proceed()
-		},
-		{ errors: [factory, "unauthorized"] },
-	)
-	return root.basePath("/secure").use(auth)
+  const auth = createMiddleware(
+    (ctx: { readonly req: Request }, proceed) => {
+      if (ctx.req.headers.get("authorization") !== "Bearer valid-token") throw factory.unauthorized();
+
+      return proceed();
+    },
+    { errors: [factory, "unauthorized"] },
+  );
+
+  return root.basePath("/secure").use(auth);
 }
 
-type Secure = ReturnType<typeof secured>
+type Secure = ReturnType<typeof secured>;
 
 /**
  * The reads a users mutation invalidates, by operationId: the document writes each as its route (`x-invalidate`),
  * which the SDK harnesses' stale tracking resolves.
  */
-const LIST = "users.list"
-const ONE = "users.get"
+const LIST = "users.list";
+const ONE = "users.get";
 
 /** `users.*`, the users in this app's closure, `taken@example.com` seeded; each mutation names what it invalidates. */
 function userRoutes(app: Secure, factory: typeof errors): void {
-	const users = new Map<string, User>([["user-0", { email: "taken@example.com", id: "user-0", name: "Taken" }]])
-	let next = 0
-	app
-		.get("/users")
-		.meta({ operationId: "users.list", mcp: true })
-		.output({ "application/json": { ok: z.array(UserSchema) } })
-		.handler((ctx) => ctx.res.json("ok", [...users.values()]))
-	app
-		.post("/users")
-		.meta({ invalidate: [LIST], operationId: "users.create", mcp: true })
-		.errors("invalid_input", "email_taken")
-		.input({ json: Fields })
-		.output({ "application/json": { created: UserSchema } })
-		.handler((ctx) => {
-			const fields = missingFields(ctx.input.json)
-			if (fields !== null) throw factory.invalid_input({ fields })
-			const { email, name } = ctx.input.json as { email: string; name: string }
-			if ([...users.values()].some((user) => user.email === email)) throw factory.email_taken()
-			const user = { email, id: `user-${++next}`, name }
-			users.set(user.id, user)
-			return ctx.res.json("created", user)
-		})
-	app
-		.get("/users/:id")
-		.meta({ operationId: "users.get", mcp: true })
-		.errors("not_found")
-		.output({ "application/json": { ok: UserSchema } })
-		.handler((ctx) => {
-			const user = users.get(ctx.params.id)
-			if (user === undefined) throw factory.not_found()
-			return ctx.res.json("ok", user)
-		})
-	app
-		.put("/users/:id")
-		.meta({ invalidate: [LIST, ONE], operationId: "users.update", mcp: true })
-		.input({ json: Fields })
-		.output({ "application/json": { ok: UserSchema } })
-		.handler((ctx) => {
-			const user = { email: "", name: "", ...users.get(ctx.params.id), ...ctx.input.json, id: ctx.params.id }
-			users.set(user.id, user)
-			return ctx.res.json("ok", user)
-		})
-	app
-		.delete("/users/:id")
-		.meta({ invalidate: [LIST, ONE], operationId: "users.delete", mcp: true })
-		.output({ no_content: true })
-		.handler((ctx) => {
-			users.delete(ctx.params.id)
-			return ctx.res.noContent()
-		})
+  const users = new Map<string, User>([["user-0", { email: "taken@example.com", id: "user-0", name: "Taken" }]]);
+  let next = 0;
+  app
+    .get("/users")
+    .meta({ mcp: true, operationId: "users.list" })
+    .output({ "application/json": { ok: z.array(UserSchema) } })
+    .handler((ctx) => ctx.res.json("ok", [...users.values()]));
+  app
+    .post("/users")
+    .meta({ invalidate: [LIST], mcp: true, operationId: "users.create" })
+    .errors("invalid_input", "email_taken")
+    .input({ json: Fields })
+    .output({ "application/json": { created: UserSchema } })
+    .handler((ctx) => {
+      const fields = missingFields(ctx.input.json);
+
+      if (fields !== null) throw factory.invalid_input({ fields });
+      const { email, name } = ctx.input.json as { email: string; name: string };
+
+      if ([...users.values()].some((user) => user.email === email)) throw factory.email_taken();
+      const user = { email, id: `user-${++next}`, name };
+      users.set(user.id, user);
+
+      return ctx.res.json("created", user);
+    });
+  app
+    .get("/users/:id")
+    .meta({ mcp: true, operationId: "users.get" })
+    .errors("not_found")
+    .output({ "application/json": { ok: UserSchema } })
+    .handler((ctx) => {
+      const user = users.get(ctx.params.id);
+
+      if (user === undefined) throw factory.not_found();
+
+      return ctx.res.json("ok", user);
+    });
+  app
+    .put("/users/:id")
+    .meta({ invalidate: [LIST, ONE], mcp: true, operationId: "users.update" })
+    .input({ json: Fields })
+    .output({ "application/json": { ok: UserSchema } })
+    .handler((ctx) => {
+      const user = { email: "", name: "", ...users.get(ctx.params.id), ...ctx.input.json, id: ctx.params.id };
+      users.set(user.id, user);
+
+      return ctx.res.json("ok", user);
+    });
+  app
+    .delete("/users/:id")
+    .meta({ invalidate: [LIST, ONE], mcp: true, operationId: "users.delete" })
+    .output({ no_content: true })
+    .handler((ctx) => {
+      users.delete(ctx.params.id);
+
+      return ctx.res.noContent();
+    });
 }
 
 /** `uploads.*`: a raw body and a multipart file, each answered with what arrived. */
 function uploadRoutes(app: Secure): void {
-	app
-		.post("/uploads/blob")
-		.meta({ operationId: "uploads.blob", mcp: true })
-		.input({ binary: ["application/octet-stream"] })
-		.output({ "application/json": { ok: z.object({ sha256: z.string(), size: z.number().int() }) } })
-		.handler(async (ctx) => {
-			const { bytes } = ctx.input.binary
-			return ctx.res.json("ok", { sha256: await sha256(bytes), size: bytes.byteLength })
-		})
-	app
-		.post("/uploads/form")
-		.meta({ operationId: "uploads.form", mcp: true })
-		.input({ form: z.object({ file: z.file() }) })
-		.output({ "application/json": { ok: z.object({ size: z.number().int() }) } })
-		.handler((ctx) => ctx.res.json("ok", { size: ctx.input.form.file.size }))
+  app
+    .post("/uploads/blob")
+    .meta({ mcp: true, operationId: "uploads.blob" })
+    .input({ binary: ["application/octet-stream"] })
+    .output({ "application/json": { ok: z.object({ sha256: z.string(), size: z.number().int() }) } })
+    .handler(async (ctx) => {
+      const { bytes } = ctx.input.binary;
+
+      return ctx.res.json("ok", { sha256: await sha256(bytes), size: bytes.byteLength });
+    });
+  app
+    .post("/uploads/form")
+    .meta({ mcp: true, operationId: "uploads.form" })
+    .input({ form: z.object({ file: z.file() }) })
+    .output({ "application/json": { ok: z.object({ size: z.number().int() }) } })
+    .handler((ctx) => ctx.res.json("ok", { size: ctx.input.form.file.size }));
 }
 
 /** `users.*` and `uploads.*` under `/secure`. */
 export function secureRoutes(root: ConformanceApp, factory: typeof errors): void {
-	const app = secured(root, factory)
-	userRoutes(app, factory)
-	uploadRoutes(app)
+  const app = secured(root, factory);
+  userRoutes(app, factory);
+  uploadRoutes(app);
 }

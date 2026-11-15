@@ -8,31 +8,31 @@
  * the connection advances in its own copy, so `rc.opts` resumes past the last message. A declared param on a resume
  * channel is carried by it, and one named `transport` is claimed as `transport2` (`sdk-method.ts`).
  */
-import { eventType, type PyStream } from "./sdk-answer.ts"
-import { isLastEventIdHeader } from "./sse.ts"
-import { pyTypeOf } from "./types.ts"
-import { isReconnectToken, socketAnswer } from "./ws.ts"
+import { eventType, type PyStream } from "./sdk-answer.ts";
+import { isLastEventIdHeader } from "./sse.ts";
+import { pyTypeOf } from "./types.ts";
+import { isReconnectToken, socketAnswer } from "./ws.ts";
 
 /** The realtime operation's answer, its one field and its docstring's lines. */
 export const realtimeStream: PyStream = {
-	answer: (op, env) =>
-		socketAnswer(op, env, {
-			base: "ResumableConnection",
-			in: "object",
-			/* the one event a connection's `on` takes for itself */
-			lifecycle: (out) => [["message", out]],
-			out: () => eventType(op, env, () => pyTypeOf({ kind: "unknown" }, env.at)),
-			run: "realtime",
-			suffix: "Connection",
-		}),
-	/* the WebSocket and long-poll dials send the cursor as query params, the SSE dial its id as Last-Event-ID */
-	carries: (name, where) =>
-		isReconnectToken(name, where) ||
-		(where === "query" && name === "last_event_id") ||
-		isLastEventIdHeader(name, where),
-	doc: [
-		"Opens the connection over WebSocket, else SSE, else long-poll; recv() reconnects after a drop and",
-		"resumes after the last message it delivered.",
-	],
-	fields: ["transport: TransportOpts | None = None"],
-}
+  answer: (op, env) =>
+    socketAnswer(op, env, {
+      base: "ResumableConnection",
+      in: "object",
+      // the one event a connection's `on` takes for itself
+      lifecycle: (out) => [["message", out]],
+      out: () => eventType(op, env, () => pyTypeOf({ kind: "unknown" }, env.at)),
+      run: "realtime",
+      suffix: "Connection",
+    }),
+  // the WebSocket and long-poll dials send the cursor as query params, the SSE dial its id as Last-Event-ID
+  carries: (name, where) =>
+    isReconnectToken(name, where) ||
+    (where === "query" && name === "last_event_id") ||
+    isLastEventIdHeader(name, where),
+  doc: [
+    "Opens the connection over WebSocket, else SSE, else long-poll; recv() reconnects after a drop and",
+    "resumes after the last message it delivered.",
+  ],
+  fields: ["transport: TransportOpts | None = None"],
+};

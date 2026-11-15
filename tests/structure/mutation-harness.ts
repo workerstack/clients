@@ -10,48 +10,59 @@
  *
  *     bun tests/structure/mutation-harness.ts
  */
-import { spawnSync } from "node:child_process"
-import { createRequire } from "node:module"
-import { dirname, join, resolve } from "node:path"
-import { withDotnet } from "../../src/emit/csharp/__fixtures__/csharp-env.ts"
-import { withGo } from "../../src/emit/go/__fixtures__/go-env.ts"
-import { withPython } from "../../src/emit/python/__fixtures__/python-env.ts"
-import { withRust } from "../../src/emit/rust/__fixtures__/rust-env.ts"
-import { GUARDS, guardNamed, SUITES, skippedFor, type Toolchain, verdicts } from "./mutation-harness.guards.ts"
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
 
-const GEN = resolve(import.meta.dirname, "../..")
-const SUITE = "tests/security"
-const VITEST = join(dirname(createRequire(import.meta.url).resolve("vitest/package.json")), "vitest.mjs")
+import { withDotnet } from "../../src/emit/csharp/__fixtures__/csharp-env.ts";
+import { withGo } from "../../src/emit/go/__fixtures__/go-env.ts";
+import { withPython } from "../../src/emit/python/__fixtures__/python-env.ts";
+import { withRust } from "../../src/emit/rust/__fixtures__/rust-env.ts";
+import { GUARDS, guardNamed, SUITES, skippedFor, type Toolchain, verdicts } from "./mutation-harness.guards.ts";
+
+const GEN = resolve(import.meta.dirname, "../..");
+const SUITE = "tests/security";
+const VITEST = join(dirname(createRequire(import.meta.url).resolve("vitest/package.json")), "vitest.mjs");
 
 /** Each toolchain's name in a skip line. */
-const NAMES: Readonly<Record<Toolchain, string>> = { csharp: ".NET", go: "Go", python: "Python", rust: "Rust" }
+const NAMES: Readonly<Record<Toolchain, string>> = { csharp: ".NET", go: "Go", python: "Python", rust: "Rust" };
 
 /** The emit adversarial suite's exit status, with `mutant` disabled when given: its toolchain's file alone, or all of it. */
 export function runSuite(mutant: string | undefined): number {
-	const env = { ...process.env, CLIENTS_MUTANT: mutant ?? "" }
-	const guard = guardNamed(mutant)
-	const suite = guard?.suite ?? (guard?.toolchain === undefined ? SUITE : SUITES[guard.toolchain])
-	const run = spawnSync(process.execPath, [VITEST, "run", suite], { cwd: GEN, encoding: "utf8", env })
-	/* a red plain run is the one nobody expects: show what failed, or the gate says only "1" */
-	if (mutant === undefined && run.status !== 0) process.stderr.write(`${run.stdout}${run.stderr}`)
-	return run.status ?? 1
+  const env = { ...process.env, CLIENTS_MUTANT: mutant ?? "" };
+  const guard = guardNamed(mutant);
+  const suite = guard?.suite ?? (guard?.toolchain === undefined ? SUITE : SUITES[guard.toolchain]);
+  const run = spawnSync(process.execPath, [VITEST, "run", suite], { cwd: GEN, encoding: "utf8", env });
+
+  // a red plain run is the one nobody expects: show what failed, or the gate says only "1"
+  if (mutant === undefined && run.status !== 0) process.stderr.write(`${run.stdout}${run.stderr}`);
+
+  return run.status ?? 1;
 }
 
 function main(): number {
-	/* throws where a toolchain is required and absent, before any suite run: a required toolchain never skips */
-	const present = { go: withGo(), python: withPython(), rust: withRust(), csharp: withDotnet() }
-	if (runSuite(undefined) !== 0) {
-		process.stderr.write("mutation: the emit adversarial suite fails with every guard in place\n")
-		return 1
-	}
-	const { killed, skipped, survived } = verdicts(GUARDS, skippedFor(GUARDS, present), runSuite)
-	for (const id of killed) process.stdout.write(`killed   ${id}\n`)
-	for (const id of skipped)
-		process.stdout.write(`skipped  ${id} (no ${NAMES[guardNamed(id)?.toolchain ?? "go"]} toolchain)\n`)
-	for (const id of survived) process.stdout.write(`SURVIVED ${id}\n`)
-	process.stdout.write(`mutation: ${killed.length} killed, ${skipped.length} skipped, ${survived.length} survived\n`)
-	if (survived.length > 0) process.stderr.write(`mutation: no case catches ${survived.join(", ")}\n`)
-	return survived.length === 0 ? 0 : 1
+  // throws where a toolchain is required and absent, before any suite run: a required toolchain never skips
+  const present = { csharp: withDotnet(), go: withGo(), python: withPython(), rust: withRust() };
+
+  if (runSuite(undefined) !== 0) {
+    process.stderr.write("mutation: the emit adversarial suite fails with every guard in place\n");
+
+    return 1;
+  }
+
+  const { killed, skipped, survived } = verdicts(GUARDS, skippedFor(GUARDS, present), runSuite);
+
+  for (const id of killed) process.stdout.write(`killed   ${id}\n`);
+
+  for (const id of skipped)
+    process.stdout.write(`skipped  ${id} (no ${NAMES[guardNamed(id)?.toolchain ?? "go"]} toolchain)\n`);
+
+  for (const id of survived) process.stdout.write(`SURVIVED ${id}\n`);
+  process.stdout.write(`mutation: ${killed.length} killed, ${skipped.length} skipped, ${survived.length} survived\n`);
+
+  if (survived.length > 0) process.stderr.write(`mutation: no case catches ${survived.join(", ")}\n`);
+
+  return survived.length === 0 ? 0 : 1;
 }
 
-if (import.meta.main) process.exit(main())
+if (import.meta.main) process.exit(main());

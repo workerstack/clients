@@ -5,13 +5,14 @@
  * about twice the interval. The config passes the interval through; a test sets 0.2 s and the server reads every ping
  * and answers none. Its 1009 on an over-cap message is httpx2's (the probe; ws.test.ts pins the error text).
  */
-import { describe, expect, it } from "vitest"
-import { served } from "../shared/__fixtures__/recording-server.ts"
-import { consume } from "./__fixtures__/consumer.ts"
-import { withPython } from "./__fixtures__/python-env.ts"
+import { describe, expect, it } from "vitest";
 
-const PY = withPython()
-const SLOW = { timeout: 600_000 }
+import { served } from "../shared/__fixtures__/recording-server.ts";
+import { consume } from "./__fixtures__/consumer.ts";
+import { withPython } from "./__fixtures__/python-env.ts";
+
+const PY = withPython();
+const SLOW = { timeout: 600_000 };
 
 /** Open the socket under a 0.2 s keepalive and `recv` with a 5 s bound: how the read ended, and whether in time. */
 const BODY = `import time
@@ -25,22 +26,23 @@ async with aclient(ws_keepalive=0.2) as c:
         ended = "timed out"
     except sdk.APIConnectionError:
         ended = "APIConnectionError"
-    note(f"{ended} within 2x {time.monotonic() - started < 0.6}")`
+    note(f"{ended} within 2x {time.monotonic() - started < 0.6}")`;
 
 describe.skipIf(!PY)("the Python SDK's WebSocket keepalive (bit 19 d1)", SLOW, () => {
-	it("ends a socket whose peer never answers a ping within about twice the interval, having pinged, 1011 on the wire", async () => {
-		const { run, streams } = await served([{ status: 101, ws: { pong: false, steps: [] } }], async (server) => ({
-			run: await consume("ws", "keepalive", { base: server.url, body: BODY }),
-			streams: [...server.streams],
-		}))
-		expect(
-			{ out: run.out?.main, pinged: (streams[0]?.pings ?? 0) > 0, received: streams[0]?.received, ran: run.ran },
-			run.stderr,
-		).toEqual({
-			out: ["APIConnectionError within 2x True"],
-			pinged: true,
-			ran: true,
-			received: [{ code: 1011, kind: "close", reason: "Keepalive ping timeout" }],
-		})
-	})
-})
+  it("ends a socket whose peer never answers a ping within about twice the interval, having pinged, 1011 on the wire", async () => {
+    const { run, streams } = await served([{ status: 101, ws: { pong: false, steps: [] } }], async (server) => ({
+      run: await consume("ws", "keepalive", { base: server.url, body: BODY }),
+      streams: [...server.streams],
+    }));
+
+    expect(
+      { out: run.out?.main, pinged: (streams[0]?.pings ?? 0) > 0, ran: run.ran, received: streams[0]?.received },
+      run.stderr,
+    ).toEqual({
+      out: ["APIConnectionError within 2x True"],
+      pinged: true,
+      ran: true,
+      received: [{ code: 1011, kind: "close", reason: "Keepalive ping timeout" }],
+    });
+  });
+});

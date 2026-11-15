@@ -7,36 +7,36 @@
  * tool's (bit 21 g) takes an https URL in place of the path. The emitter's half of the extension: its keyword is named
  * here and nowhere else in gen.
  */
-import type { JsonSchema } from "./schema.ts"
+import type { JsonSchema } from "./schema.ts";
 
-const STRING = { type: "string" }
+const STRING = { type: "string" };
 
 /** The extension's FileInput, marked: the members it requires, the digest's algorithm SHA-256. */
 const FILE_INPUT: JsonSchema = {
-	type: "object",
-	"x-mcp-file": {},
-	properties: {
-		digest: {
-			type: "object",
-			properties: { algorithm: { const: "sha-256" }, value: STRING },
-			required: ["algorithm", "value"],
-		},
-	},
-	required: ["id", "mimeType", "size", "digest"],
-}
+  properties: {
+    digest: {
+      properties: { algorithm: { const: "sha-256" }, value: STRING },
+      required: ["algorithm", "value"],
+      type: "object",
+    },
+  },
+  required: ["id", "mimeType", "size", "digest"],
+  type: "object",
+  "x-mcp-file": {},
+};
 
 /** A file argument's schema: the extension's FileInput, or a path the server reads. */
 export const FILE_SCHEMA: JsonSchema = {
-	anyOf: [
-		FILE_INPUT,
-		{
-			type: "object",
-			properties: { path: { type: "string", description: "A file under the server's file root" } },
-			required: ["path"],
-			additionalProperties: false,
-		},
-	],
-}
+  anyOf: [
+    FILE_INPUT,
+    {
+      additionalProperties: false,
+      properties: { path: { description: "A file under the server's file root", type: "string" } },
+      required: ["path"],
+      type: "object",
+    },
+  ],
+};
 
 /**
  * A mounted tool's file argument (bit 21 g): the FileInput (inline, or uploaded through the extension's flow), or an
@@ -44,13 +44,13 @@ export const FILE_SCHEMA: JsonSchema = {
  * no path, so it shows none.
  */
 export const MOUNTED_FILE_SCHEMA: JsonSchema = {
-	anyOf: [
-		FILE_INPUT,
-		{
-			type: "object",
-			properties: { url: { type: "string", description: "An https URL the server fetches" } },
-			required: ["url"],
-			additionalProperties: false,
-		},
-	],
-}
+  anyOf: [
+    FILE_INPUT,
+    {
+      additionalProperties: false,
+      properties: { url: { description: "An https URL the server fetches", type: "string" } },
+      required: ["url"],
+      type: "object",
+    },
+  ],
+};

@@ -4,12 +4,13 @@
  * ~/.cache/backend-tmp/b19/probes/http-version.txt); the crate is built without it, so no client, a caller's
  * `http_builder` included, can offer h2.
  */
-import { describe, expect, it } from "vitest"
-import { alpnServer, trusted } from "../shared/__fixtures__/alpn-server.ts"
-import { consume } from "./__fixtures__/consumer.ts"
-import { withRust } from "./__fixtures__/rust-env.ts"
+import { describe, expect, it } from "vitest";
 
-const RUST = withRust()
+import { alpnServer, trusted } from "../shared/__fixtures__/alpn-server.ts";
+import { consume } from "./__fixtures__/consumer.ts";
+import { withRust } from "./__fixtures__/rust-env.ts";
+
+const RUST = withRust();
 
 /** The default client's call, then one through a caller's `http_builder`. */
 const BODY = `match client(&base) {
@@ -24,23 +25,24 @@ const BODY = `match client(&base) {
     match built {
         Ok(c) => if let Err(e) = c.echo().get(&sdk::EchoGetOpts::default()).await { n.note(format!("error {e}")) },
         Err(e) => n.note(format!("client {e}")),
-    }`
+    }`;
 
 describe.skipIf(!RUST)("the Rust SDK speaks HTTP/1.1 to a server that offers h2 (bit 19 d2)", () => {
-	it("sends over http/1.1 by default and through a caller's http_builder", async () => {
-		const server = await alpnServer()
-		try {
-			const run = await trusted(() => consume("http", "version", { base: server.url, body: BODY }))
-			expect({ built: run.built, out: run.out, seen: server.seen() }, run.stderr).toEqual({
-				built: true,
-				out: {},
-				seen: [
-					{ alpn: "http/1.1", version: "1.1" },
-					{ alpn: "http/1.1", version: "1.1" },
-				],
-			})
-		} finally {
-			await server.close()
-		}
-	}, 600_000)
-})
+  it("sends over http/1.1 by default and through a caller's http_builder", async () => {
+    const server = await alpnServer();
+
+    try {
+      const run = await trusted(() => consume("http", "version", { base: server.url, body: BODY }));
+      expect({ built: run.built, out: run.out, seen: server.seen() }, run.stderr).toEqual({
+        built: true,
+        out: {},
+        seen: [
+          { alpn: "http/1.1", version: "1.1" },
+          { alpn: "http/1.1", version: "1.1" },
+        ],
+      });
+    } finally {
+      await server.close();
+    }
+  }, 600_000);
+});

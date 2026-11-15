@@ -1,0 +1,2 @@
+# The vendored tokenizer, kept byte for byte as upstream ships it (see knip.ignore in repo.config.ts).
+src/_tokenizer/

@@ -6,40 +6,41 @@
  * the server's `--http` with its bearer token. Bit 21 e: both against the handler mounted in the reference app itself,
  * each call in process. Opt-in: `vitest run --mode harness`.
  */
-import { describe } from "vitest"
-import { clientSession, httpSession, withClients } from "../../../src/emit/mcp/__fixtures__/clients.ts"
-import { targetSuite } from "./harness.ts"
-import { MCP_TOKEN, mcpMountedRunner, mcpRunner } from "./mcp-runner.ts"
+import { describe } from "vitest";
+
+import { clientSession, httpSession, withClients } from "../../../src/emit/mcp/__fixtures__/clients.ts";
+import { targetSuite } from "./harness.ts";
+import { MCP_TOKEN, mcpMountedRunner, mcpRunner } from "./mcp-runner.ts";
 
 describe.skipIf(!withClients())("mcp clients", () => {
-	targetSuite(mcpRunner((command, steps) => clientSession("sdk", command, steps), "2025-11-25"))
-	targetSuite(
-		mcpRunner((command, steps) => clientSession("modern", command, steps), "2026-07-28", "2026-07-28, v2 client"),
-	)
-	targetSuite(
-		mcpRunner(
-			(command, steps) => clientSession("sdk", command, steps, MCP_TOKEN),
-			"2025-11-25",
-			"http, sdk client",
-			true,
-		),
-	)
-	targetSuite(
-		mcpRunner(
-			(command, steps) => clientSession("modern", command, steps, MCP_TOKEN),
-			"2026-07-28",
-			"http, 2026-07-28, v2 client",
-			true,
-		),
-	)
-	targetSuite(
-		mcpMountedRunner((target, steps) => httpSession("sdk", target, steps), "2025-11-25", "mounted, sdk client"),
-	)
-	targetSuite(
-		mcpMountedRunner(
-			(target, steps) => httpSession("modern", target, steps),
-			"2026-07-28",
-			"mounted, 2026-07-28, v2 client",
-		),
-	)
-})
+  targetSuite(mcpRunner((command, steps) => clientSession("sdk", command, steps), "2025-11-25"));
+  targetSuite(
+    mcpRunner((command, steps) => clientSession("modern", command, steps), "2026-07-28", "2026-07-28, v2 client"),
+  );
+  targetSuite(
+    mcpRunner(
+      (command, steps) => clientSession("sdk", command, steps, MCP_TOKEN),
+      "2025-11-25",
+      "http, sdk client",
+      true,
+    ),
+  );
+  targetSuite(
+    mcpRunner(
+      (command, steps) => clientSession("modern", command, steps, MCP_TOKEN),
+      "2026-07-28",
+      "http, 2026-07-28, v2 client",
+      true,
+    ),
+  );
+  targetSuite(
+    mcpMountedRunner((target, steps) => httpSession("sdk", target, steps), "2025-11-25", "mounted, sdk client"),
+  );
+  targetSuite(
+    mcpMountedRunner(
+      (target, steps) => httpSession("modern", target, steps),
+      "2026-07-28",
+      "mounted, 2026-07-28, v2 client",
+    ),
+  );
+});

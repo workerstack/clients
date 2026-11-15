@@ -5,21 +5,22 @@
  * client's own headers. Here, in the python project, since its client runs through python-env. Opt-in:
  * `vitest run --mode harness`.
  */
-import { describe } from "vitest"
-import { pythonHttpSession, pythonSession } from "../../src/emit/mcp/__fixtures__/python-client.ts"
-import { withPython } from "../../src/emit/python/__fixtures__/python-env.ts"
-import { targetSuite } from "./conformance/harness.ts"
-import { MCP_TOKEN, mcpMountedRunner, mcpRunner } from "./conformance/mcp-runner.ts"
+import { describe } from "vitest";
+
+import { pythonHttpSession, pythonSession } from "../../src/emit/mcp/__fixtures__/python-client.ts";
+import { withPython } from "../../src/emit/python/__fixtures__/python-env.ts";
+import { targetSuite } from "./conformance/harness.ts";
+import { MCP_TOKEN, mcpMountedRunner, mcpRunner } from "./conformance/mcp-runner.ts";
 
 describe.skipIf(!withPython())("mcp python client", () => {
-	targetSuite(mcpRunner(pythonSession, "2026-07-28", "2026-07-28, python client"))
-	targetSuite(
-		mcpRunner(
-			(command, steps) => pythonSession(command, steps, MCP_TOKEN),
-			"2026-07-28",
-			"http, 2026-07-28, python client",
-			true,
-		),
-	)
-	targetSuite(mcpMountedRunner(pythonHttpSession, "2026-07-28", "mounted, 2026-07-28, python client"))
-})
+  targetSuite(mcpRunner(pythonSession, "2026-07-28", "2026-07-28, python client"));
+  targetSuite(
+    mcpRunner(
+      (command, steps) => pythonSession(command, steps, MCP_TOKEN),
+      "2026-07-28",
+      "http, 2026-07-28, python client",
+      true,
+    ),
+  );
+  targetSuite(mcpMountedRunner(pythonHttpSession, "2026-07-28", "mounted, 2026-07-28, python client"));
+});

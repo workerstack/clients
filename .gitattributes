@@ -1,9 +1,14 @@
 # Every checkout keeps LF, Windows included: installgen's templates and golden files, and the README tables its
 # tests parse, are compared byte for byte.
-# repo:generated bdcd5921
+# repo:generated 6dadfc33
 * text=auto eol=lf
+.githooks/commit-msg linguist-generated
+.githooks/pre-commit linguist-generated
+.githooks/pre-push linguist-generated
+.githooks/reference-transaction linguist-generated
 .repo/.gitkeep linguist-generated
 .repo/lessons/INDEX.md linguist-generated
 .vscode/tasks.json linguist-generated
+README.md linguist-generated
 bunfig.toml linguist-generated
 # /repo:generated

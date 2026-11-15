@@ -4,51 +4,51 @@
  * stream shapes, the error envelope, the safe mirror). Here so sdk-types.ts holds only how a
  * document becomes those types.
  */
-import type { TsRuntimeFeatures } from "./http.ts"
+import type { TsRuntimeFeatures } from "./http.ts";
 
 /* globals the emitted types read, and the names they declare: a component schema never takes one */
-export const RESERVED = [
-	"AbortSignal",
-	"ArrayBuffer",
-	"AsyncIterable",
-	"Blob",
-	"ErrorEnvelope",
-	"ErrorField",
-	"HttpArgs",
-	"HttpCall",
-	"HttpSafe",
-	"HttpStream",
-	"HttpOptions",
-	"Omit",
-	"Promise",
-	"ReadableStream",
-	"RealtimeCallOptions",
-	"RealtimeOptions",
-	"Record",
-	"ResumableConnection",
-	"Response",
-	"Result",
-	"SDKConfig",
-	"SSEEvent",
-	"SSEEventOf",
-	"SseOptions",
-	"TypedWebSocket",
-	"Uint8Array",
-	"WsFrame",
-	"WsOptions",
-]
+export const RESERVED: readonly string[] = [
+  "AbortSignal",
+  "ArrayBuffer",
+  "AsyncIterable",
+  "Blob",
+  "ErrorEnvelope",
+  "ErrorField",
+  "HttpArgs",
+  "HttpCall",
+  "HttpSafe",
+  "HttpStream",
+  "HttpOptions",
+  "Omit",
+  "Promise",
+  "ReadableStream",
+  "RealtimeCallOptions",
+  "RealtimeOptions",
+  "Record",
+  "ResumableConnection",
+  "Response",
+  "Result",
+  "SDKConfig",
+  "SSEEvent",
+  "SSEEventOf",
+  "SseOptions",
+  "TypedWebSocket",
+  "Uint8Array",
+  "WsFrame",
+  "WsOptions",
+];
 
 /** What the types file may import from the runtime module, in the order the import lists them. */
 const RUNTIME_TYPES = [
-	"RealtimeOptions",
-	"Result",
-	"ResumableConnection",
-	"SDKConfig",
-	"SSEEvent",
-	"SSEEventOf",
-	"TypedWebSocket",
-	"WsFrame",
-] as const
+  "RealtimeOptions",
+  "Result",
+  "ResumableConnection",
+  "SDKConfig",
+  "SSEEvent",
+  "SSEEventOf",
+  "TypedWebSocket",
+  "WsFrame",
+] as const;
 
 /** The input fields every call takes, by transport. */
 const OPTIONS = `export type HttpOptions = {
@@ -61,9 +61,9 @@ const OPTIONS = `export type HttpOptions = {
 }
 export type SseOptions = Omit<HttpOptions, "idempotencyKey"> & { lastEventId?: string }
 export type WsOptions = { protocols?: string | string[]; reconnectToken?: string }
-`
+`;
 
-/* the error envelope, the call and stream shapes, and the safe mirror's opening */
+// the error envelope, the call and stream shapes, and the safe mirror's opening
 const CALLS = `
 type ErrorField = { error_key: string; message: string; path: string }
 
@@ -98,9 +98,9 @@ type HttpStream<I, V, E = never> = {
 
 /** \`client.safe\`: every REST and stream call answering a Result, never throwing an API answer; a connection as is. */
 export type HttpSafe<T> = {
-	[K in keyof T]: `
+	[K in keyof T]: `;
 
-/* the safe mirror's REST and stream arms */
+// the safe mirror's REST and stream arms
 const SAFE_ARMS = `			? {
 					(input: I & HttpOptions & { raw: true }): Promise<Result<Response, E>>
 					(...input: HttpArgs<I, HttpOptions & { raw?: false }>): Promise<Result<D, E, H>>
@@ -109,33 +109,40 @@ const SAFE_ARMS = `			? {
 				? (...input: HttpArgs<I, SseOptions>) => Promise<Result<AsyncIterable<V>, E>>
 				: HttpSafe<T[K]>
 }
-`
+`;
 
 /** The input fields every call takes, by transport, and the safe twin's types, for an API with `features`. */
 export function shared(features: TsRuntimeFeatures): string {
-	const connections = [
-		...(features.realtime ? ["ResumableConnection<infer _>"] : []),
-		...(features.ws || features.realtime ? ["TypedWebSocket"] : []),
-	]
-	const realtime = features.realtime
-		? `export type RealtimeCallOptions = Omit<HttpOptions, "idempotencyKey" | "timeout"> & RealtimeOptions\n`
-		: ""
-	const rest = "T[K] extends HttpCall<infer I, infer D, infer E, infer H>"
-	const safe =
-		connections.length === 0
-			? rest
-			: `T[K] extends (...input: never[]) => ${connections.join(" | ")}\n\t\t? T[K]\n\t\t: ${rest}`
-	return `${OPTIONS}${realtime}${CALLS}${safe}\n${SAFE_ARMS}`
+  const connections = [
+    ...(features.realtime ? ["ResumableConnection<infer _>"] : []),
+    ...(features.ws || features.realtime ? ["TypedWebSocket"] : []),
+  ];
+
+  const realtime = features.realtime
+    ? `export type RealtimeCallOptions = Omit<HttpOptions, "idempotencyKey" | "timeout"> & RealtimeOptions\n`
+    : "";
+
+  const rest = "T[K] extends HttpCall<infer I, infer D, infer E, infer H>";
+
+  const safe =
+    connections.length === 0
+      ? rest
+      : `T[K] extends (...input: never[]) => ${connections.join(" | ")}\n\t\t? T[K]\n\t\t: ${rest}`;
+
+  return `${OPTIONS}${realtime}${CALLS}${safe}\n${SAFE_ARMS}`;
 }
 
 /** The runtime types this text names, in order: a document with no realtime route uses neither
  *  `SSEEvent` nor `ResumableConnection`, and an import a file never reads is a consumer's error
  *  under `noUnusedLocals`. A type in `aliases` is imported, and named in `body`, by its alias. */
 export function importText(body: string, runtime: string, aliases: Readonly<Record<string, string>> = {}): string {
-	const used = RUNTIME_TYPES.flatMap((type) => {
-		const local = aliases[type] ?? type
-		if (!new RegExp(`\\b${local}\\b`).test(body)) return []
-		return local === type ? [type] : [`${type} as ${local}`]
-	})
-	return `import type { ${used.join(", ")} } from "./${runtime}.js"\n`
+  const used = RUNTIME_TYPES.flatMap((type) => {
+    const local = aliases[type] ?? type;
+
+    if (!new RegExp(`\\b${local}\\b`).test(body)) return [];
+
+    return local === type ? [type] : [`${type} as ${local}`];
+  });
+
+  return `import type { ${used.join(", ")} } from "./${runtime}.js"\n`;
 }

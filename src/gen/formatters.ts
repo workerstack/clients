@@ -4,13 +4,14 @@
  * rather than another branch, and a language with no row is visibly unformatted here instead of unformatted
  * by omission.
  */
-import { existsSync, realpathSync, statSync } from "node:fs"
-import { delimiter, dirname, join } from "node:path"
-import type { Formatter } from "../emit/shared/format.ts"
-import { gofmtFormatter } from "../emit/shared/gofmt.ts"
-import { ruffFormatter } from "../emit/shared/ruff.ts"
-import { rustfmtFormatter } from "../emit/shared/rustfmt.ts"
-import type { Target } from "./targets.ts"
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { delimiter, dirname, join } from "node:path";
+
+import type { Formatter } from "../emit/shared/format.ts";
+import { gofmtFormatter } from "../emit/shared/gofmt.ts";
+import { ruffFormatter } from "../emit/shared/ruff.ts";
+import { rustfmtFormatter } from "../emit/shared/rustfmt.ts";
+import type { Target } from "./targets.ts";
 
 /**
  * The binary a caller named through an environment variable, checked here at the edge. An override that
@@ -19,18 +20,20 @@ import type { Target } from "./targets.ts"
  * which raises a failure there as though clients had emitted source the formatter could not parse.
  */
 function named(variable: string, path: string | undefined): string | undefined {
-	if (path === undefined || path === "") return undefined
-	if (!existsSync(path)) throw new Error(`${variable}=${path} is not there`)
-	return path
+  if (path === undefined || path === "") return undefined;
+
+  if (!existsSync(path)) throw new Error(`${variable}=${path} is not there`);
+
+  return path;
 }
 
 /** An executable named `name` on PATH, or none. */
 function onPath(name: string, env: NodeJS.ProcessEnv): string | undefined {
-	return (env.PATH ?? "")
-		.split(delimiter)
-		.filter(Boolean)
-		.map((dir) => join(dir, name))
-		.find((path) => existsSync(path) && statSync(path).isFile())
+  return (env.PATH ?? "")
+    .split(delimiter)
+    .filter(Boolean)
+    .map((dir) => join(dir, name))
+    .find((path) => existsSync(path) && statSync(path).isFile());
 }
 
 /**
@@ -39,13 +42,16 @@ function onPath(name: string, env: NodeJS.ProcessEnv): string | undefined {
  * looking, never by running Go.
  */
 export function findGofmt(env: NodeJS.ProcessEnv = process.env): string | undefined {
-	const override = named("GOFMT", env.GOFMT)
-	if (override !== undefined) return override
-	const fromRoot = env.GOROOT ? join(env.GOROOT, "bin", "gofmt") : undefined
-	if (fromRoot !== undefined && existsSync(fromRoot)) return fromRoot
-	const go = onPath("go", env)
-	const beside = go === undefined ? undefined : join(dirname(realpathSync(go)), "gofmt")
-	return onPath("gofmt", env) ?? (beside !== undefined && existsSync(beside) ? beside : undefined)
+  const override = named("GOFMT", env.GOFMT);
+
+  if (override !== undefined) return override;
+  const fromRoot = env.GOROOT ? join(env.GOROOT, "bin", "gofmt") : undefined;
+
+  if (fromRoot !== undefined && existsSync(fromRoot)) return fromRoot;
+  const go = onPath("go", env);
+  const beside = go === undefined ? undefined : join(dirname(realpathSync(go)), "gofmt");
+
+  return onPath("gofmt", env) ?? (beside !== undefined && existsSync(beside) ? beside : undefined);
 }
 
 /**
@@ -54,7 +60,7 @@ export function findGofmt(env: NodeJS.ProcessEnv = process.env): string | undefi
  * `formatFiles` would raise as though clients had emitted unparseable Python.
  */
 export function findRuff(env: NodeJS.ProcessEnv = process.env): string | undefined {
-	return named("RUFF", env.RUFF) ?? onPath("ruff", env)
+  return named("RUFF", env.RUFF) ?? onPath("ruff", env);
 }
 
 /**
@@ -62,39 +68,41 @@ export function findRuff(env: NodeJS.ProcessEnv = process.env): string | undefin
  * rustc. The rustup proxy on PATH would pick a toolchain by cwd, so a sysroot binary is preferred over it.
  */
 export function findRustfmt(env: NodeJS.ProcessEnv = process.env): string | undefined {
-	const override = named("RUSTFMT", env.RUSTFMT)
-	if (override !== undefined) return override
-	const rustc = onPath("rustc", env)
-	const beside = rustc === undefined ? undefined : join(dirname(realpathSync(rustc)), "rustfmt")
-	return (beside !== undefined && existsSync(beside) ? beside : undefined) ?? onPath("rustfmt", env)
+  const override = named("RUSTFMT", env.RUSTFMT);
+
+  if (override !== undefined) return override;
+  const rustc = onPath("rustc", env);
+  const beside = rustc === undefined ? undefined : join(dirname(realpathSync(rustc)), "rustfmt");
+
+  return (beside !== undefined && existsSync(beside) ? beside : undefined) ?? onPath("rustfmt", env);
 }
 
 /** oxfmt's `format`, the optional peer, when installed; else undefined (TS then goes out as emitted). */
 export async function loadOxfmt(specifier = "oxfmt"): Promise<Formatter | undefined> {
-	try {
-		return ((await import(specifier)) as { format: Formatter }).format
-	} catch (error) {
-		if ((error as { code?: string }).code === "ERR_MODULE_NOT_FOUND") return undefined
-		throw error
-	}
+  try {
+    return ((await import(specifier)) as { format: Formatter }).format;
+  } catch (error) {
+    if ((error as { code?: string }).code === "ERR_MODULE_NOT_FOUND") return undefined;
+    throw error;
+  }
 }
 
 /** What one target's formatting is: the extension the post-pass dispatches on, and what to say about the tool. */
 export type FormatPass = {
-	readonly extension: string
-	readonly install: string
-	/**
-	 * Say nothing when this one is absent. Only `ts`: oxfmt is clients' own choice of TS formatter and a
-	 * declared optional peer, so a consumer is not expected to have it and "TS goes out as emitted" is the
-	 * documented rule (Q12, `blueprint/00-rules.md`). ruff, rustfmt and gofmt are the language's own standard
-	 * tools, which a developer of that language has — clients simply never called them, and silence there is
-	 * what let unformatted Python ship.
-	 */
-	readonly quiet?: true
-	readonly tool: string
-}
+  readonly extension: string;
+  readonly install: string;
+  /**
+   * Say nothing when this one is absent. Only `ts`: oxfmt is clients' own choice of TS formatter and a
+   * declared optional peer, so a consumer is not expected to have it and "TS goes out as emitted" is the
+   * documented rule (Q12, `blueprint/00-rules.md`). ruff, rustfmt and gofmt are the language's own standard
+   * tools, which a developer of that language has — clients simply never called them, and silence there is
+   * what let unformatted Python ship.
+   */
+  readonly quiet?: true;
+  readonly tool: string;
+};
 
-const GO_PASS: FormatPass = { extension: "go", install: "install Go, or set GOFMT", tool: "gofmt" }
+const GO_PASS: FormatPass = { extension: "go", install: "install Go, or set GOFMT", tool: "gofmt" };
 
 /**
  * Every target that has a formatter, one row each (F4). A target absent from this table has none in this
@@ -103,12 +111,12 @@ const GO_PASS: FormatPass = { extension: "go", install: "install Go, or set GOFM
  * project rather than stdin and need a formatter `formatFiles` does not have yet.
  */
 export const FORMATTERS: Partial<Record<Target, FormatPass>> = {
-	cli: GO_PASS,
-	go: GO_PASS,
-	python: { extension: "py", install: "install ruff, or set RUFF", tool: "ruff" },
-	rust: { extension: "rs", install: "install rustfmt, or set RUSTFMT", tool: "rustfmt" },
-	ts: { extension: "ts", install: "install oxfmt", quiet: true, tool: "oxfmt" },
-}
+  cli: GO_PASS,
+  go: GO_PASS,
+  python: { extension: "py", install: "install ruff, or set RUFF", tool: "ruff" },
+  rust: { extension: "rs", install: "install rustfmt, or set RUSTFMT", tool: "rustfmt" },
+  ts: { extension: "ts", install: "install oxfmt", quiet: true, tool: "oxfmt" },
+};
 
 /**
  * The formatter for `target`, or none when its binary is not there. Each factory is named here rather than
@@ -117,29 +125,39 @@ export const FORMATTERS: Partial<Record<Target, FormatPass>> = {
  * test calling `generated()` free of the bound it needs, since the spawn is real either way.
  */
 export async function formatterFor(
-	target: Target,
-	where: { env: NodeJS.ProcessEnv; oxfmt?: string | undefined },
+  target: Target,
+  where: { env: NodeJS.ProcessEnv; oxfmt?: string | undefined },
 ): Promise<Formatter | undefined> {
-	const { env, oxfmt } = where
-	switch (target) {
-		case "cli":
-		case "go": {
-			const gofmt = findGofmt(env)
-			return gofmt === undefined ? undefined : gofmtFormatter(gofmt)
-		}
-		case "python": {
-			const ruff = findRuff(env)
-			return ruff === undefined ? undefined : ruffFormatter(ruff)
-		}
-		case "rust": {
-			const rustfmt = findRustfmt(env)
-			return rustfmt === undefined ? undefined : rustfmtFormatter(rustfmt)
-		}
-		case "ts":
-			return await loadOxfmt(oxfmt)
-		default:
-			return undefined
-	}
+  const { env, oxfmt } = where;
+
+  switch (target) {
+    case "cli":
+    case "go": {
+      const gofmt = findGofmt(env);
+
+      return gofmt === undefined ? undefined : gofmtFormatter(gofmt);
+    }
+
+    case "python": {
+      const ruff = findRuff(env);
+
+      return ruff === undefined ? undefined : ruffFormatter(ruff);
+    }
+
+    case "rust": {
+      const rustfmt = findRustfmt(env);
+
+      return rustfmt === undefined ? undefined : rustfmtFormatter(rustfmt);
+    }
+
+    case "ts": {
+      return await loadOxfmt(oxfmt);
+    }
+
+    default: {
+      return undefined;
+    }
+  }
 }
 
 /**
@@ -152,13 +170,15 @@ export async function formatterFor(
  * generation in CI without oxfmt into a hard failure, which is how rc.10's release run died.
  */
 export function missingFormatter(
-	target: Target,
-	pass: FormatPass,
-	env: NodeJS.ProcessEnv,
-	report: (line: string) => void,
+  target: Target,
+  pass: FormatPass,
+  env: NodeJS.ProcessEnv,
+  report: (line: string) => void,
 ): void {
-	const said = `${pass.tool} was not found, so the ${target} output is not formatted (${pass.install})`
-	/* an explicit demand is honoured for every target, quiet or not: the caller asked to be stopped */
-	if (env.CLIENTS_REQUIRE_FORMATTERS === "1") throw new Error(said)
-	if (pass.quiet !== true) report(`clients: ${said}\n`)
+  const said = `${pass.tool} was not found, so the ${target} output is not formatted (${pass.install})`;
+
+  // an explicit demand is honoured for every target, quiet or not: the caller asked to be stopped
+  if (env.CLIENTS_REQUIRE_FORMATTERS === "1") throw new Error(said);
+
+  if (pass.quiet !== true) report(`clients: ${said}\n`);
 }

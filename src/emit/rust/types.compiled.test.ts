@@ -5,18 +5,19 @@
  * a boxed cycle, a payload-keeping discriminator over named or inline variants, raw identifiers, an integer enum,
  * the extra flatten, unique enum labels, an inline array answer's item type) is proven on the wire.
  */
-import { describe, expect, it } from "vitest"
-import { compiledRust } from "./__fixtures__/compiled.ts"
-import { consume, once, seen } from "./__fixtures__/consumer.ts"
-import { withRust } from "./__fixtures__/rust-env.ts"
+import { describe, expect, it } from "vitest";
+
+import { compiledRust } from "./__fixtures__/compiled.ts";
+import { consume, once, seen } from "./__fixtures__/consumer.ts";
+import { withRust } from "./__fixtures__/rust-env.ts";
 
 /** Whether Rust is here: a missing toolchain fails where it is required and skips these legs elsewhere (rust-env). */
-const RUST = withRust()
+const RUST = withRust();
 
-/* cargo builds the crate's dependencies on a cold cache */
-const CARGO = 600_000
+// cargo builds the crate's dependencies on a cold cache
+const CARGO = 600_000;
 
-/* serde helpers the sections share: a decode with serde's error as text, an encode, a decode-then-encode */
+// serde helpers the sections share: a decode with serde's error as text, an encode, a decode-then-encode
 const DECLS = `/// \`text\` decoded as a \`T\`, or serde's error as text.
 fn de<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, String> {
     serde_json::from_str(text).map_err(|e| e.to_string())
@@ -48,9 +49,9 @@ fn thing(note: Option<Option<String>>, x_key: Option<Option<i64>>) -> sdk::Thing
 /// \`list().get\`'s answer bound to its hoisted item type: an untyped answer fails the build.
 async fn listed(c: &sdk::Client) -> Result<Vec<sdk::ListGetResponseItem>, sdk::Error> {
     c.list().get(&sdk::ListGetOpts::default()).await
-}`
+}`;
 
-/* one section per §8.3 row; each notes what it decoded or encoded */
+// one section per §8.3 row; each notes what it decoded or encoded
 const BODY = `
     n.section("tri");
     for text in [r#"{"tags":[],"attrs":{},"note":null}"#, r#"{"tags":[],"attrs":{}}"#, r#"{"tags":[],"attrs":{},"note":"n","x-key":3}"#] {
@@ -141,143 +142,144 @@ const BODY = `
     };
     n.note(line);
     n.note(en(&sdk::ListGetResponseItem { a: Some("x".into()) }));
-`.trim()
+`.trim();
 
 /** The `types` crate with the program beside it, built and run once for every section. */
-const run = once(() => consume("types", "types", { body: BODY, decls: DECLS }))
+const run = once(() => consume("types", "types", { body: BODY, decls: DECLS }));
 
 /** Whether the program built, the notes of `section`, and its stderr, which a failure's diff shows. */
 async function notes(section: string) {
-	const ran = await run()
-	return { ...seen(ran, section), stderr: ran.stderr }
+  const ran = await run();
+
+  return { ...seen(ran, section), stderr: ran.stderr };
 }
 
 /** What a section is expected to note: built, exactly `out`, any stderr. */
-const noted = (out: readonly unknown[]) => ({ built: true, out, stderr: expect.any(String) })
+const noted = (out: readonly unknown[]) => ({ built: true, out, stderr: expect.any(String) });
 
 describe.skipIf(!RUST)("emitted Rust structs on the wire: optional, nullable, empty, cyclic, keyword and open", () => {
-	it(
-		"builds the types crate as emitted, under --locked",
-		() => {
-			const sdk = compiledRust("types")
-			expect(sdk.built, sdk.stderr).toBe(true)
-		},
-		CARGO,
-	)
+  it(
+    "builds the types crate as emitted, under --locked",
+    () => {
+      const sdk = compiledRust("types");
+      expect(sdk.built, sdk.stderr).toBe(true);
+    },
+    CARGO,
+  );
 
-	// v0: 411e33be52
-	// v0: 047b5225e0
-	it(
-		"keeps absent, null and a value apart on an optional nullable field, and omits an absent one",
-		async () =>
-			expect(await notes("tri")).toEqual(
-				noted([
-					"note=Some(None) x_key=None",
-					"note=None x_key=None",
-					'note=Some(Some("n")) x_key=Some(Some(3))',
-					'{"attrs":{},"note":null,"tags":[],"x-key":3}',
-					'{"attrs":{},"tags":[]}',
-					'{"attrs":{},"parent":null,"tags":[]}',
-					'{"attrs":{},"parent":{"attrs":{},"tags":[]},"tags":[]}',
-				]),
-			),
-		CARGO,
-	)
+  // v0: 411e33be52
+  // v0: 047b5225e0
+  it(
+    "keeps absent, null and a value apart on an optional nullable field, and omits an absent one",
+    async () =>
+      expect(await notes("tri")).toEqual(
+        noted([
+          "note=Some(None) x_key=None",
+          "note=None x_key=None",
+          'note=Some(Some("n")) x_key=Some(Some(3))',
+          '{"attrs":{},"note":null,"tags":[],"x-key":3}',
+          '{"attrs":{},"tags":[]}',
+          '{"attrs":{},"parent":null,"tags":[]}',
+          '{"attrs":{},"parent":{"attrs":{},"tags":[]},"tags":[]}',
+        ]),
+      ),
+    CARGO,
+  );
 
-	/* V0BUG: v0 emitted the unit struct `X;`, which serde_json encodes as null and which rejects {}; `X {}` round-trips {} */
-	// v0: 5a7811ce38
-	it(
-		"encodes and decodes a closed empty object as {}",
-		async () => expect(await notes("closed")).toEqual(noted(["{}", "{}"])),
-		CARGO,
-	)
+  // V0BUG: v0 emitted the unit struct `X;`, which serde_json encodes as null and which rejects {}; `X {}` round-trips {}
+  // v0: 5a7811ce38
+  it(
+    "encodes and decodes a closed empty object as {}",
+    async () => expect(await notes("closed")).toEqual(noted(["{}", "{}"])),
+    CARGO,
+  );
 
-	// v0: fdac715f3f
-	// v0: 7fc4520774
-	it(
-		"round-trips a mutually recursive pair through its boxed fields",
-		async () => expect(await notes("cycle")).toEqual(noted(['{"b":{"a":{}}}', '{"b":{}}'])),
-		CARGO,
-	)
+  // v0: fdac715f3f
+  // v0: 7fc4520774
+  it(
+    "round-trips a mutually recursive pair through its boxed fields",
+    async () => expect(await notes("cycle")).toEqual(noted(['{"b":{"a":{}}}', '{"b":{}}'])),
+    CARGO,
+  );
 
-	// v0: f265fd24a2
-	it(
-		"names keyword fields as raw identifiers that serialize under their JSON keys",
-		async () => expect(await notes("keywords")).toEqual(noted(['{"fn":"f","match":"m","type":"t"}', "f m t"])),
-		CARGO,
-	)
+  // v0: f265fd24a2
+  it(
+    "names keyword fields as raw identifiers that serialize under their JSON keys",
+    async () => expect(await notes("keywords")).toEqual(noted(['{"fn":"f","match":"m","type":"t"}', "f m t"])),
+    CARGO,
+  );
 
-	// v0: f902313a30
-	it(
-		"collects unnamed keys into the extra flatten and writes them back beside the named fields",
-		async () => expect(await notes("extra")).toEqual(noted(['id=1 extra={"k": "v"}', '{"id":"1","k":"v"}'])),
-		CARGO,
-	)
-})
+  // v0: f902313a30
+  it(
+    "collects unnamed keys into the extra flatten and writes them back beside the named fields",
+    async () => expect(await notes("extra")).toEqual(noted(['id=1 extra={"k": "v"}', '{"id":"1","k":"v"}'])),
+    CARGO,
+  );
+});
 
 describe.skipIf(!RUST)("an emitted Rust operation's answer on the wire: an inline array keeps its item type", () => {
-	// v0: 0c1cfcbc85
-	it(
-		"answers an inline array of inline objects as a Vec of its hoisted item type, decoded and encoded",
-		async () => expect(await notes("listed")).toEqual(noted(['[Some("x"), None]', '{"a":"x"}'])),
-		CARGO,
-	)
-})
+  // v0: 0c1cfcbc85
+  it(
+    "answers an inline array of inline objects as a Vec of its hoisted item type, decoded and encoded",
+    async () => expect(await notes("listed")).toEqual(noted(['[Some("x"), None]', '{"a":"x"}'])),
+    CARGO,
+  );
+});
 
 describe.skipIf(!RUST)(
-	"emitted Rust enums and unions on the wire: literals, discriminators, integers and labels",
-	() => {
-		// v0: 1f2d0b3088
-		it(
-			"decodes the const strings of a mixed union to its Literal variant and anything else to the rest",
-			async () => expect(await notes("mixed")).toEqual(noted(["Literal(A)", "Literal(B)", "Variant2(7)", '"b"', "7"])),
-			CARGO,
-		)
+  "emitted Rust enums and unions on the wire: literals, discriminators, integers and labels",
+  () => {
+    // v0: 1f2d0b3088
+    it(
+      "decodes the const strings of a mixed union to its Literal variant and anything else to the rest",
+      async () => expect(await notes("mixed")).toEqual(noted(["Literal(A)", "Literal(B)", "Variant2(7)", '"b"', "7"])),
+      CARGO,
+    );
 
-		/* V0BUG: v0's #[serde(tag = "kind")] consumed the discriminator, so a variant's required kind failed to decode; dispatch keeps the payload whole */
-		// v0: 2fda8aac06
-		it(
-			"dispatches a discriminated union on its kind, keeps kind in the payload, and keeps an unknown kind whole",
-			async () =>
-				expect(await notes("animal")).toEqual(
-					noted([
-						"Dog name=rex kind=dog",
-						"Cat lives=Some(9) kind=cat",
-						'Unknown {"kind":"bird"}',
-						'{"kind":"dog","name":"rex"}',
-						'{"kind":"bird"}',
-					]),
-				),
-			CARGO,
-		)
+    // V0BUG: v0's #[serde(tag = "kind")] consumed the discriminator, so a variant's required kind failed to decode; dispatch keeps the payload whole
+    // v0: 2fda8aac06
+    it(
+      "dispatches a discriminated union on its kind, keeps kind in the payload, and keeps an unknown kind whole",
+      async () =>
+        expect(await notes("animal")).toEqual(
+          noted([
+            "Dog name=rex kind=dog",
+            "Cat lives=Some(9) kind=cat",
+            'Unknown {"kind":"bird"}',
+            '{"kind":"dog","name":"rex"}',
+            '{"kind":"bird"}',
+          ]),
+        ),
+      CARGO,
+    );
 
-		// v0: 9db777e640
-		it(
-			"dispatches a discriminated union of inline variants, each named by its kind const, kind kept in the payload",
-			async () =>
-				expect(await notes("shape")).toEqual(
-					noted(["A x=s kind=a", "B y=Some(2.0) kind=b", 'Unknown {"kind":"c"}', '{"kind":"a","x":"s"}']),
-				),
-			CARGO,
-		)
+    // v0: 9db777e640
+    it(
+      "dispatches a discriminated union of inline variants, each named by its kind const, kind kept in the payload",
+      async () =>
+        expect(await notes("shape")).toEqual(
+          noted(["A x=s kind=a", "B y=Some(2.0) kind=b", 'Unknown {"kind":"c"}', '{"kind":"a","x":"s"}']),
+        ),
+      CARGO,
+    );
 
-		// v0: 4b2edd336d
-		it(
-			"encodes an integer enum as its number, decodes a known one, rejects an unknown one, defaults to the first",
-			async () =>
-				expect(await notes("kind")).toEqual(noted(["2", "L1", expect.stringContaining("unknown Kind 3"), "L1 2"])),
-			CARGO,
-		)
+    // v0: 4b2edd336d
+    it(
+      "encodes an integer enum as its number, decodes a known one, rejects an unknown one, defaults to the first",
+      async () =>
+        expect(await notes("kind")).toEqual(noted(["2", "L1", expect.stringContaining("unknown Kind 3"), "L1 2"])),
+      CARGO,
+    );
 
-		// v0: 784a6dbdf7
-		// v0: 84b788c011
-		it(
-			"gives enum values that collide or are not identifiers unique variants that keep their wire value",
-			async () =>
-				expect(await notes("labels")).toEqual(
-					noted(["Empty", "SelfValue", "CreatedAt2", '"-created_at"', '"created_at"']),
-				),
-			CARGO,
-		)
-	},
-)
+    // v0: 784a6dbdf7
+    // v0: 84b788c011
+    it(
+      "gives enum values that collide or are not identifiers unique variants that keep their wire value",
+      async () =>
+        expect(await notes("labels")).toEqual(
+          noted(["Empty", "SelfValue", "CreatedAt2", '"-created_at"', '"created_at"']),
+        ),
+      CARGO,
+    );
+  },
+);

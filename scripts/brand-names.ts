@@ -11,111 +11,121 @@
 // a README's dated upgrade sections. Two files are partly live: `blueprint/files.tsv`, whose path column check-tree
 // reads, and each lesson, whose `paths:` and commands agents run; only its `evidence:` line is history.
 
-export const ALLOW: Record<string, readonly string[]> = {
-	comb: ["combobox", "Combobox", "combination", "combine"],
-	honey: ["honeymoon", "Honeydew", "honeypot", "honeybadger", "HoneyBadger", "migrating-from-honey", "no-honey"],
-}
+const ALLOW: Record<string, readonly string[]> = {
+  comb: ["combobox", "Combobox", "combination", "combine"],
+  honey: ["honeymoon", "Honeydew", "honeypot", "honeybadger", "HoneyBadger", "migrating-from-honey", "no-honey"],
+};
 
 /** A character of a whole token: what a brand segment's token runs over, and what ALLOW matches whole. */
-export const TOKEN_CHAR = /[A-Za-z0-9_$-]/
-
-/** Whether `text[start, end)` sits inside a token some brand's ALLOW list keeps, so a rename leaves it. */
-export function allowedAt(text: string, from: number, to: number): boolean {
-	let start = from
-	let end = to
-	while (start > 0 && TOKEN_CHAR.test(text.charAt(start - 1))) start--
-	while (end < text.length && TOKEN_CHAR.test(text.charAt(end))) end++
-	const token = text.slice(start, end)
-	return Object.values(ALLOW).some((words) => words.includes(token))
-}
+const TOKEN_CHAR: RegExp = /[A-Za-z0-9_$-]/;
 
 function segmentPattern(brand: string): RegExp {
-	const lower = brand.toLowerCase()
-	const cap = lower.charAt(0).toUpperCase() + lower.slice(1)
-	const upper = lower.toUpperCase()
-	return new RegExp(`(?<![a-z])${lower}(?![a-z])|(?<![A-Z])${cap}(?![a-z])|(?<![A-Za-z])${upper}(?![A-Za-z])`, "g")
+  const lower = brand.toLowerCase();
+  const cap = lower.charAt(0).toUpperCase() + lower.slice(1);
+  const upper = lower.toUpperCase();
+
+  return new RegExp(`(?<![a-z])${lower}(?![a-z])|(?<![A-Z])${cap}(?![a-z])|(?<![A-Za-z])${upper}(?![A-Za-z])`, "g");
 }
 
 /** Each whole token (a run of `[A-Za-z0-9_$-]`) that holds a brand segment, in text order, allow list removed. */
 export function brandTokens(text: string, brand: string): string[] {
-	const allowed = new Set(ALLOW[brand.toLowerCase()] ?? [])
-	const out: string[] = []
-	let end = 0
-	for (const match of text.matchAll(segmentPattern(brand))) {
-		if (match.index < end) continue
-		let start = match.index
-		let stop = match.index + match[0].length
-		while (start > 0 && TOKEN_CHAR.test(text.charAt(start - 1))) start--
-		while (stop < text.length && TOKEN_CHAR.test(text.charAt(stop))) stop++
-		end = stop
-		const token = text.slice(start, stop)
-		if (!allowed.has(token)) out.push(token)
-	}
-	return out
+  const allowed = new Set(ALLOW[brand.toLowerCase()] ?? []);
+  const out: string[] = [];
+  let end = 0;
+
+  for (const match of text.matchAll(segmentPattern(brand))) {
+    if (match.index < end) continue;
+    let start = match.index;
+    let stop = match.index + match[0].length;
+
+    while (start > 0 && TOKEN_CHAR.test(text.charAt(start - 1))) start--;
+
+    while (stop < text.length && TOKEN_CHAR.test(text.charAt(stop))) stop++;
+    end = stop;
+    const token = text.slice(start, stop);
+
+    if (!allowed.has(token)) out.push(token);
+  }
+
+  return out;
 }
 
-export type Area = "history" | "files-tsv" | "lesson" | "live"
+type Area = "history" | "files-tsv" | "lesson" | "live";
 
 /** One run of a file's text: `live` when a rename rewrites it and a leftover there counts. */
-export type Span = { live: boolean; text: string }
+export type Span = { live: boolean; text: string };
 
 const HISTORY = [
-	/(^|\/)CHANGELOG\.md$/,
-	/(^|\/)docs\/(.*\/)?[^/]*migrat[^/]*\.md$/,
-	/(^|\/)tests\/structure\/no-[a-z-]+\.test\.ts$/,
-	/(^|\/)__snapshots__\/released-[^/]+$/,
-	/* a directory named by an exact version pins a published release: its package names and bins are that release's */
-	/(^|\/)\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?\//,
-	/(^|\/)brand-names(\.test)?\.ts$/,
-]
+  /(^|\/)CHANGELOG\.md$/,
+  /(^|\/)docs\/(.*\/)?[^/]*migrat[^/]*\.md$/,
+  /(^|\/)tests\/structure\/no-[a-z-]+\.test\.ts$/,
+  /(^|\/)__snapshots__\/released-[^/]+$/,
+  // a directory named by an exact version pins a published release: its package names and bins are that release's
+  /(^|\/)\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?\//,
+  /(^|\/)brand-names(\.test)?\.ts$/,
+];
 
 /** Where `path` stands: all history, partly live (`files-tsv`, `lesson`), or live, with `maps` the rename's maps. */
-export function historyOf(path: string, maps: readonly string[] = []): Area {
-	if (maps.includes(path) || HISTORY.some((re) => re.test(path))) return "history"
-	if (path === "blueprint/files.tsv") return "files-tsv"
-	if (path.startsWith("blueprint/")) return "history"
-	if (/^\.repo\/lessons\/.*\.md$/.test(path)) return "lesson"
-	return "live"
+function historyOf(path: string, maps: readonly string[] = []): Area {
+  if (maps.includes(path) || HISTORY.some((re) => re.test(path))) return "history";
+
+  if (path === "blueprint/files.tsv") return "files-tsv";
+
+  if (path.startsWith("blueprint/")) return "history";
+
+  if (/^\.repo\/lessons\/.*\.md$/.test(path)) return "lesson";
+
+  return "live";
 }
 
 /** `text` split into lines, each keeping its newline, so the lines rejoin to it. */
-const linesOf = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) ?? []
+const linesOf = (text: string): string[] => text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
 
 /** Adjacent spans of one kind merged. */
 function merged(spans: readonly Span[]): Span[] {
-	const out: Span[] = []
-	for (const span of spans) {
-		const last = out.at(-1)
-		if (last && last.live === span.live) last.text += span.text
-		else if (span.text !== "") out.push({ ...span })
-	}
-	return out
+  const out: Span[] = [];
+
+  for (const span of spans) {
+    const last = out.at(-1);
+
+    if (last && last.live === span.live) last.text += span.text;
+    else if (span.text !== "") out.push({ ...span });
+  }
+
+  return out;
 }
 
 function tsvSpans(text: string): Span[] {
-	return linesOf(text).flatMap((line) => {
-		const tab = line.indexOf("\t")
-		if (line.startsWith("#") || tab < 0) return [{ live: false, text: line }]
-		return [
-			{ live: true, text: line.slice(0, tab) },
-			{ live: false, text: line.slice(tab) },
-		]
-	})
+  return linesOf(text).flatMap((line) => {
+    const tab = line.indexOf("\t");
+
+    if (line.startsWith("#") || tab < 0) return [{ live: false, text: line }];
+
+    return [
+      { live: true, text: line.slice(0, tab) },
+      { live: false, text: line.slice(tab) },
+    ];
+  });
 }
 
-const UPGRADE = /^## (Upgrading to |\d)/
+const UPGRADE = /^## (Upgrading to |\d)/;
 
 function readmeSpans(text: string): Span[] {
-	return text.split(/(?<=\n)(?=## )/).map((section) => ({ live: !UPGRADE.test(section), text: section }))
+  return text.split(/(?<=\n)(?=## )/).map((section) => ({ live: !UPGRADE.test(section), text: section }));
 }
 
 /** `text` of `path` as live and history spans, in order; their texts rejoin to `text`. */
 export function spansOf(path: string, text: string, maps: readonly string[] = []): Span[] {
-	const area = historyOf(path, maps)
-	if (area === "history") return [{ live: false, text }]
-	if (area === "files-tsv") return merged(tsvSpans(text))
-	if (area === "lesson")
-		return merged(linesOf(text).map((line) => ({ live: !line.startsWith("evidence:"), text: line })))
-	if (/(^|\/)README\.md$/.test(path)) return merged(readmeSpans(text))
-	return [{ live: true, text }]
+  const area = historyOf(path, maps);
+
+  if (area === "history") return [{ live: false, text }];
+
+  if (area === "files-tsv") return merged(tsvSpans(text));
+
+  if (area === "lesson")
+    return merged(linesOf(text).map((line) => ({ live: !line.startsWith("evidence:"), text: line })));
+
+  if (/(^|\/)README\.md$/.test(path)) return merged(readmeSpans(text));
+
+  return [{ live: true, text }];
 }

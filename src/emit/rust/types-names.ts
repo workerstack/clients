@@ -4,12 +4,12 @@
  * crate root (`lib.rs` re-exports each runtime module's public items), of the emitter's own `ErrorKey`,
  * and of the prelude and std names generated code relies on (H52).
  */
-import type { IR } from "../../ir/model.ts"
-import { irResolver } from "../../ir/schema.ts"
-import { valueCycleSchemas } from "../../ir/sdk-model.ts"
-import { compareCodeUnits, isRustPreludeType, NameScope, rustTypeIdent } from "../shared/lang.ts"
-import { publicItems, runtimeFiles } from "./http.ts"
-import type { RustTypeNames } from "./types.ts"
+import type { IR } from "../../ir/model.ts";
+import { irResolver } from "../../ir/schema.ts";
+import { valueCycleSchemas } from "../../ir/sdk-model.ts";
+import { compareCodeUnits, isRustPreludeType, NameScope, rustTypeIdent } from "../shared/lang.ts";
+import { publicItems, runtimeFiles } from "./http.ts";
+import type { RustTypeNames } from "./types.ts";
 
 /**
  * The top-level `pub` items of the runtime's Rust files (contract §6.2), `ws` and `realtime` included,
@@ -17,27 +17,27 @@ import type { RustTypeNames } from "./types.ts"
  * `pub struct|enum|trait|type|fn|const|static` at column 0, the way `go/types-names.ts` reads the Go runtime.
  */
 function runtimeIdentifiers(): string[] {
-	return Object.entries(runtimeFiles({ realtime: true, ws: true }))
-		.filter(([name]) => name.endsWith(".rs"))
-		.flatMap(([, source]) => publicItems(source))
+  return Object.entries(runtimeFiles({ realtime: true, ws: true }))
+    .filter(([name]) => name.endsWith(".rs"))
+    .flatMap(([, source]) => publicItems(source));
 }
 
 /** The style parameter every resource and its methods' `Call` take (bit 21 i4): no type may be named it. */
-export const STYLE = "S"
+export const STYLE = "S";
 
-/* the crate-root types the emitter itself declares beside the runtime's (errors.ts's enum), and the style parameter */
-const EMITTED: readonly string[] = ["ErrorKey", STYLE]
+// the crate-root types the emitter itself declares beside the runtime's (errors.ts's enum), and the style parameter
+const EMITTED: readonly string[] = ["ErrorKey", STYLE];
 
 /** Names for one schema on its own: each as asked for, no cycles, refs left unresolved. */
 export function plainNames(): RustTypeNames {
-	return {
-		claim: (base) => base,
-		cyclic: new Set(),
-		hoist: (_key, base) => base,
-		renamed: new Map(),
-		ref: rustTypeIdent,
-		resolve: (schema) => schema,
-	}
+  return {
+    claim: (base) => base,
+    cyclic: new Set(),
+    hoist: (_key, base) => base,
+    ref: rustTypeIdent,
+    renamed: new Map(),
+    resolve: (schema) => schema,
+  };
 }
 
 /**
@@ -47,32 +47,39 @@ export function plainNames(): RustTypeNames {
  * them, a hoist key always getting the name it got first; `cyclic` is every component on a by-value cycle.
  */
 export function irNames(ir: IR): RustTypeNames {
-	const scope = new NameScope([...runtimeIdentifiers(), ...EMITTED])
-	const components = new Map<string, string>()
-	const renamed = new Map<string, string>()
-	for (const name of Object.keys(ir.schemas).sort(compareCodeUnits)) {
-		const base = rustTypeIdent(name)
-		const taken = scope.has(base) || isRustPreludeType(base)
-		const claimed = scope.claim(taken ? `${base}Model` : base)
-		components.set(name, claimed)
-		if (taken) renamed.set(name, claimed)
-	}
-	/* a joined name can spell a prelude one (`Hash` + `map`): that one is taken too, so the claim moves on */
-	const claim = (base: string) => {
-		const name = scope.claim(base)
-		return isRustPreludeType(name) ? scope.claim(base) : name
-	}
-	const hoisted = new Map<string, string>()
-	return {
-		claim,
-		cyclic: valueCycleSchemas(ir.schemas),
-		hoist: (key, base) => {
-			const name = hoisted.get(key) ?? claim(base)
-			hoisted.set(key, name)
-			return name
-		},
-		ref: (name) => components.get(name) ?? rustTypeIdent(name),
-		renamed,
-		resolve: irResolver(ir.schemas),
-	}
+  const scope = new NameScope([...runtimeIdentifiers(), ...EMITTED]);
+  const components = new Map<string, string>();
+  const renamed = new Map<string, string>();
+
+  for (const name of Object.keys(ir.schemas).sort(compareCodeUnits)) {
+    const base = rustTypeIdent(name);
+    const taken = scope.has(base) || isRustPreludeType(base);
+    const claimed = scope.claim(taken ? `${base}Model` : base);
+    components.set(name, claimed);
+
+    if (taken) renamed.set(name, claimed);
+  }
+
+  // a joined name can spell a prelude one (`Hash` + `map`): that one is taken too, so the claim moves on
+  const claim = (base: string) => {
+    const name = scope.claim(base);
+
+    return isRustPreludeType(name) ? scope.claim(base) : name;
+  };
+
+  const hoisted = new Map<string, string>();
+
+  return {
+    claim,
+    cyclic: valueCycleSchemas(ir.schemas),
+    hoist: (key, base) => {
+      const name = hoisted.get(key) ?? claim(base);
+      hoisted.set(key, name);
+
+      return name;
+    },
+    ref: (name) => components.get(name) ?? rustTypeIdent(name),
+    renamed,
+    resolve: irResolver(ir.schemas),
+  };
 }
