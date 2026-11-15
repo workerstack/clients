@@ -8,12 +8,13 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * A WebSocket call (bit 16 phase d2a; C#'s Stream.cs FramesAsync): a recording handler per end
- * under {@code ws.on}; the grid's {@code send} as text, then the script's (text, that many bytes
- * {@code i & 0xff}, or a JSON value through sendJson), which a failure ends but not the reads (what
- * the server sent first still waits); {@code take} frames (absent: until the socket ends); then
- * closedBy, and close with the script's code and reason (1000 and none by default). The trace holds
- * the frames read, the server's close, the close's failure and every handler run, those the
- * driver's own close fires included.
+ * under {@code ws.on}; the grid's {@code send} as text, then the script's (text through sendText,
+ * that many bytes {@code i & 0xff} through sendBinary, or a JSON value through send, an untyped
+ * socket's JsonNode), which a failure ends but not the reads (what the server sent first still
+ * waits); {@code take} frames (absent: until the socket ends); then closedBy, and close with the
+ * script's code and reason (1000 and none by default). The trace holds the frames read, the
+ * server's close, the close's failure and every handler run, those the driver's own close fires
+ * included.
  */
 final class Sockets {
   private Sockets() {}
@@ -81,19 +82,19 @@ final class Sockets {
   private static RuntimeException sent(Object ws, JsonNode call, JsonNode script) {
     try {
       for (JsonNode text : Wire.items(Wire.member(call, "send"))) {
-        send(ws, String.class, text.asString());
+        Reflect.call(ws, "sendText", text.asString());
       }
       for (JsonNode message : Wire.items(Wire.member(script, "send"))) {
         if (message.has("text")) {
-          send(ws, String.class, message.get("text").asString());
+          Reflect.call(ws, "sendText", message.get("text").asString());
         } else if (message.has("bytes")) {
           byte[] bytes = new byte[message.get("bytes").asInt()];
           for (int i = 0; i < bytes.length; i++) {
             bytes[i] = (byte) (i & 0xff);
           }
-          send(ws, byte[].class, bytes);
+          Reflect.call(ws, "sendBinary", (Object) bytes);
         } else {
-          Reflect.call(ws, "sendJson", Wire.JSON.convertValue(message.get("json"), Object.class));
+          Reflect.call(ws, "send", message.get("json"));
         }
       }
       return null;
@@ -102,17 +103,6 @@ final class Sockets {
         throw e;
       }
       return e;
-    }
-  }
-
-  /** {@code send} by its parameter type: the overloads share a name and an arity. */
-  private static void send(Object ws, Class<?> type, Object value) {
-    try {
-      Reflect.method(ws.getClass(), "send", type).invoke(ws, value);
-    } catch (java.lang.reflect.InvocationTargetException e) {
-      throw Reflect.unwrap(e.getCause());
-    } catch (IllegalAccessException e) {
-      throw new DriverException("send is not accessible: " + e.getMessage());
     }
   }
 

@@ -4,7 +4,7 @@
  * the stream's error; a `take` that lets the connection go while the run goes on (the driver closes at take, Java's
  * try-with-resources, so this is the SDK's own release); the reader's interrupt ending an open stream quietly, its
  * cancel traced; the 10 s watchdog; and what the driver refuses on a call, nothing sent. Driven against the `sse`
- * registry document; the refusals run on hand-written plans laid over it, refused before the SDK loads: a realtime
+ * registry document, and a named-event stream's records (D17) against `typed`; the refusals run on hand-written plans laid over it, refused before the SDK loads: a realtime
  * call's own (d2b) among them. The WebSocket and realtime observations: the d2a legs below, and `realtime.test.ts`.
  */
 import { describe, expect, it } from "vitest"
@@ -93,7 +93,28 @@ describe("javaCallPlans: an SSE operation's plan", () => {
 	})
 })
 
-describe.skipIf(!JAVA)("the Java test driver: SSE, EventStream<T>", SLOW, () => {
+describe.skipIf(!JAVA)("the Java test driver: a named-event stream, EventStream<<Op>Event>", SLOW, () => {
+	/* new: D17, a named-event stream's records read by the same reflection as an SseEvent */
+	it("observes a named-event stream's records: each JSON name decoded, a string one as sent, an unnamed one message", async () => {
+		const sdk = drivenJavaSdk("typed")
+		expect(sdk.built, sdk.diagnostics.join("\n")).toBe(true)
+		const wire = 'event: tick\ndata: {"at":1}\nid: 1\n\ndata: plain\n\nevent: other\ndata: {"x":1}\n\n'
+		const call: Call = { operation: "sse.ticks.stream", route: route("GET", "/sse/ticks") }
+		const { run } = await drive(sdk, [sse([wire])], [call])
+		expect(run.observed, run.stderr).toEqual([
+			{
+				events: [
+					{ data: { at: 1 }, event: "tick", id: "1" },
+					{ data: "plain", event: "message", id: "1" },
+					{ data: '{"x":1}', event: "other", id: "1" },
+				],
+				kind: "events",
+			},
+		] satisfies Observed[])
+	})
+})
+
+describe.skipIf(!JAVA)("the Java test driver: SSE, EventStream<SseEvent<T>>", SLOW, () => {
 	/* new: C# sdk.driver.stream.test.ts:199 */
 	it("observes typed events with event and id until take, and traces retry (null when unset) and the typed headers", async () => {
 		const reply: Reply = {

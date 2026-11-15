@@ -160,7 +160,10 @@ type Header = {
 	readonly name: string
 	readonly end: "{" | "{}"
 }
-/** A type declaration's header: a record's components and interface, a class's superclass, an interface's permits. */
+/**
+ * A type declaration's header: a record's components and interface, a class's superclass, an interface's permits (none
+ * when its subtypes are nested in it).
+ */
 export type TypeHeader = Header &
 	(
 		| { readonly kind: "enum" }

@@ -134,7 +134,7 @@ describe.skipIf(!JAVA)("the one send gate and the pong clock (K8, W17/W19, the p
 		expect(
 			probed(`${OPEN(200)}
 fake.hold = true;
-CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.send("x".repeat(64)));
+CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.sendText("x".repeat(64)));
 Thread.sleep(250);
 long during = fake.count("ping");
 fake.release();
@@ -153,7 +153,7 @@ w.close();`),
 		expect(
 			probed(`${OPEN(100)}
 fake.hold = true;
-CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.send("x"));
+CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.sendText("x"));
 Thread.sleep(320);
 System.out.println("pending " + fake.aborted + " " + runs);
 fake.release();
@@ -189,7 +189,7 @@ System.out.println(fake.count("ping") + " " + fake.aborted + " " + runs);`),
 		expect(
 			probed(`${OPEN(50)}
 fake.hold = true;
-CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.send("x"));
+CompletableFuture<Void> sending = CompletableFuture.runAsync(() -> w.sendText("x"));
 Thread.sleep(100);
 fake.release();
 sending.join();
@@ -210,7 +210,7 @@ try {
 fake.hold = true;
 CompletableFuture<String> sending = CompletableFuture.supplyAsync(() -> {
   try {
-    w.send("x");
+    w.sendText("x");
     return "sent";
   } catch (RuntimeException e) {
     return e.getClass().getSimpleName() + ": " + e.getMessage();
@@ -361,7 +361,7 @@ try {
 } catch (RuntimeException e) {
   System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
 }
-w.send("still open");
+w.sendText("still open");
 System.out.println(fake.frames + " " + runs);`),
 		).toEqual([
 			"ConfigException: a WebSocket client can't close with status 1005: 1000, 1001, 1008, 1011 or 3000-4999",

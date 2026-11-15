@@ -139,7 +139,7 @@ function streamMethodLines(op: SdkOp, site: MethodSite, env: OpEnv): string[] | 
 	const params = paramsName(op, env.ctx)
 	const lines = callLines(fields, op)
 	if (op.stream === "sse") return sseMethodLines(op, { call: lines, constant, headers, name, params }, env.ctx)
-	if (op.stream === "ws") return wsMethodLines(op, { call: lines, constant, name, params })
+	if (op.stream === "ws") return wsMethodLines(op, { call: lines, constant, name, params }, env.ctx)
 	return realtimeMethodLines(op, { call: lines, constant, name, params }, env.ctx)
 }
 

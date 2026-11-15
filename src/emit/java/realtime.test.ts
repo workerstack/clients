@@ -1,13 +1,14 @@
 /**
  * A realtime operation in the Java SDK (bit 16 phase d2b, R1–R8; C#'s `realtime.test.ts`, contract 50 §5.6, Fd3, Fd6,
- * Fd7): the method dials WebSocket, else SSE, else long-poll and returns `ResumableConnection<T>` connected (`JsonNode`
- * untyped); the reading thread's interrupt before or during the dial ends the call, and under a later read it drops the
- * transport and leaves the connection reconnecting (R3); a reconnect reopens the chain from the advanced cursor; the
- * backoff; the give-up once; every dial's params, auth, headers and request id, the SSE and long-poll dials through the
- * exchange, the WebSocket dial with no hook; a send POSTed on the SSE and long-poll transports. Driven on `realtime`;
- * every timed call follows a warm one on its client. The consumer, type and surface legs: `realtime.api.test.ts`; the
- * default chain and the adapters alone: `realtime.transports.test.ts`; a caller's in-process adapters:
- * `realtime.adapters.test.ts`; the open bound and the interrupt's ownership in process: `realtime.loop.test.ts`.
+ * Fd7): the method dials WebSocket, else SSE, else long-poll and returns `ResumableConnection<T, JsonNode>` connected
+ * (`T` `JsonNode` untyped); the reading thread's interrupt before or during the dial ends the call, and under a later
+ * read it drops the transport and leaves the connection reconnecting (R3); a reconnect reopens the chain from the
+ * advanced cursor; the backoff; the give-up once; every dial's params, auth, headers and request id, the SSE and
+ * long-poll dials through the exchange, the WebSocket dial with no hook; a send POSTed on the SSE and long-poll
+ * transports. Driven on `realtime`; every timed call follows a warm one on its client. The consumer, type and surface
+ * legs: `realtime.api.test.ts`; the default chain and the adapters alone: `realtime.transports.test.ts`; a caller's
+ * in-process adapters: `realtime.adapters.test.ts`; the open bound and the interrupt's ownership in process:
+ * `realtime.loop.test.ts`.
  */
 import { describe, expect, it } from "vitest"
 import type { Call, Setup } from "../../../tests/integration/conformance/matrix.ts"
@@ -79,38 +80,42 @@ const ids = ({ hops }: Drove) => hops.map((hop) => hop.headers["x-request-id"])
 const call = ({ run }: Drove, i = 0) => run.trace?.calls[i]
 const failure = (drove: Drove, i = 0) => ((e) => e && [e.type, e.status, e.via])(call(drove, i)?.error)
 
-describe.skipIf(!JAVA)("a realtime method: it returns ResumableConnection<T> connected (Fd6, R1, R8)", SLOW, () => {
-	/* new: C# realtime.test.ts:149 (300 ms against a dial held 2,700 ms past it, after a warm open) */
-	it.each(JDKS)(
-		"dials before it returns: an interrupt before the call dials nothing, one during the dial ends it (JDK %i)",
-		async (jdk) => {
-			const script: Script = { calls: [{}, { cancel: "before" }, { cancel: { afterMs: 300 } }] }
-			const calls = [WARM, live({ take: 1 }), live({ take: 1 })]
-			const drove = await drive([...WARMED, { ...refused, delayMs: 3000 }], calls, { jdk, script })
-			const seen = { hops: drove.hops.length, observed: drove.run.observed, upgrade: drove.hops[2]?.headers.upgrade }
-			expect(seen, drove.run.stderr).toEqual({ hops: 3, observed: [WARM_SEEN, null, null], upgrade: "websocket" })
-			const ends = [1, 2].map((i) => call(drove, i)).map((c) => [c?.error, c?.stream, (c?.elapsedMs ?? 1e9) < 2500])
-			const returned = [expect.objectContaining({ canceled: true, via: "return" }), undefined, true]
-			expect(ends).toEqual([returned, returned])
-		},
-	)
+describe.skipIf(!JAVA)(
+	"a realtime method: it returns ResumableConnection<T, JsonNode> connected (Fd6, R1, R8)",
+	SLOW,
+	() => {
+		/* new: C# realtime.test.ts:149 (300 ms against a dial held 2,700 ms past it, after a warm open) */
+		it.each(JDKS)(
+			"dials before it returns: an interrupt before the call dials nothing, one during the dial ends it (JDK %i)",
+			async (jdk) => {
+				const script: Script = { calls: [{}, { cancel: "before" }, { cancel: { afterMs: 300 } }] }
+				const calls = [WARM, live({ take: 1 }), live({ take: 1 })]
+				const drove = await drive([...WARMED, { ...refused, delayMs: 3000 }], calls, { jdk, script })
+				const seen = { hops: drove.hops.length, observed: drove.run.observed, upgrade: drove.hops[2]?.headers.upgrade }
+				expect(seen, drove.run.stderr).toEqual({ hops: 3, observed: [WARM_SEEN, null, null], upgrade: "websocket" })
+				const ends = [1, 2].map((i) => call(drove, i)).map((c) => [c?.error, c?.stream, (c?.elapsedMs ?? 1e9) < 2500])
+				const returned = [expect.objectContaining({ canceled: true, via: "return" }), undefined, true]
+				expect(ends).toEqual([returned, returned])
+			},
+		)
 
-	/* new: C# realtime.test.ts:161, at R3 (Fd3): the interrupt drops the transport, so nothing is proven after it */
-	it.each(JDKS)(
-		"ends a read on a later interrupt: the frames so far, the cancel traced, the transport dropped, no reconnect (JDK %i)",
-		async (jdk) => {
-			/* the interrupt lands 1,000 ms in, after the first event, and 4,000 ms before the second */
-			const script: Script = { calls: [{}, { cancel: { afterMs: 1000 }, ...QUICK_ENTRY }] }
-			const held = sse([ev(1), { waitMs: 5000 }, ev(2)], "hold")
-			const drove = await drive([...WARMED, refused, held], [WARM, live({ take: 2 })], { jdk, script })
-			const c = call(drove, 1)
-			const seen = [c?.error, drove.hops.length, drove.run.observed, c?.stream]
-			const want = [CANCELED, 4, [WARM_SEEN, framed(frame(1))], settled(1, "1 rt-1", null, [c?.error?.text])]
-			expect(seen, drove.run.stderr).toEqual(want)
-			expect([(c?.elapsedMs ?? 0) >= 990, (c?.elapsedMs ?? 1e9) < 4000], `${c?.elapsedMs}`).toEqual([true, true])
-		},
-	)
-})
+		/* new: C# realtime.test.ts:161, at R3 (Fd3): the interrupt drops the transport, so nothing is proven after it */
+		it.each(JDKS)(
+			"ends a read on a later interrupt: the frames so far, the cancel traced, the transport dropped, no reconnect (JDK %i)",
+			async (jdk) => {
+				/* the interrupt lands 1,000 ms in, after the first event, and 4,000 ms before the second */
+				const script: Script = { calls: [{}, { cancel: { afterMs: 1000 }, ...QUICK_ENTRY }] }
+				const held = sse([ev(1), { waitMs: 5000 }, ev(2)], "hold")
+				const drove = await drive([...WARMED, refused, held], [WARM, live({ take: 2 })], { jdk, script })
+				const c = call(drove, 1)
+				const seen = [c?.error, drove.hops.length, drove.run.observed, c?.stream]
+				const want = [CANCELED, 4, [WARM_SEEN, framed(frame(1))], settled(1, "1 rt-1", null, [c?.error?.text])]
+				expect(seen, drove.run.stderr).toEqual(want)
+				expect([(c?.elapsedMs ?? 0) >= 990, (c?.elapsedMs ?? 1e9) < 4000], `${c?.elapsedMs}`).toEqual([true, true])
+			},
+		)
+	},
+)
 
 describe.skipIf(!JAVA)("the cursor advances past each delivered message; a reconnect reopens the chain", SLOW, () => {
 	/* new: C# realtime.test.ts:177 (red under a delivery without the cursor advance: the bare URL again) */
@@ -289,17 +294,17 @@ describe.skipIf(!JAVA)("the SSE and long-poll dials ride the exchange; the WebSo
 
 describe.skipIf(!JAVA)("a send POSTs on the SSE and long-poll transports, its error status thrown", SLOW, () => {
 	/* new: C# realtime.test.ts:430 */
-	it("POSTs on a long-poll connection with the call's params, the bearer and compact JSON, then polls", async () => {
-		const replies = [refused, unavailable, { json: {}, status: 200 }, polled(1, "7")]
-		const sending = live({ headers: { "x-tenant": "acme" }, send: ['{"hi":1}'], take: 1 })
+	it("POSTs on a long-poll connection with the call's params, the bearer, compact JSON and text as it is, then polls", async () => {
+		const posted = { json: {}, status: 200 }
+		const replies = [refused, unavailable, posted, posted, polled(1, "7")]
+		const sending = live({ headers: { "x-tenant": "acme" }, send: ['{ "hi": 1 }', "as is"], take: 1 })
 		const drove = await drive(replies, [sending], { script: QUICK, setup: TOK })
 		const seen = [failure(drove), drove.run.observed]
 		expect(seen, drove.run.stderr).toEqual([undefined, frames({ n: 1, reconnect_token: "rt-7" })])
-		expect(drove.hops.slice(2)).toMatchObject([
-			{ ...JSON_POST, headers: { authorization: "Bearer tok", "x-tenant": "acme" } },
-			{ method: "GET", url: FEED_URL },
-		])
-		expect(drove.bodies[2]?.toString()).toBe('{"hi":1}')
+		const headers = { authorization: "Bearer tok", "x-tenant": "acme" }
+		const text = { ...JSON_POST, body: { contentType: "application/json" }, headers }
+		expect(drove.hops.slice(2)).toMatchObject([{ ...JSON_POST, headers }, text, { method: "GET", url: FEED_URL }])
+		expect(drove.bodies.slice(2, 4).map((body) => body?.toString())).toEqual(['{"hi":1}', "as is"])
 	})
 
 	/* new: C# realtime.test.ts:444 (a 405 has no class of its own: UnexpectedStatusException) */

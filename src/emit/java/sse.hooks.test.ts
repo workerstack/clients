@@ -148,7 +148,7 @@ public class Probe {
       System.out.println(error.getClass().getSimpleName() + ": " + error.getMessage());
     }
     ExampleClient plain = ExampleClient.builder().baseUrl("${url}").build();
-    try (EventStream<Tick> s = plain.ticks().stream(TicksStreamParams.builder().build())) {
+    try (EventStream<SseEvent<Tick>> s = plain.ticks().stream(TicksStreamParams.builder().build())) {
       for (SseEvent<Tick> next : s) {
         System.out.println(next.data().n());
         break;

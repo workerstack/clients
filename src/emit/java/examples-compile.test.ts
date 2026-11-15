@@ -1,9 +1,10 @@
 /**
  * The docs' Java example (docs/examples/java/Example.java) compiles and runs (it returns at once without a base URL)
- * against an SDK generated from the docs' API, and every Java block on a docs page is a verbatim excerpt of it (bit 20).
+ * against an SDK generated from the docs' API, the Kitchen document and the typed streams beside it, and every Java
+ * block on a docs page is a verbatim excerpt of it (bit 20).
  */
 import { describe, expect, it } from "vitest"
-import { allBlocks, docsDocument, exampleOf, strayExcerpts } from "../shared/__fixtures__/docs-blocks.ts"
+import { allBlocks, docsStreamsDocument, exampleOf, strayExcerpts } from "../shared/__fixtures__/docs-blocks.ts"
 import { compiledJavaSdk } from "./__fixtures__/compiled.ts"
 import { withJava } from "./__fixtures__/java-env.ts"
 import { generateJavaSdk } from "./sdk.ts"
@@ -24,7 +25,7 @@ describe("the docs' Java example", () => {
 
 	it.skipIf(!JAVA)("compiles and runs against the generated SDK", SLOW, () => {
 		const options = { clientName: "KitchenClient", packageName: "com.example.kitchen" }
-		const ran = compiledJavaSdk(generateJavaSdk(docsDocument(), options).files).run("Example", program)
+		const ran = compiledJavaSdk(generateJavaSdk(docsStreamsDocument(), options).files).run("Example", program)
 		expect([ran.status, ran.status === 0 ? "" : ran.stderr]).toEqual([0, ""])
 	})
 })

@@ -83,7 +83,7 @@ export function typeDeclaration(v: Visitor, h: TypeHeader): void {
 				v.b.space()
 				v.type(type(h.extends))
 			}
-		} else typeList(v, "permits", h.permits)
+		} else if (h.permits.length > 0) typeList(v, "permits", h.permits)
 		v.b.close()
 	}
 	v.b.space()

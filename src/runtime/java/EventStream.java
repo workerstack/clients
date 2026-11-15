@@ -8,40 +8,66 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
+import java.util.function.Function;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 
 /**
- * An open event stream, read once as an {@code Iterable} of {@link SseEvent}. Its connection is let
- * go by its end: the server's end, an error (thrown once, then the end), {@link #close()} from any
+ * An open event stream, read once as an {@code Iterable} of its events, each decoded whole into
+ * {@code E}: an {@link SseEvent}, or a named-event operation's own sealed interface. An event that
+ * does not decode is thrown once and ends it, the cursor already past it. Its connection is let go
+ * by its end: the server's end, an error (thrown once, then the end), {@link #close()} from any
  * thread (a pending read then ends quietly), or an interrupt of the reading thread (a {@link
  * CancellationException}). Open it in try-with-resources: a for-each break without one keeps the
  * connection. No timeout bounds it once open.
  */
-public final class EventStream<T> implements Iterable<SseEvent<T>>, AutoCloseable {
+public final class EventStream<E> implements Iterable<E>, AutoCloseable {
   private final InputStream body;
   private final Sse parser;
-  private final TypeReference<T> type;
+  private final Function<SseEvent<String>, E> decode;
   private boolean taken;
   private volatile boolean closed;
   private boolean ended;
-  private SseEvent<T> pending;
+  private E pending;
+  private String pendingId;
   private String lastEventId = "";
 
-  EventStream(InputStream body, TypeReference<T> type) {
+  EventStream(InputStream body, Function<SseEvent<String>, E> decode) {
     this.body = body;
     this.parser = new Sse(body);
-    this.type = type;
+    this.decode = decode;
   }
 
-  /** The id of the last event read, empty before any. */
+  /**
+   * Each event's data decoded into {@code T}, its name, id and retry as parsed: a one-schema
+   * stream's decode.
+   */
+  static <T> Function<SseEvent<String>, SseEvent<T>> typed(TypeReference<T> type) {
+    return e -> new SseEvent<>(data(e.data(), type), e.event(), e.id(), e.retry());
+  }
+
+  /** An event's data decoded into {@code T}; data that does not decode is a DecodeException. */
+  static <T> T data(String data, TypeReference<T> type) {
+    try {
+      return Json.MAPPER.readValue(data, type);
+    } catch (JacksonException e) {
+      throw new DecodeException("an event's data does not decode: " + e.getOriginalMessage(), e);
+    }
+  }
+
+  /** An event's name: {@code message}, the SSE default, when it came unnamed. */
+  static String nameOf(SseEvent<String> e) {
+    return e.event() == null || e.event().isEmpty() ? "message" : e.event();
+  }
+
+  /** The id of the last event read, taken before it decodes; empty before any. */
   public String lastEventId() {
     return lastEventId;
   }
 
   /** The stream's one iterator; a second call throws IllegalStateException. */
   @Override
-  public synchronized Iterator<SseEvent<T>> iterator() {
+  public synchronized Iterator<E> iterator() {
     if (taken) {
       throw new IllegalStateException("an EventStream is read once");
     }
@@ -53,13 +79,13 @@ public final class EventStream<T> implements Iterable<SseEvent<T>>, AutoCloseabl
       }
 
       @Override
-      public SseEvent<T> next() {
+      public E next() {
         if (!advance()) {
           throw new NoSuchElementException("the event stream ended");
         }
-        SseEvent<T> event = pending;
+        E event = pending;
         pending = null;
-        lastEventId = event.id() == null ? "" : event.id();
+        lastEventId = pendingId;
         return event;
       }
     };
@@ -78,7 +104,15 @@ public final class EventStream<T> implements Iterable<SseEvent<T>>, AutoCloseabl
         end();
         return false;
       }
-      pending = decoded(event);
+      String id = event.id() == null ? "" : event.id();
+      Duration retry = event.retry() == null ? null : Duration.ofMillis(event.retry());
+      try {
+        pending = decode.apply(new SseEvent<>(event.data(), event.event(), event.id(), retry));
+      } catch (RuntimeException e) {
+        lastEventId = id;
+        throw e;
+      }
+      pendingId = id;
       return true;
     } catch (InterruptedIOException e) {
       end();
@@ -94,22 +128,6 @@ public final class EventStream<T> implements Iterable<SseEvent<T>>, AutoCloseabl
       end();
       throw e;
     }
-  }
-
-  @SuppressWarnings("unchecked")
-  private SseEvent<T> decoded(Sse.Event event) {
-    Duration retry = event.retry() == null ? null : Duration.ofMillis(event.retry());
-    T data;
-    if (type.getType() == String.class) {
-      data = (T) event.data();
-    } else {
-      try {
-        data = Json.MAPPER.readValue(event.data(), type);
-      } catch (JacksonException e) {
-        throw new DecodeException("an event's data does not decode: " + e.getOriginalMessage(), e);
-      }
-    }
-    return new SseEvent<>(data, event.event(), event.id(), retry);
   }
 
   private void end() {

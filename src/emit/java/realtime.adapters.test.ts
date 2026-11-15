@@ -17,7 +17,7 @@ const servedRun = runner()
 
 /** A connection over the in-process adapters `adapters` at an address nothing serves, with `options`. */
 const rc = (adapters: string, options = "") =>
-	`ResumableConnection<JsonNode> rc = new ResumableConnection<>("http://rt.test/feed", List.of(${adapters}), Rt.ELEMENT${options === "" ? "" : `, ${options}`});`
+	`ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://rt.test/feed", List.of(${adapters}), Rt.ELEMENT${options === "" ? "" : `, ${options}`});`
 const delay = (ms: number, more = "") =>
 	`TransportOptions.builder()${more}.reconnectDelay(Duration.ofMillis(${ms})).build()`
 /** Interrupts this thread after `ms`, the caller's cancel (R3). */
@@ -37,7 +37,7 @@ note(Rt.json(Rt.take(rc, 2)));
 rc.close();
 note(Rt.j(rc.state().toString(), Rt.take(rc, 1).get(0)));`,
 	custom: `Fake one = new Fake(TransportKind.WS, new Conn(List.of("{\\"kind\\":\\"custom\\",\\"seq\\":1}", "{\\"kind\\":\\"custom\\",\\"seq\\":2}")));
-ResumableConnection<JsonNode> rc = new ResumableConnection<>(BASE + "/feed", List.of(one), Rt.ELEMENT);
+ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>(BASE + "/feed", List.of(one), Rt.ELEMENT);
 rc.connect();
 note(Rt.json(Rt.take(rc, 2)));
 note(Rt.j(one.got, rc.provenTransport().toString(), rc.state().toString()));
@@ -59,7 +59,7 @@ ${rc("plan", delay(1, ".maxReconnectAttempts(2)"))}
 rc.connect();
 note(Rt.json(Rt.take(rc, 5)));
 note(Rt.j(plan.got.size(), Arrays.stream(conns).map(conn -> conn.closed).toList(), rc.state().toString()));
-ResumableConnection<JsonNode> late = new ResumableConnection<>("http://rt.test/feed", List.of(new Fake(TransportKind.WS, new Conn(List.of(), "hold", 10_000))), Rt.ELEMENT);
+ResumableConnection<JsonNode, JsonNode> late = new ResumableConnection<>("http://rt.test/feed", List.of(new Fake(TransportKind.WS, new Conn(List.of(), "hold", 10_000))), Rt.ELEMENT);
 ${interruptAfter(300)}
 try {
   late.connect();
@@ -71,8 +71,8 @@ try {
 ${rc("new Fake(TransportKind.WS, conn)")}
 rc.connect();
 note(Rt.j(rc.state().toString(), rc.provenTransport().toString()));
-rc.sendJson(Json.MAPPER.readTree("{\\"hi\\":1,\\"é\\":\\"ü\\"}"));
-rc.send("as is");
+rc.send(Json.MAPPER.readTree("{\\"hi\\":1,\\"é\\":\\"ü\\"}"));
+rc.sendText("as is");
 note(Rt.json(conn.sent));
 note(Rt.json(Rt.take(rc, 1)));
 rc.close();

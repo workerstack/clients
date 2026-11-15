@@ -35,7 +35,7 @@ final class SseAdapter implements TransportAdapter, RealtimeLoop.Dialed {
    */
   @Override
   public TransportConnection connect(String url, TransportOptions options) {
-    EventStream<String> stream = dial.stream(options);
+    EventStream<SseEvent<String>> stream = dial.stream(options);
     Iterator<SseEvent<String>> events = stream.iterator();
     return new TransportConnection() {
       @Override

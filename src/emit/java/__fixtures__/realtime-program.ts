@@ -78,7 +78,7 @@ final class Fake implements TransportAdapter {
   private int next;
   final List<String> got = Collections.synchronizedList(new ArrayList<>());
   final List<String> states = Collections.synchronizedList(new ArrayList<>());
-  volatile ResumableConnection<JsonNode> rc;
+  volatile ResumableConnection<JsonNode, JsonNode> rc;
   final CountDownLatch redialed = new CountDownLatch(1);
 
   Fake(TransportKind kind, Conn... conns) {
@@ -136,12 +136,12 @@ final class Rt {
     return e.getClass().getSimpleName() + ": " + e.getMessage();
   }
 
-  static String proven(ResumableConnection<?> c) {
+  static String proven(ResumableConnection<?, ?> c) {
     TransportKind kind = c.provenTransport();
     return kind == null ? "none" : kind.toString().replace("_", "").toLowerCase(Locale.ROOT);
   }
 
-  static String cursor(ResumableConnection<JsonNode> c) {
+  static String cursor(ResumableConnection<JsonNode, JsonNode> c) {
     return s(c.options().lastEventId()) + "/" + s(c.options().reconnectToken()) + " " + c.provenTransport() + " " + c.state();
   }
 
@@ -163,7 +163,7 @@ final class Rt {
   }
 
   /* n values, each read within 5 s on its own thread; a null or a failure counts as one */
-  static List<Object> take(ResumableConnection<JsonNode> rc, int n) throws Exception {
+  static List<Object> take(ResumableConnection<JsonNode, JsonNode> rc, int n) throws Exception {
     List<Object> taken = new ArrayList<>();
     while (taken.size() < n) {
       CompletableFuture<JsonNode> next = CompletableFuture.supplyAsync(rc::receive);
@@ -179,9 +179,9 @@ final class Rt {
     return taken;
   }
 
-  static String send(ResumableConnection<JsonNode> rc, int n) {
+  static String send(ResumableConnection<JsonNode, JsonNode> rc, int n) {
     try {
-      rc.sendJson(Json.MAPPER.readTree("{\\"hi\\":" + n + "}"));
+      rc.send(Json.MAPPER.readTree("{\\"hi\\":" + n + "}"));
       return j("sent");
     } catch (RuntimeException e) {
       return j(failed(e), rc.state().toString());

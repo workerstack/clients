@@ -69,8 +69,15 @@ const wrapperText = (wrapper: string, union: string, payload: string): string =>
 		name: wrapper,
 	}).join("\n")
 
-/** Each selectable variant's payload, wrapper and selecting values; the wrappers are declared here. */
-function dispatchOf(name: string, union: Discriminated, scope: UnionScope): Dispatch[] {
+/** Whether `union` is keyed on one field, so Java declares it as a sealed interface of wrappers. */
+export const isKeyed = (union: Of<"union">): union is Discriminated =>
+	union.discriminator !== undefined && union.variants.length > 0 && !union.variants.every(isLiteral)
+
+/**
+ * Each selectable variant's payload, wrapper and selecting values, in the Deserializer's order; the wrappers are
+ * declared here, under the same names however often it runs.
+ */
+export function dispatchOf(name: string, union: Discriminated, scope: UnionScope): Dispatch[] {
 	return selectedBy(union, scope.at).map(({ index, schema, values }) => {
 		const first = values[0] ?? `Variant${index}`
 		const payload =

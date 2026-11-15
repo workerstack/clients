@@ -5,26 +5,34 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 
 /**
- * A connection over a chain of transports, tried in order, read by {@link #receive()} or a
- * for-each: each message decoded as {@code T} (a message that does not decode throws once, the
- * connection kept), the cursor in {@link #options()} advanced past it. After a drop it reopens the
- * chain from the cursor, backing off from the delay (an SSE retry first), doubling to 30 s, for up
- * to maxReconnectAttempts in a row; giving up throws the last failure once, and the reads then end.
- * Leaving a loop keeps the connection, so one thread reads at a time. An interrupt of the reading
- * thread throws CancellationException and leaves it reconnecting; {@link #close()} from any thread
- * ends a pending read with null.
+ * A connection over a chain of transports, tried in order, that reads {@code TIn}, what the server
+ * sends, by {@link #receive()} or a for-each, and sends {@code TOut}, what it receives, as JSON.
+ * Each message advances the cursor in {@link #options()} first, then decodes as {@code TIn}, and
+ * onMessage fires inside the read, on the reading thread, before it returns. A message that does
+ * not decode throws {@link DecodeException} once, from receive or the iterator's hasNext (it reads
+ * ahead), the connection kept, and the next read reads the next one; a connection of declared
+ * messages reads only JSON, any other reads a message that is no JSON as a JSON string. After a
+ * drop it reopens the chain from the cursor, backing off from the delay (an SSE retry first),
+ * doubling to 30 s, for up to maxReconnectAttempts in a row; giving up throws the last failure
+ * once, and the reads then end. Leaving a loop keeps the connection, so one thread reads at a time.
+ * An interrupt of the reading thread throws CancellationException and leaves it reconnecting;
+ * {@link #close()} from any thread ends a pending read with null.
  */
-public final class ResumableConnection<T> implements Iterable<T>, AutoCloseable {
+public class ResumableConnection<TIn, TOut> implements Iterable<TIn>, AutoCloseable {
   private final String url;
   private final List<TransportAdapter> adapters;
   private final TransportOptions options;
-  private final TypeReference<T> type;
+  private final TypeReference<TIn> type;
+  private final boolean strict;
   private final RealtimeLoop loop;
+  private final List<Consumer<TIn>> onMessage;
 
   /**
    * A connection to {@code url} over {@code adapters}, its messages read as {@code type}; it opens
@@ -33,27 +41,44 @@ public final class ResumableConnection<T> implements Iterable<T>, AutoCloseable 
   public ResumableConnection(
       String url,
       List<TransportAdapter> adapters,
-      TypeReference<T> type,
+      TypeReference<TIn> type,
       TransportOptions options) {
-    this(url, adapters, type, options, RealtimeLoop.OPEN_LIMIT);
+    this(url, adapters, type, options, RealtimeLoop.OPEN_LIMIT, false);
   }
 
   /** A connection with the default options: no cursor, 5 attempts, a 1 s delay. */
-  public ResumableConnection(String url, List<TransportAdapter> adapters, TypeReference<T> type) {
+  public ResumableConnection(String url, List<TransportAdapter> adapters, TypeReference<TIn> type) {
     this(url, adapters, type, null);
   }
 
   ResumableConnection(
       String url,
       List<TransportAdapter> adapters,
-      TypeReference<T> type,
+      TypeReference<TIn> type,
       TransportOptions options,
-      Duration openLimit) {
+      Duration openLimit,
+      boolean strict) {
     this.url = url;
     this.adapters = List.copyOf(adapters);
     this.options = options == null ? TransportOptions.builder().build() : options;
     this.type = type;
+    this.strict = strict;
     this.loop = new RealtimeLoop(this.adapters, this.options, url, openLimit);
+    this.onMessage = new CopyOnWriteArrayList<>();
+  }
+
+  /**
+   * The connection {@code opened}, its reads, sends, cursor and handlers shared: a generated
+   * connection's base.
+   */
+  protected ResumableConnection(ResumableConnection<TIn, TOut> opened) {
+    this.url = opened.url;
+    this.adapters = opened.adapters;
+    this.options = opened.options;
+    this.type = opened.type;
+    this.strict = opened.strict;
+    this.loop = opened.loop;
+    this.onMessage = opened.onMessage;
   }
 
   /** The URL each adapter connects to. */
@@ -91,17 +116,22 @@ public final class ResumableConnection<T> implements Iterable<T>, AutoCloseable 
     loop.open();
   }
 
-  /** The next message, decoded; null once DISCONNECTED. */
-  public T receive() {
+  /** The next message, decoded, each onMessage handler run on it; null once DISCONNECTED. */
+  public TIn receive() {
     TransportMessage message = loop.next();
-    return message == null ? null : deliver(message);
+    if (message == null) {
+      return null;
+    }
+    TIn value = deliver(message);
+    onMessage.forEach(handler -> Socket.run(handler, value));
+    return value;
   }
 
   /** The messages in order, through receive(). */
   @Override
-  public Iterator<T> iterator() {
+  public Iterator<TIn> iterator() {
     return new Iterator<>() {
-      private T ahead;
+      private TIn ahead;
 
       @Override
       public boolean hasNext() {
@@ -112,25 +142,30 @@ public final class ResumableConnection<T> implements Iterable<T>, AutoCloseable 
       }
 
       @Override
-      public T next() {
+      public TIn next() {
         if (!hasNext()) {
           throw new NoSuchElementException("the connection ended");
         }
-        T value = ahead;
+        TIn value = ahead;
         ahead = null;
         return value;
       }
     };
   }
 
+  /** Sends {@code value} as its JSON text, through the SDK's mapper, over the open transport. */
+  public void send(TOut value) {
+    sendText(Json.MAPPER.writeValueAsString(value));
+  }
+
   /** Sends {@code text} as it is over the open transport (an SSE or long-poll one POSTs it). */
-  public void send(String text) {
+  public void sendText(String text) {
     loop.send(text);
   }
 
-  /** Sends {@code value} as its JSON text, through the SDK's mapper. */
-  public void sendJson(Object value) {
-    send(Json.MAPPER.writeValueAsString(value));
+  /** Runs {@code handler} on each message as a read delivers it, before the read returns. */
+  public void onMessage(Consumer<TIn> handler) {
+    onMessage.add(handler);
   }
 
   /** Closes the open transport and ends a pending read on any thread with null. */
@@ -139,26 +174,36 @@ public final class ResumableConnection<T> implements Iterable<T>, AutoCloseable 
     loop.close();
   }
 
-  /* the message as JSON, else as a JSON string of its text; the cursor advanced before it decodes */
-  private T deliver(TransportMessage message) {
+  /*
+   * the message as JSON, else (unless strict) as a JSON string of its text; the cursor advanced
+   * before it decodes
+   */
+  private TIn deliver(TransportMessage message) {
     JsonNode payload;
+    JacksonException malformed = null;
     try {
       payload = Json.MAPPER.readTree(message.text());
     } catch (JacksonException e) {
       payload = null;
+      malformed = e;
     }
     if (payload == null || payload.isMissingNode()) {
-      payload = Json.MAPPER.getNodeFactory().stringNode(message.text());
+      payload = strict ? null : Json.MAPPER.getNodeFactory().stringNode(message.text());
     }
     options.advance(message.id(), payload);
-    T value;
+    if (payload == null) {
+      String why = malformed == null ? "it is empty" : malformed.getOriginalMessage();
+      throw new DecodeException("realtime message is not valid JSON: " + why, malformed);
+    }
+    String what = strict ? "realtime message" : "a message";
+    TIn value;
     try {
       value = Json.MAPPER.convertValue(payload, type);
     } catch (IllegalArgumentException | JacksonException e) {
-      throw new DecodeException("a message does not decode: " + e.getMessage(), e);
+      throw new DecodeException(what + " does not decode: " + e.getMessage(), e);
     }
     if (value == null) {
-      throw new DecodeException("a message does not decode: it is null", null);
+      throw new DecodeException(what + " does not decode: it is null", null);
     }
     return value;
   }

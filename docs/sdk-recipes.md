@@ -288,15 +288,46 @@ the small streaming API the TypeScript one calls.
 
 ## Java
 
-Open a stream in try-with-resources: a `break` out of a for-each without one keeps the connection.
+Open a stream in try-with-resources: a `break` out of a for-each without one keeps the connection. A named event is a
+nested record of the operation's `<Op>Event`, matched with `instanceof`.
 
 ```java
-    try (EventStream<String> stream = client.events().list(EventsListParams.builder().build())) {
-      for (SseEvent<String> event : stream) {
-        seen.add(event.data());
+    try (EventStream<EventsListEvent> stream =
+        client.events().list(EventsListParams.builder().build())) {
+      for (EventsListEvent event : stream) {
+        if (event instanceof EventsListEvent.Message message) {
+          seen.add(message.data());
+        }
         if (seen.size() == limit) {
           break;
         }
       }
     }
+```
+
+A stream the document types is typed end to end. An SSE operation with named events yields `<Op>Event`, a sealed
+interface with one nested record per name holding `data`, `event`, `id` and `retry`, so an `instanceof` match reads
+`data()` typed, each JSON event decoded by its name; a name the operation does not declare is `Unknown`, its data as
+text. A WebSocket operation with declared messages answers `TypedWebSocket<TIn, TOut>` and a realtime one
+`ResumableConnection<TIn, TOut>`: `send` takes what the server receives, as JSON, the read gives what it sends, and
+`sendText` sends text as is. When the read side is a union keyed on one field, it is the sealed interface the models
+declare, one wrapper record per member and `<Union>Unknown` for an undeclared value, and the answer is
+`<Read>Socket<TOut>` or `<Read>Connection<TOut>`, whose `on<Value>` takes a handler of that member's type, run inside
+the read. A socket's frame that is not JSON is a `DecodeException` from `receive`, passed to `onError`, and the socket
+reads on; a realtime connection throws it once from `receive` or the for-each, and the next read reads on. A member
+named like a handler (`message`, `closed`, `error`; on realtime only `message`) is heard only through `onMessage`. This
+excerpt runs against the small streaming API the TypeScript one calls.
+
+```java
+  static void chat(KitchenClient client) {
+    try (ChatOutSocket<ChatIn> chat = client.chat().open(ChatOpenParams.builder().build())) {
+      chat.onSaid(message -> System.out.println(message.text()));
+      chat.onError(error -> System.err.println(error.getMessage()));
+      chat.send(new ChatInSay(new Say("hi", "say"))); // a member of ChatIn, sent as JSON
+      ChatOut read = chat.receive(); // null once the socket ended
+      if (read instanceof ChatOutUnknown other) {
+        System.out.println("undeclared " + other.value()); // the handlers ran as receive read it
+      }
+    }
+  }
 ```

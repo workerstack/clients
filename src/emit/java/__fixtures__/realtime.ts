@@ -54,7 +54,7 @@ public class Probe {
     return ExampleClient.builder().baseUrl(BASE).build();
   }
 
-  static String read(ResumableConnection<?> rc) {
+  static String read(ResumableConnection<?, ?> rc) {
     try {
       Object value = rc.receive();
       return value == null ? "none" : "ok " + Json.MAPPER.writeValueAsString(value);

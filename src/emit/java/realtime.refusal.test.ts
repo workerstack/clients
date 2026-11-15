@@ -65,7 +65,7 @@ async function drove(replies: readonly Reply[], o: { script?: Script; setup?: Se
 const chain = (second: string) => `ExampleClient c = ExampleClient.builder().baseUrl(BASE).bearerToken("tok").build();
 String url;
 List<TransportAdapter> adapters;
-try (ResumableConnection<Payload> setup = c.feed().live(feed())) {
+try (ResumableConnection<Payload, JsonNode> setup = c.feed().live(feed())) {
   url = setup.url();
   adapters = setup.adapters();
 }
@@ -80,7 +80,7 @@ TransportAdapter once = new TransportAdapter() {
   }
 };
 TransportOptions options = TransportOptions.builder().maxReconnectAttempts(3).reconnectDelay(Duration.ofMillis(1)).build();
-try (ResumableConnection<JsonNode> rc = new ResumableConnection<>(url, List.of(adapters.get(0), ${second}), Rt.ELEMENT, options)) {
+try (ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>(url, List.of(adapters.get(0), ${second}), Rt.ELEMENT, options)) {
   rc.connect();
   note(Rt.json(Rt.take(rc, 2)));
   note(Rt.j(rc.state().toString()));

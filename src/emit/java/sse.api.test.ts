@@ -1,6 +1,6 @@
 /**
  * An SSE operation through the Java SDK's public API (bit 16 phase d1; C#'s `sse.test.ts` consumer legs): consumer programs
- * on the `sse` client open, read and close `EventStream<T>` (J1), javac holds its types, a refused open's error body is
+ * on the `sse` client open, read and close `EventStream<SseEvent<T>>` (J1), javac holds its types, a refused open's error body is
  * read at most 64 KiB (J4), `raw` fills at the open (J6), a stream is read once, and its cursor is the last delivered id.
  * The emitted text: a stream method's safe twin answers a `Result` of its stream (bit 21 i6), and its javadoc and EventStream's say that a for-each `break`
  * needs try-with-resources (F1, condition a). The driven legs: `sse.test.ts`.
@@ -66,7 +66,7 @@ async function consume(replies: readonly Reply[], body: string) {
  * typed one ends by try-with-resources alone (its iterator never ends), the second by a `break` inside
  * try-with-resources, and the third is read to its end.
  */
-const TYPED = `try (EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build())) {
+const TYPED = `try (EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build())) {
   note("[" + s.lastEventId() + "]");
   Iterator<SseEvent<Tick>> e = s.iterator();
   SseEvent<Tick> ev = e.next();
@@ -74,18 +74,18 @@ const TYPED = `try (EventStream<Tick> s = c.ticks().stream(TicksStreamParams.bui
   Object o = s;
   note(o instanceof Iterable<?>);
 }
-try (EventStream<String> t = c.text().stream(TextStreamParams.builder().build())) {
+try (EventStream<SseEvent<String>> t = c.text().stream(TextStreamParams.builder().build())) {
   for (SseEvent<String> ev : t) {
     note(ev.data());
     break;
   }
 }
-EventStream<String> last = c.text().stream(TextStreamParams.builder().build());
+EventStream<SseEvent<String>> last = c.text().stream(TextStreamParams.builder().build());
 for (SseEvent<String> ev : last) {
   note(ev.data());
 }`
 
-describe.skipIf(!JAVA)("an SSE method: it opens EventStream<T>, read once as an Iterable", SLOW, () => {
+describe.skipIf(!JAVA)("an SSE method: it opens EventStream<SseEvent<T>>, read once as an Iterable", SLOW, () => {
 	/* new: C# sse.test.ts:131 (await using and break become try-with-resources, F1) */
 	it("reads a typed event with its id and the stream's cursor; try-with-resources, with or without a break, lets the connection go", async () => {
 		/* the second stream's answer waits until the typed stream's client left, the third's until the second's */
@@ -101,13 +101,13 @@ describe.skipIf(!JAVA)("an SSE method: it opens EventStream<T>, read once as an 
 	})
 
 	/* new: C# sse.test.ts:145 (javac holds the types; a WebSocket cursor is no Params field) */
-	it("types the methods EventStream<Tick> and EventStream<String>, and has no WebSocket cursor", () => {
+	it("types the methods EventStream<SseEvent<Tick>> and EventStream<SseEvent<String>>, and has no WebSocket cursor", () => {
 		const source = consumer(
 			"http://127.0.0.1:1",
 			[
-				"EventStream<String> s = c.ticks().stream(TicksStreamParams.builder().build());",
+				"EventStream<SseEvent<String>> s = c.ticks().stream(TicksStreamParams.builder().build());",
 				'c.ticks().stream(TicksStreamParams.builder().reconnectToken("x").build());',
-				'EventStream<Tick> u = c.ticks().stream(TicksStreamParams.builder().since(5L).lastEventId("7").build());',
+				'EventStream<SseEvent<Tick>> u = c.ticks().stream(TicksStreamParams.builder().since(5L).lastEventId("7").build());',
 				"for (SseEvent<Tick> ev : u) {",
 				"  Tick data = ev.data();",
 				"  String name = ev.event();",
@@ -115,13 +115,13 @@ describe.skipIf(!JAVA)("an SSE method: it opens EventStream<T>, read once as an 
 				"  java.time.Duration retry = ev.retry();",
 				"}",
 				"String cursor = u.lastEventId();",
-				"EventStream<String> t = c.text().stream(TextStreamParams.builder().build());",
+				"EventStream<SseEvent<String>> t = c.text().stream(TextStreamParams.builder().build());",
 			].join("\n"),
 		)
 		const run = driven().run("probe.Probe", source)
 		const errors = run.diagnostics.filter((line) => / error: /.test(line)).map((line) => line.replace(/^.*error: /, ""))
 		expect(errors).toEqual([
-			"incompatible types: EventStream<Tick> cannot be converted to EventStream<String>",
+			"incompatible types: EventStream<SseEvent<Tick>> cannot be converted to EventStream<SseEvent<String>>",
 			"cannot find symbol",
 		])
 		expect(run.diagnostics.join("\n")).toMatch(/symbol: +method reconnectToken\(String\)/)
@@ -189,7 +189,7 @@ describe.skipIf(!JAVA)("an EventStream's open, its cursor and its one reader, th
 			[TICK],
 			[
 				"RawResponse raw = new RawResponse();",
-				"try (EventStream<Tick> s = c.ticks().stream(",
+				"try (EventStream<SseEvent<Tick>> s = c.ticks().stream(",
 				"    TicksStreamParams.builder().since(5L).build(), RequestOptions.builder().raw(raw).build())) {",
 				'  note(raw.status() + " " + raw.url() + " " + raw.headers().get("content-type") + " " + raw.body().length);',
 				"  for (SseEvent<Tick> ev : s) {",
@@ -209,7 +209,7 @@ describe.skipIf(!JAVA)("an EventStream's open, its cursor and its one reader, th
 		const { out, ran } = await consume(
 			[sse(["data: a\n\n", "data: b\n\n"])],
 			[
-				"EventStream<String> s = c.text().stream(TextStreamParams.builder().build());",
+				"EventStream<SseEvent<String>> s = c.text().stream(TextStreamParams.builder().build());",
 				"for (SseEvent<String> ev : s) {",
 				"  note(ev.data());",
 				"}",
@@ -234,7 +234,7 @@ describe.skipIf(!JAVA)("an EventStream's cursor: the last delivered id", SLOW, (
 		const { out, ran } = await consume(
 			[sse(["id: 1\ndata: a\n\n", "id: 9\n\n"])],
 			[
-				"EventStream<String> s = c.text().stream(TextStreamParams.builder().build());",
+				"EventStream<SseEvent<String>> s = c.text().stream(TextStreamParams.builder().build());",
 				'note("[" + s.lastEventId() + "]");',
 				"for (SseEvent<String> ev : s) {",
 				'  note(ev.data() + " " + s.lastEventId());',

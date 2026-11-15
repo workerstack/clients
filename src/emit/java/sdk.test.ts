@@ -277,9 +277,9 @@ describe("generateJavaSdk: a streaming operation (SSE from d1, WebSocket from d2
 		const resource = generateJavaSdk(sse()).files["src/main/java/com/example/TicksResource.java"] ?? ""
 		const rooms = generateJavaSdk(ws()).files["src/main/java/com/example/RoomsResource.java"] ?? ""
 		const feed = generateJavaSdk(realtime()).files["src/main/java/com/example/FeedResource.java"] ?? ""
-		expect(resource).toMatch(/^ {2}public EventStream<Tick> stream\(TicksStreamParams params\) \{$/m)
-		expect(rooms).toMatch(/^ {2}public TypedWebSocket socket\(RoomsSocketParams params\) \{$/m)
-		expect(feed).toMatch(/^ {2}public ResumableConnection<Payload> live\(FeedLiveParams params\) \{$/m)
+		expect(resource).toMatch(/^ {2}public EventStream<SseEvent<Tick>> stream\(TicksStreamParams params\) \{$/m)
+		expect(rooms).toMatch(/^ {2}public TypedWebSocket<WsMessage, JsonNode> socket\(RoomsSocketParams params\) \{$/m)
+		expect(feed).toMatch(/^ {2}public ResumableConnection<Payload, JsonNode> live\(FeedLiveParams params\) \{$/m)
 	})
 
 	/* new: SSE is core (C#'s CORE set): its runtime ships with every operation SDK, none with a zero-op SDK */
@@ -484,9 +484,10 @@ describe("generateJavaSdk: the mirror's names and notices (bit 21 i6)", () => {
 		const ticks = generateJavaSdk(sse()).files[at("SafeTicksResource")] ?? ""
 		expect({
 			live: feed.match(
-				/^ {2}public ResumableConnection<Payload> live\(FeedLiveParams params\) \{\n {4}return _n\.live\(params\);$/m,
+				/^ {2}public ResumableConnection<Payload, JsonNode> live\(FeedLiveParams params\) \{\n {4}return _n\.live\(params\);$/m,
 			)?.length,
-			stream: ticks.match(/^ {2}public Result<EventStream<Tick>> stream\(TicksStreamParams params\) \{$/m)?.length,
+			stream: ticks.match(/^ {2}public Result<EventStream<SseEvent<Tick>>> stream\(TicksStreamParams params\) \{$/m)
+				?.length,
 		}).toEqual({ live: 1, stream: 1 })
 	})
 

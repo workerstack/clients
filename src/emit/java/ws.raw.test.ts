@@ -2,7 +2,8 @@
  * A WebSocket dial's answer in the Java SDK (bit 16 phase d2a, K3, K4, K10; C#'s `ws.raw.test.ts`): `RequestOptions.raw`
  * holds the 101's status and the dialed ws:// URL (its headers empty: the JDK's WebSocket exposes none, K10's FLAG) or a
  * refused handshake's status, headers and body (read at most 64 KiB); a refusal is its status exception; a closed origin
- * is ApiConnectionException; no redirect is followed; the call's timeout bounds the handshake; and a 101 the JDK
+ * is ApiConnectionException; no redirect is followed; the call's timeout bounds the handshake; a 101 marked with a
+ * content coding opens all the same, its content the connection (the JDK decodes none); and a 101 the JDK
  * refuses fails closed, the SDK naming an unoffered subprotocol (W5) and, for an Accept mismatch or another Upgrade, the
  * handshake (K4's FLAG: the JDK owns the key).
  */
@@ -37,6 +38,10 @@ const handshake = (why?: string) => ({
 	type: "ApiConnectionException",
 	via: "return",
 })
+
+/** An accepted upgrade whose 101 carries `Content-Encoding: coding`, echoing the client's first message. */
+const echoed = (coding: string) =>
+	ws([{ receive: 1 }, { text: `echo:${coding}` }], { headers: { "content-encoding": coding } })
 
 /** The `ws` SDK with the driver aimed at it, which must build. */
 function driven(): DrivenJavaSdk {
@@ -77,7 +82,8 @@ public class Probe {
   public static void main(String[] args) {
     ExampleClient c = ExampleClient.builder().baseUrl("${url}").build();
     RawResponse raw = new RawResponse();
-    TypedWebSocket w = c.rooms().socket(RoomsSocketParams.builder().room("r").since(3L).build(),
+    TypedWebSocket<WsMessage, tools.jackson.databind.JsonNode> w = c.rooms().socket(
+        RoomsSocketParams.builder().room("r").since(3L).build(),
         RequestOptions.builder().raw(raw).build());
     System.out.println(shown(raw));
     w.close();
@@ -145,6 +151,18 @@ describe.skipIf(!JAVA)("what fails at the handshake: the method throws, nothing 
 			error: { text: expect.stringMatching(/^GET \/rooms\/\{room\}: /), type: "ApiConnectionException", via: "return" },
 			observed: [{ kind: "transport" }],
 		})
+	})
+})
+
+describe.skipIf(!JAVA)("a 101 marked with a content coding: its content is the connection", SLOW, () => {
+	/* plan 13's workerd 101 (`Content-Encoding: gzip`), which broke .NET's dial; the JDK decodes no 101 content */
+	it("opens under gzip on the 101, sends text and reads the echo", async () => {
+		const script: Script = { calls: [{ ws: { send: [{ text: "gzip" }] } }] }
+		const { hops, run } = await drive([echoed("gzip")], [rooms({ take: 1 })], script)
+		expect(
+			{ error: failed(run.trace?.calls[0]?.error), hops: hops.length, observed: run.observed },
+			run.stderr,
+		).toEqual({ error: null, hops: 1, observed: [{ frames: ["echo:gzip"], kind: "frames" }] })
 	})
 })
 

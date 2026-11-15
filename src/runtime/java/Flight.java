@@ -17,7 +17,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import tools.jackson.core.type.TypeReference;
 
 /**
  * One call's exchange: its hops, its auth retry, and its one deadline over all of them, which
@@ -85,7 +84,8 @@ final class Flight {
   /**
    * Opens the stream: an error status throws; a 2xx fills headersInto and raw, and settles stale.
    */
-  <T> EventStream<T> events(Consumer<Map<String, String>> headersInto, TypeReference<T> type) {
+  <E> EventStream<E> events(
+      Consumer<Map<String, String>> headersInto, Function<SseEvent<String>, E> decode) {
     stream = true;
     Hop hop = exchanged();
     ApiException error = finish(hop).error();
@@ -96,7 +96,7 @@ final class Flight {
       if (headersInto != null) {
         headersInto.accept(hop.headers());
       }
-      return new EventStream<>(hop.live(), type);
+      return new EventStream<>(hop.live(), decode);
     } catch (RuntimeException e) {
       Pump.release(hop.live());
       throw e;

@@ -17,20 +17,27 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 
 /**
  * A WebSocket call's dial: the path checked, the call's headers layered (a fresh X-Request-Id, the
  * config's, the call's, the options', the credential) with no hook and no log, a restricted name
- * refused by name, the subprotocols offered, the call's timeout bounding the handshake alone. A
- * refusal is its status exception (its body read at most 64 KiB); no redirect is followed.
+ * refused by name, the subprotocols offered, the call's timeout bounding the handshake alone, each
+ * frame read through the operation's reader. A refusal is its status exception (its body read at
+ * most 64 KiB); no redirect is followed.
  */
 final class WsDial {
   private static final int ERROR_CAP = 64 * 1024;
 
   private WsDial() {}
 
-  static TypedWebSocket open(
-      Exchange exchange, Operation op, Call call, RequestOptions given, List<String> protocols) {
+  static <TIn, TOut> TypedWebSocket<TIn, TOut> open(
+      Exchange exchange,
+      Operation op,
+      Call call,
+      RequestOptions given,
+      List<String> protocols,
+      Function<WsMessage, TIn> read) {
     RequestOptions options = given == null ? RequestOptions.NONE : given;
     ClientConfig config = exchange.config();
     if (java.lang.Thread.currentThread().isInterrupted()) {
@@ -65,7 +72,7 @@ final class WsDial {
     if (options.raw() != null) {
       options.raw().fill(101, Map.of(), new byte[0], url);
     }
-    return new TypedWebSocket(socket);
+    return new TypedWebSocket<>(socket, read);
   }
 
   /** The dial's headers, layered as a call's; a restricted name or a value with CR/LF refused. */

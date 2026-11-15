@@ -2,43 +2,97 @@
 package http.runtime;
 
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 
 /**
- * An open WebSocket. {@link #receive()} reads the next whole message: nothing reads in the
- * background, so a socket no one receives from asks the server for nothing more, and onMessage
- * fires as receive delivers a message, on the receiving thread. The socket's end, the server's
- * close (echoed with its code and reason), a drop, a message over 16 MiB (closed 1008), a keepalive
- * ping unanswered for 20 s, or {@link #close()}, fires exactly one of onClosed or onError, once; a
- * throwing handler is ignored. An interrupt of the reading thread closes it 1000. Close it, or open
- * it in try-with-resources. Its dial runs no onRequest or onResponse hook, and a refused
- * handshake's 401 is its error, with no onAuthExpired refresh.
+ * An open WebSocket that reads {@code TIn}, what the server sends, and sends {@code TOut}, what it
+ * receives, as JSON; an operation that declares no read side reads each {@link WsMessage} as it
+ * came. {@link #receive()} reads the next whole message: nothing reads in the background, so a
+ * socket no one receives from asks the server for nothing more, and onMessage fires as receive
+ * delivers a message, on the receiving thread. A typed frame that is no JSON, or does not decode,
+ * throws {@link DecodeException} from receive and fires onError, and the next receive reads on; a
+ * binary frame is read as UTF-8 JSON. The socket's end, the server's close (echoed with its code
+ * and reason), a drop, a message over 16 MiB (closed 1008), a keepalive ping unanswered for 20 s,
+ * or {@link #close()}, fires exactly one of onClosed or onError, once; a throwing handler is
+ * ignored. An interrupt of the reading thread closes it 1000. Close it, or open it in
+ * try-with-resources. Its dial runs no onRequest or onResponse hook, and a refused handshake's 401
+ * is its error, with no onAuthExpired refresh.
  */
-public final class TypedWebSocket implements AutoCloseable {
+public class TypedWebSocket<TIn, TOut> implements AutoCloseable {
   private final Socket socket;
+  private final Function<WsMessage, TIn> read;
+  private final List<Consumer<TIn>> onMessage;
 
-  TypedWebSocket(Socket socket) {
+  TypedWebSocket(Socket socket, Function<WsMessage, TIn> read) {
     this.socket = socket;
+    this.read = read;
+    this.onMessage = new CopyOnWriteArrayList<>();
   }
 
-  /** The next whole message, null once the socket ended; an end's error is thrown once. */
-  public WsMessage receive() {
-    return socket.receive();
+  /** The socket {@code opened}, its reads, sends and handlers shared: a generated socket's base. */
+  protected TypedWebSocket(TypedWebSocket<TIn, TOut> opened) {
+    this.socket = opened.socket;
+    this.read = opened.read;
+    this.onMessage = opened.onMessage;
   }
 
-  /** Sends {@code text} as one text message. */
-  public void send(String text) {
+  /** The frame reader of {@code T}: each frame's bytes as UTF-8 JSON, decoded into {@code T}. */
+  static <T> Function<WsMessage, T> json(TypeReference<T> type) {
+    return message -> {
+      JsonNode node;
+      try {
+        node = Json.MAPPER.readTree(message.data());
+      } catch (JacksonException e) {
+        throw new DecodeException(
+            "WebSocket frame is not valid JSON: " + e.getOriginalMessage(), e);
+      }
+      try {
+        return Json.MAPPER.readerFor(type).readValue(node);
+      } catch (JacksonException e) {
+        throw new DecodeException("WebSocket frame does not decode: " + e.getOriginalMessage(), e);
+      }
+    };
+  }
+
+  /**
+   * The next whole message, null once the socket ended; an end's error is thrown once, and a frame
+   * that does not decode is thrown as it is read.
+   */
+  public TIn receive() {
+    WsMessage message = socket.receive();
+    if (message == null) {
+      return null;
+    }
+    TIn value;
+    try {
+      value = read.apply(message);
+    } catch (DecodeException e) {
+      socket.report(e);
+      throw e;
+    }
+    onMessage.forEach(handler -> Socket.run(handler, value));
+    return value;
+  }
+
+  /** Sends {@code value} as one text message, its JSON through the SDK's mapper. */
+  public void send(TOut value) {
+    sendText(Json.MAPPER.writeValueAsString(value));
+  }
+
+  /** Sends {@code text} as one text message, as it is. */
+  public void sendText(String text) {
     socket.send(ws -> ws.sendText(text, true));
   }
 
   /** Sends {@code data} as one binary message. */
-  public void send(byte[] data) {
+  public void sendBinary(byte[] data) {
     socket.send(ws -> ws.sendBinary(ByteBuffer.wrap(data), true));
-  }
-
-  /** Sends {@code value} as its JSON text, through the SDK's mapper. */
-  public void sendJson(Object value) {
-    send(Json.MAPPER.writeValueAsString(value));
   }
 
   /** Closes 1000 with no reason; on an ended socket it does nothing. */
@@ -67,8 +121,8 @@ public final class TypedWebSocket implements AutoCloseable {
   }
 
   /** Runs {@code handler} on each message as receive delivers it. */
-  public void onMessage(Consumer<WsMessage> handler) {
-    socket.onMessage.add(handler);
+  public void onMessage(Consumer<TIn> handler) {
+    onMessage.add(handler);
   }
 
   /** Runs {@code handler} once when the socket closes cleanly. */
@@ -76,7 +130,10 @@ public final class TypedWebSocket implements AutoCloseable {
     socket.onClosed.add(handler);
   }
 
-  /** Runs {@code handler} once when the socket ends in an error. */
+  /**
+   * Runs {@code handler} once when the socket ends in an error, and on each frame that does not
+   * decode.
+   */
   public void onError(Consumer<java.lang.Exception> handler) {
     socket.onError.add(handler);
   }

@@ -121,7 +121,7 @@ const SAFE_LEG_HELPERS = [
 	"  private static <E> void stream(Result<EventStream<E>> r) {",
 	"    narrow(r);",
 	"    if (r instanceof Result.Ok<EventStream<E>> ok) {",
-	"      for (SseEvent<E> event : ok.data()) {",
+	"      for (E event : ok.data()) {",
 	"        if (event != null) {",
 	"          break;",
 	"        }",

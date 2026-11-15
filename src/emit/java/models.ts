@@ -9,7 +9,8 @@ import { pascalWords, javaTypeName } from "../shared/lang.ts"
 import { enumDecl, enumValues } from "./models-enum.ts"
 import { fieldsOf, isOpen, recordDecl } from "./models-record.ts"
 import { javaNames, JSON_NODE, type JavaTypeNames } from "./models-names.ts"
-import { isLiteral, unionDecl } from "./models-union.ts"
+import type { Dispatch } from "./json.ts"
+import { dispatchOf, isKeyed, isLiteral, unionDecl, type UnionScope } from "./models-union.ts"
 
 export type { JavaTypeNames } from "./models-names.ts"
 
@@ -141,13 +142,32 @@ export function javaTypeOf(ir: IRSchema, at: JavaTypeContext): string {
 	return use(ir, { ...at, depth: 0, path: "" })
 }
 
+/** The Java type of `ir` at `at`, a schema that declares hoisted as `<Parent><Field>`: an inline keyed union too. */
+export function declaredTypeOf(ir: IRSchema, at: JavaTypeContext): string {
+	return ir.kind !== "ref" && declares(ir) ? hoist(ir, { ...at, depth: 0, path: "" }) : javaTypeOf(ir, at)
+}
+
+/** The members of the declaration `name` (a Java name already) and what its variants hoist, in `ctx`. */
+const scopeOf = (name: string, ctx: JavaTypeContext): UnionScope => ({
+	at: ctx,
+	declare: (schema, key, base) => declare(schema, ctx, key, base),
+	member: (schema, fieldName) => javaTypeOf(schema, { ...ctx, fieldName, parentName: name }),
+})
+
+/** The wrappers of `name`, the keyed union `ir` resolves to, in its Deserializer's order; none when `ir` is not one. */
+export function keyedArms(name: string, ir: IRSchema, ctx: JavaTypeContext): readonly Dispatch[] {
+	const union = ctx.names.resolve(ir)
+	return union.kind === "union" && isKeyed(union) ? dispatchOf(name, union, scopeOf(name, ctx)) : []
+}
+
 /** The top-level declaration of the type `name` (a Java name already) for `ir`, which `declares`. */
 export function javaTopLevel(name: string, ir: IRSchema, ctx: JavaTypeContext): string {
-	const member: Member = (schema, fieldName) => javaTypeOf(schema, { ...ctx, fieldName, parentName: name })
+	const scope = scopeOf(name, ctx)
 	if (ir.kind === "scalar") return enumDecl(name, ir)
 	const open = isOpen(ir, ctx.names.resolve)
-	if (ir.kind === "object") return recordDecl(name, { fields: ir.fields, open }, member, ctx)
-	if (ir.kind === "allOf") return recordDecl(name, { fields: fieldsOf(ir, ctx.names.resolve), open }, member, ctx)
-	const declareVariant = (schema: IRSchema, key: string, base: string) => declare(schema, ctx, key, base)
-	return unionDecl(name, ir as Of<"union">, { at: ctx, declare: declareVariant, member })
+	if (ir.kind === "object") return recordDecl(name, { fields: ir.fields, open }, scope.member, ctx)
+	if (ir.kind === "allOf") {
+		return recordDecl(name, { fields: fieldsOf(ir, ctx.names.resolve), open }, scope.member, ctx)
+	}
+	return unionDecl(name, ir as Of<"union">, scope)
 }

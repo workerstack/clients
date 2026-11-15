@@ -28,7 +28,7 @@ const bad: Reply = { json: { message: "no" }, status: 400 }
 /** A call refused over WebSocket and SSE opens over long-poll, which dials nothing: its URL and adapters, two hops in. */
 const SETUP = `String url;
 List<TransportAdapter> adapters;
-try (ResumableConnection<Payload> setup = c.feed().live(feed())) {
+try (ResumableConnection<Payload, JsonNode> setup = c.feed().live(feed())) {
   url = setup.url();
   adapters = setup.adapters();
 }`
@@ -37,7 +37,7 @@ const hooked = (config = "") => `List<String[]> hooked = Collections.synchronize
 ExampleClient c = ExampleClient.builder().baseUrl(BASE).bearerToken("tok")${config}.onRequest(Rt.hook(hooked)).build();`
 /** A connection over the setup's adapter `i` with `options`, connected, then `text` on it. */
 const alone = (i: number, options: string, text: string) =>
-	`try (ResumableConnection<JsonNode> rc = new ResumableConnection<>(url, List.of(adapters.get(${i})), Rt.ELEMENT${options})) {
+	`try (ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>(url, List.of(adapters.get(${i})), Rt.ELEMENT${options})) {
   rc.connect();
 ${text}
 }`
@@ -62,7 +62,7 @@ TransportOptions t = TransportOptions.builder().lastEventId("42").reconnectToken
 note(Rt.j(t.lastEventId(), t.reconnectToken(), t.protocols(), t.maxReconnectAttempts(), t.reconnectDelay().toString()));
 note(Rt.json(TransportKind.values()));
 ExampleClient c = ExampleClient.builder().baseUrl(BASE).bearerToken("tok").build();
-try (ResumableConnection<Payload> conn = c.feed().live(feed())) {
+try (ResumableConnection<Payload, JsonNode> conn = c.feed().live(feed())) {
   List<Object[]> named = new ArrayList<>();
   for (TransportAdapter a : conn.adapters()) {
     named.add(Rt.named(a));
@@ -73,16 +73,16 @@ try (ResumableConnection<Payload> conn = c.feed().live(feed())) {
 	},
 	defaults: {
 		body: `ExampleClient c = ExampleClient.builder().baseUrl(BASE).bearerToken("tok").build();
-try (ResumableConnection<Payload> first = c.feed().live(feed())) {
+try (ResumableConnection<Payload, JsonNode> first = c.feed().live(feed())) {
   note(Rt.proven(first));
   List<TransportAdapter> a = first.adapters();
-  try (ResumableConnection<JsonNode> custom = new ResumableConnection<>(first.url(), List.of(a.get(1), a.get(0), a.get(2)), Rt.ELEMENT)) {
+  try (ResumableConnection<JsonNode, JsonNode> custom = new ResumableConnection<>(first.url(), List.of(a.get(1), a.get(0), a.get(2)), Rt.ELEMENT)) {
     custom.connect();
     note(Rt.proven(custom));
   }
 }
 for (int i = 0; i < 2; i++) {
-  try (ResumableConnection<Payload> conn = c.feed().live(feed())) {
+  try (ResumableConnection<Payload, JsonNode> conn = c.feed().live(feed())) {
     note(Rt.proven(conn));
   }
 }`,
@@ -93,7 +93,7 @@ for (int i = 0; i < 2; i++) {
 String host = URI.create(BASE).getAuthority();
 for (int i = 0; i < 3; i++) {
   RawResponse raw = new RawResponse();
-  try (ResumableConnection<Payload> conn = c.feed().live(feed(), RequestOptions.builder().raw(raw).build())) {
+  try (ResumableConnection<Payload, JsonNode> conn = c.feed().live(feed(), RequestOptions.builder().raw(raw).build())) {
     note(Rt.j(raw.status(), raw.url().toString().replace(host, "H")));
     note(Rt.proven(conn));
   }

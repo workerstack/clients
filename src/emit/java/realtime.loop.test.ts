@@ -204,8 +204,8 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 
 final class LoopProbe {
-  static ResumableConnection<JsonNode> open(TransportAdapter adapter, long ms) {
-    return new ResumableConnection<>("http://t/rt", List.of(adapter), new TypeReference<JsonNode>() {}, null, Duration.ofMillis(ms));
+  static ResumableConnection<JsonNode, JsonNode> open(TransportAdapter adapter, long ms) {
+    return new ResumableConnection<>("http://t/rt", List.of(adapter), new TypeReference<JsonNode>() {}, null, Duration.ofMillis(ms), false);
   }
 
   public static void main(String[] args) throws Exception {
@@ -238,7 +238,7 @@ describe.skipIf(!JAVA)("the open bound (R4): no transport within it is ApiTimeou
 	it("ends a chain that opens nothing within the bound: ApiTimeoutException, the adapter interrupted, no interrupt left", () => {
 		expect(
 			probed(`Held held = new Held();
-ResumableConnection<JsonNode> rc = open(held, 100);
+ResumableConnection<JsonNode, JsonNode> rc = open(held, 100);
 long started = System.nanoTime();
 try {
   rc.open();
@@ -255,7 +255,7 @@ System.out.println(held.interrupted + " " + Thread.currentThread().isInterrupted
 	it("closes what an open returned past the bound and throws the timeout, no interrupt left", () => {
 		expect(
 			probed(`Spin spin = new Spin(400);
-ResumableConnection<JsonNode> rc = open(spin, 50);
+ResumableConnection<JsonNode, JsonNode> rc = open(spin, 50);
 try {
   rc.open();
   System.out.println("opened");
@@ -280,7 +280,7 @@ int timedOut = 0;
 int probed = 0;
 for (int round = 0; round < 200; round++) {
   Spin spin = new Spin(45 + round % 11);
-  ResumableConnection<JsonNode> rc = open(spin, 50);
+  ResumableConnection<JsonNode, JsonNode> rc = open(spin, 50);
   boolean caller = round % 2 == 1;
   /* the caller's interrupt, marked under one lock as it lands */
   Object lock = new Object();
@@ -361,7 +361,7 @@ describe.skipIf(!JAVA)("the backoff is capped at the open bound (C#'s OpenLimit)
 		expect(
 			probed(`Spin spin = new Spin(0);
 TransportOptions slow = TransportOptions.builder().reconnectDelay(Duration.ofHours(1)).build();
-ResumableConnection<JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(spin), new TypeReference<JsonNode>() {}, slow, Duration.ofMillis(100));
+ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(spin), new TypeReference<JsonNode>() {}, slow, Duration.ofMillis(100), false);
 rc.connect();
 rc.receive();
 long started = System.nanoTime();
@@ -378,7 +378,7 @@ describe.skipIf(!JAVA)("a for-each over the connection (R1): not read once", SLO
 		expect(
 			probed(`Spin spin = new Spin(0);
 TransportOptions quick = TransportOptions.builder().reconnectDelay(Duration.ofMillis(1)).build();
-ResumableConnection<JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(spin), new TypeReference<JsonNode>() {}, quick, Duration.ofSeconds(5));
+ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(spin), new TypeReference<JsonNode>() {}, quick, Duration.ofSeconds(5), false);
 rc.connect();
 int read = 0;
 for (JsonNode message : rc) {
@@ -400,7 +400,7 @@ System.out.println(read + " " + rc.receive() + " " + spin.conns.size() + " " + r
  */
 const reconnecting = (blocks: boolean, before = "") => `Twice twice = new Twice(${blocks});
 TransportOptions quick = TransportOptions.builder().reconnectDelay(Duration.ofMillis(1)).build();
-ResumableConnection<JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(twice), new TypeReference<JsonNode>() {}, quick, Duration.ofSeconds(30));
+ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(twice), new TypeReference<JsonNode>() {}, quick, Duration.ofSeconds(30), false);
 rc.connect();
 rc.receive();
 CompletableFuture<String> reader = new CompletableFuture<>();
@@ -453,7 +453,7 @@ describe.skipIf(!JAVA)("the open bound never takes a caller's interrupt (R4 refi
 	it("keeps a caller's interrupt that lands during an open that succeeds: still set after it, and the next receive is the cancel", () => {
 		expect(
 			probed(`Spin spin = new Spin(60);
-ResumableConnection<JsonNode> rc = open(spin, 1_000);
+ResumableConnection<JsonNode, JsonNode> rc = open(spin, 1_000);
 Thread self = Thread.currentThread();
 CompletableFuture.delayedExecutor(15, TimeUnit.MILLISECONDS).execute(self::interrupt);
 rc.open();

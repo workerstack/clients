@@ -4,7 +4,7 @@ package http.runtime;
 import java.net.http.HttpClient;
 import java.util.Map;
 import java.util.function.Consumer;
-import tools.jackson.core.type.TypeReference;
+import java.util.function.Function;
 
 /**
  * A client's exchange: its config, its one HTTP client (never following a redirect on its own), its
@@ -28,14 +28,14 @@ final class Exchange {
     return new Flight(this, op, call, options).run();
   }
 
-  /** Opens one stream call: its events, once an error status has not thrown. */
-  <T> EventStream<T> events(
+  /** Opens one stream call: its events, each decoded whole, once an error status has not thrown. */
+  <E> EventStream<E> events(
       Operation op,
       Call call,
       RequestOptions options,
       Consumer<Map<String, String>> headers,
-      TypeReference<T> type) {
-    return new Flight(this, op, call, options).events(headers, type);
+      Function<SseEvent<String>, E> decode) {
+    return new Flight(this, op, call, options).events(headers, decode);
   }
 
   Flight dial(Operation op, Call call, RequestOptions options) {

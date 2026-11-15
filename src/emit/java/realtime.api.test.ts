@@ -20,12 +20,12 @@ const CLASH_URL = "/realtime-clash/feed?channel=c&max_reconnect_attempts=3&recon
 const READ_1 = '{"n":1,"reconnect_token":"rt-1"}'
 const LIVE = 'c.feed().live(FeedLiveParams.builder().channel("c")'
 /** What javac holds of the realtime methods: each typed by its event schema, the folded resume params gone. */
-const WRONG = `ResumableConnection<JsonNode> wrong = ${LIVE}.build());`
+const WRONG = `ResumableConnection<JsonNode, JsonNode> wrong = ${LIVE}.build());`
 const CLAIMED = 'c.feed().resume(FeedResumeParams.builder().reconnectToken2("x").build());'
 const TYPES = [
 	"ExampleClient c = client();",
-	`ResumableConnection<Payload> x = ${LIVE}.build());`,
-	'ResumableConnection<JsonNode> r = c.feed().resume(FeedResumeParams.builder().protocols2("p").lastEventId("5").reconnectToken("rt").build());',
+	`ResumableConnection<Payload, JsonNode> x = ${LIVE}.build());`,
+	'ResumableConnection<JsonNode, JsonNode> r = c.feed().resume(FeedResumeParams.builder().protocols2("p").lastEventId("5").reconnectToken("rt").build());',
 	WRONG,
 	CLAIMED,
 	`${LIVE}.maxReconnectAttempts(3).reconnectDelay(Duration.ofSeconds(2)).protocols(List.of("v1")).build());`,
@@ -35,25 +35,31 @@ const TYPES = [
 	"for (Payload p : x) { Long n = p.n(); }",
 ]
 
-describe.skipIf(!JAVA)("a realtime method: it returns ResumableConnection<T> connected (Fd6, R1, R8)", SLOW, () => {
-	/* new: C# realtime.test.ts:136 (javac's view: an untyped receiver is incompatible, reconnectToken2 unknown) */
-	it("returns the connection CONNECTED, typed by the event schema, DISCONNECTED after close(); the folded params gone", async () => {
-		const body = `ResumableConnection<Payload> rc = client().feed().live(FeedLiveParams.builder().channel("c").build());
+describe.skipIf(!JAVA)(
+	"a realtime method: it returns ResumableConnection<T, JsonNode> connected (Fd6, R1, R8)",
+	SLOW,
+	() => {
+		/* new: C# realtime.test.ts:136 (javac's view: an untyped receiver is incompatible, reconnectToken2 unknown) */
+		it("returns the connection CONNECTED, typed by the event schema, DISCONNECTED after close(); the folded params gone", async () => {
+			const body = `ResumableConnection<Payload, JsonNode> rc = client().feed().live(FeedLiveParams.builder().channel("c").build());
 note(rc.state());
 rc.close();
 note(rc.state());`
-		const { hops, out, stderr } = await consumed([refused, sse([ev(1)], "hold")], body)
-		expect({ hops: hops.length, out: out?.main }, stderr).toEqual({ hops: 2, out: ["CONNECTED", "DISCONNECTED"] })
-		const run = drivenRealtime().run("com.example.Probe", consumer("http://127.0.0.1:1", TYPES.join("\n")))
-		const errors = run.diagnostics.filter((line) => / error: /.test(line)).map((line) => line.replace(/^.*error: /, ""))
-		expect(errors).toEqual([
-			expect.stringMatching(
-				/^incompatible types: ResumableConnection<Payload> cannot be converted to ResumableConnection<JsonNode>$/,
-			),
-			"cannot find symbol",
-		])
-	})
-})
+			const { hops, out, stderr } = await consumed([refused, sse([ev(1)], "hold")], body)
+			expect({ hops: hops.length, out: out?.main }, stderr).toEqual({ hops: 2, out: ["CONNECTED", "DISCONNECTED"] })
+			const run = drivenRealtime().run("com.example.Probe", consumer("http://127.0.0.1:1", TYPES.join("\n")))
+			const errors = run.diagnostics
+				.filter((line) => / error: /.test(line))
+				.map((line) => line.replace(/^.*error: /, ""))
+			expect(errors).toEqual([
+				expect.stringMatching(
+					/^incompatible types: ResumableConnection<Payload,JsonNode> cannot be converted to ResumableConnection<JsonNode,JsonNode>$/,
+				),
+				"cannot find symbol",
+			])
+		})
+	},
+)
 
 /**
  * A caller's adapter (Fd6): each connect takes the plan's next item, one message per connection; a null fails with
@@ -132,12 +138,12 @@ final class Slow extends Fake {
 
 /** The states leg's program: a budget of 0 raising once, then a connection interrupted mid-reconnect and closed. */
 const STATES = `section("no-reconnect");
-ResumableConnection<Payload> rc = client().feed().live(FeedLiveParams.builder().channel("c").maxReconnectAttempts(0).reconnectDelay(Duration.ofMillis(1)).build());
+ResumableConnection<Payload, JsonNode> rc = client().feed().live(FeedLiveParams.builder().channel("c").maxReconnectAttempts(0).reconnectDelay(Duration.ofMillis(1)).build());
 note(rc.state());
 note(read(rc));
 note(rc.state() + " " + read(rc) + " " + read(rc));
 section("reconnecting");
-ResumableConnection<Payload> again = client().feed().live(FeedLiveParams.builder().channel("c").reconnectDelay(Duration.ofMillis(1)).build());
+ResumableConnection<Payload, JsonNode> again = client().feed().live(FeedLiveParams.builder().channel("c").reconnectDelay(Duration.ofMillis(1)).build());
 note(again.state() + " " + read(again));
 Thread reader = Thread.currentThread();
 CompletableFuture.delayedExecutor(1000, TimeUnit.MILLISECONDS).execute(reader::interrupt);
@@ -174,7 +180,7 @@ describe.skipIf(!JAVA)("a connection's states; a caller's adapter under the same
 		const body = `section("give-up");
 Fake a = new Fake(1, 2, 3, null, null);
 TransportOptions options = TransportOptions.builder().maxReconnectAttempts(2).reconnectDelay(Duration.ofMillis(1)).build();
-ResumableConnection<JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(a), new tools.jackson.core.type.TypeReference<JsonNode>() {}, options);
+ResumableConnection<JsonNode, JsonNode> rc = new ResumableConnection<>("http://t/rt", List.of(a), new tools.jackson.core.type.TypeReference<JsonNode>() {}, options);
 rc.connect();
 for (int i = 0; i < 5; i++) {
   note(read(rc));
@@ -182,7 +188,7 @@ for (int i = 0; i < 5; i++) {
 note(rc.state() + " " + a.conns.size() + " " + a.conns.stream().allMatch(conn -> conn.closed) + " " + a.plan.size());
 section("cancel");
 Fake fallback = new Fake(1);
-ResumableConnection<JsonNode> slow = new ResumableConnection<>("http://t/rt", List.of(new Slow(), fallback), new tools.jackson.core.type.TypeReference<JsonNode>() {});
+ResumableConnection<JsonNode, JsonNode> slow = new ResumableConnection<>("http://t/rt", List.of(new Slow(), fallback), new tools.jackson.core.type.TypeReference<JsonNode>() {});
 Thread opener = Thread.currentThread();
 CompletableFuture.delayedExecutor(300, TimeUnit.MILLISECONDS).execute(opener::interrupt);
 try {
@@ -205,7 +211,7 @@ try {
 describe.skipIf(!JAVA)("a message that does not decode keeps the connection; a claimed …2 is sent", SLOW, () => {
 	/* new: C# realtime.test.ts:420 (Jackson refuses another JSON kind itself: `5` into Payload) */
 	it("throws DecodeException for a message that does not decode, the cursor advanced and the connection kept", async () => {
-		const body = `ResumableConnection<Payload> rc = client().feed().live(FeedLiveParams.builder().channel("c").reconnectDelay(Duration.ofMillis(1)).build());
+		const body = `ResumableConnection<Payload, JsonNode> rc = client().feed().live(FeedLiveParams.builder().channel("c").reconnectDelay(Duration.ofMillis(1)).build());
 note(read(rc));
 note(rc.options().lastEventId());
 note(read(rc));
@@ -221,7 +227,7 @@ rc.close();`
 
 	/* new: C# realtime.test.ts:454 (Java's clash.feed in the realtime fixture) */
 	it("sends a claimed …2 param by its wire name beside a budget of 0", async () => {
-		const body = `ResumableConnection<Payload> rc = client().clash().feed(ClashFeedParams.builder().channel("c").maxReconnectAttempts2(3L).reconnectDelay2(4L).maxReconnectAttempts(0).build());
+		const body = `ResumableConnection<Payload, JsonNode> rc = client().clash().feed(ClashFeedParams.builder().channel("c").maxReconnectAttempts2(3L).reconnectDelay2(4L).maxReconnectAttempts(0).build());
 note(read(rc));
 note(read(rc));`
 		const { hops, out, stderr } = await consumed([refused, refused, bad], body)
@@ -238,13 +244,15 @@ const DOC = "It reconnects after a drop and resumes after the last message it de
 /** The methods' signatures and the clash fold, by the same rules (its clashing queries claimed `…2`). */
 const EMITTED = {
 	"ClashResource.java": [
-		"  public ResumableConnection<Payload> feed(ClashFeedParams params, RequestOptions options) {",
+		"  public ResumableConnection<Payload, JsonNode> feed(",
+		"      ClashFeedParams params, RequestOptions options) {",
 		'            Call.Arg.of("max_reconnect_attempts", params.maxReconnectAttempts2()),',
 		'            Call.Arg.of("reconnect_delay", params.reconnectDelay2()));',
 	],
 	"FeedResource.java": [
-		"  public ResumableConnection<Payload> live(FeedLiveParams params) {",
-		"  public ResumableConnection<JsonNode> resume(FeedResumeParams params, RequestOptions options) {",
+		"  public ResumableConnection<Payload, JsonNode> live(FeedLiveParams params) {",
+		"  public ResumableConnection<JsonNode, JsonNode> resume(",
+		"      FeedResumeParams params, RequestOptions options) {",
 		'    List<Call.Arg> query = List.of(Call.Arg.of("protocols", params.protocols2()));',
 		"        TransportOptions.of(",
 		"    return Realtime.open(",

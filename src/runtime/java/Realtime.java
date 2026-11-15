@@ -6,8 +6,10 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 
 /**
  * A realtime call's entry and its dials (C#'s RealtimeAsync and Dial): the WebSocket upgrade with
@@ -33,19 +35,45 @@ final class Realtime {
     this.options = options;
   }
 
-  /** The call's connection over WebSocket, else SSE, else long-poll, opened within 30 s. */
-  static <T> ResumableConnection<T> open(
+  /**
+   * The call's connection over WebSocket, else SSE, else long-poll, opened within 30 s; a message
+   * that is no JSON read as a JSON string.
+   */
+  static <TIn, TOut> ResumableConnection<TIn, TOut> open(
       Exchange exchange,
       Operation op,
       Call call,
       RequestOptions given,
       TransportOptions transport,
-      TypeReference<T> type) {
+      TypeReference<TIn> type) {
+    return connected(exchange, op, call, given, transport, type, false);
+  }
+
+  /** The connection of an operation that declares its messages: one that is no JSON throws. */
+  static <TIn, TOut> ResumableConnection<TIn, TOut> typed(
+      Exchange exchange,
+      Operation op,
+      Call call,
+      RequestOptions given,
+      TransportOptions transport,
+      TypeReference<TIn> type) {
+    return connected(exchange, op, call, given, transport, type, true);
+  }
+
+  private static <TIn, TOut> ResumableConnection<TIn, TOut> connected(
+      Exchange exchange,
+      Operation op,
+      Call call,
+      RequestOptions given,
+      TransportOptions transport,
+      TypeReference<TIn> type,
+      boolean strict) {
     Realtime dial = new Realtime(exchange, op, call, given == null ? RequestOptions.NONE : given);
     List<TransportAdapter> chain =
         List.of(new WsAdapter(dial), new SseAdapter(dial), new LongPollAdapter(dial));
-    ResumableConnection<T> connection =
-        new ResumableConnection<>(dial.url(call), chain, type, transport, RealtimeLoop.OPEN_LIMIT);
+    ResumableConnection<TIn, TOut> connection =
+        new ResumableConnection<>(
+            dial.url(call), chain, type, transport, RealtimeLoop.OPEN_LIMIT, strict);
     connection.open();
     return connection;
   }
@@ -59,15 +87,21 @@ final class Realtime {
         + (query.isEmpty() ? "" : "?" + query);
   }
 
-  TypedWebSocket socket(TransportOptions cursor) {
+  TypedWebSocket<WsMessage, JsonNode> socket(TransportOptions cursor) {
     RawResponse raw = new RawResponse();
-    TypedWebSocket socket =
-        WsDial.open(exchange, op, cursored(cursor), with(raw, null), cursor.protocols());
+    TypedWebSocket<WsMessage, JsonNode> socket =
+        WsDial.open(
+            exchange,
+            op,
+            cursored(cursor),
+            with(raw, null),
+            cursor.protocols(),
+            Function.identity());
     opened(raw);
     return socket;
   }
 
-  EventStream<String> stream(TransportOptions cursor) {
+  EventStream<SseEvent<String>> stream(TransportOptions cursor) {
     Operation sse =
         new Operation(
             op.method(),
@@ -83,8 +117,8 @@ final class Realtime {
             plus(call.headers(), Call.Arg.cursor("Last-Event-ID", cursor.lastEventId())),
             call.body());
     RawResponse raw = new RawResponse();
-    EventStream<String> stream =
-        exchange.dial(sse, at, with(raw, null)).events(null, new TypeReference<String>() {});
+    EventStream<SseEvent<String>> stream =
+        exchange.dial(sse, at, with(raw, null)).events(null, e -> e);
     opened(raw);
     return stream;
   }

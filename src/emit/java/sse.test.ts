@@ -1,6 +1,6 @@
 /**
  * An SSE operation in the Java SDK (bit 16 phase d1; C#'s `sse.test.ts`, contract 50 §5.1), on the shared `sse` document:
- * the method opens `EventStream<T>` (`String` untyped), read once as an `Iterable<SseEvent<T>>`; closing it, its end, an
+ * the method opens `EventStream<SseEvent<T>>` (`String` untyped), read once as an `Iterable<SseEvent<T>>`; closing it, its end, an
  * error or a cancel lets the connection go (J1). Java's for-each `break` has no close hook, so try-with-resources is the
  * release (F1). An error status throws from the call before any event, in either mode; the request carries `Accept`,
  * `Last-Event-ID`, the merged headers, the params, the body and the token; a typed stream ends at an event that does not

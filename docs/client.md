@@ -129,7 +129,8 @@ of its own), or a `DecodeException` for a 2xx, or a declared header, that does n
 `MaxResponseBytes` included. Reading `Value` on an Err, or `Error` on an Ok, throws `InvalidOperationException`;
 `Match(onOk, onErr)` and `TryGetValue(out T)` never do. `Response` is the answer's `RawResponse` on both (the one
 `RequestOptions.Raw` holds, when given). No answer still throws. An event stream's twin answers once it opens (`Value`
-is the `EventStream<T>`), its error status at the opening the Err; a WebSocket or realtime method is the very method.
+is the `EventStream<TEvent>`), its error status at the opening the Err; a WebSocket or realtime method is the very
+method.
 
 ```csharp
     public static async Task<string> Listing(HttpSdkClient client, string id)
@@ -156,7 +157,7 @@ class of its own), or a `DecodeException` for a 2xx, or a declared header, that 
 `isOk()` reports the arm and `orElseThrow()` returns the data or throws the Err's own error. `response()` is the
 answer's `RawResponse` on both (the one `RequestOptions.raw` holds, when given). No answer still throws: a
 `CancellationException` for the caller's interrupt, an `ApiTimeoutException`, an `ApiConnectionException`. An event
-stream's twin answers once it opens (the Ok's data is the `EventStream<T>`), its error status at the opening the Err; a
+stream's twin answers once it opens (the Ok's data is the `EventStream<E>`), its error status at the opening the Err; a
 WebSocket or realtime method is the very method.
 
 ```java

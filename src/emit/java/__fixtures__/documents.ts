@@ -14,6 +14,7 @@ import integerEnumStatus from "../../../ir/__fixtures__/specs/go/integer-enum-st
 import nullablePrimitive from "../../../ir/__fixtures__/specs/go/nullable-primitive.json" with { type: "json" }
 import { errors, http, httpExtraPaths } from "../../shared/__fixtures__/documents-http.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
+import { typedStreams } from "../../shared/__fixtures__/documents-typed.ts"
 import { merged } from "../../shared/__fixtures__/merge.ts"
 import type { JavaSdkOptions } from "../sdk.ts"
 
@@ -209,6 +210,8 @@ export const FIXTURES = {
 	streams: { document: () => merged({ realtime: realtime(), sse: streams.sse(), ws: streams.ws() }) },
 	/** the layout's input-driven shapes, each past the width (bit 21 i7a) */
 	shapes: { document: shapes },
+	/** the declared events and messages (D7, D9): every typed stream shape the `*.typed.test.ts` legs compile and drive */
+	typed: { document: typedStreams },
 } as const satisfies Record<string, JavaFixture>
 
 export type FixtureKey = keyof typeof FIXTURES

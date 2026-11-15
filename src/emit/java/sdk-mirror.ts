@@ -7,7 +7,6 @@
  */
 import type { IR } from "../../ir/model.ts"
 import type { SdkOp } from "../../ir/sdk-model.ts"
-import { messageTypeOf } from "./realtime.ts"
 import {
 	accessor,
 	assign,
@@ -27,6 +26,7 @@ import { docOf, docParagraphs } from "./sdk-decl.ts"
 import type { JavaHeaders } from "./sdk-headers.ts"
 import { putFile } from "./sdk-models.ts"
 import { answerOf, type OpEnv, paragraphsOf } from "./sdk-op.ts"
+import { connectionOf } from "./realtime.ts"
 import { paramsName } from "./sdk-params.ts"
 import {
 	blocks,
@@ -38,13 +38,14 @@ import {
 	resourceName,
 	type SurfaceEnv,
 } from "./sdk-client.ts"
-import { eventTypeOf } from "./sse.ts"
+import { sseEventOf } from "./sse.ts"
+import { wsSocketOf } from "./ws.ts"
 
 /** The type the normal method answers: a stream's, a connection's, or the answer's (`void` for none). */
 function returnsOf(op: SdkOp, env: OpEnv): string {
-	if (op.stream === "sse") return `EventStream<${eventTypeOf(op, env.ctx)}>`
-	if (op.stream === "ws") return "TypedWebSocket"
-	if (op.stream === "realtime") return `ResumableConnection<${messageTypeOf(op, env.ctx)}>`
+	if (op.stream === "sse") return `EventStream<${sseEventOf(op, env.ctx).type}>`
+	if (op.stream === "ws") return wsSocketOf(op, env.ctx).type
+	if (op.stream === "realtime") return connectionOf(op, env.ctx).type
 	return answerOf(op, env).type
 }
 

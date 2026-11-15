@@ -38,6 +38,8 @@ const consumer = (url: string, body: string) => `package probe;
 import com.example.*;
 import java.util.List;
 import java.util.concurrent.*;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 public class Probe {
   static final String BASE = "${url}";
@@ -72,9 +74,9 @@ describe.skipIf(!JAVA)("a WebSocket method: its types, through javac", SLOW, () 
 	/* new: C# ws.test.ts:127 (a socket has no event id; the fold claims no reconnectToken2) */
 	it("types the method, the reads, the handlers, closedBy and subprotocol; has no lastEventId and no reconnectToken2", () => {
 		const lines = [
-			`TypedWebSocket w = c.rooms().socket(${ROOMS}.build());`,
-			`TypedWebSocket s = c.rooms().socket(${ROOMS}.since(3L).protocols(List.of("v2")).reconnectToken("t").build());`,
-			'TypedWebSocket p = c.plain().socket(PlainSocketParams.builder().protocols(List.of("v1")).reconnectToken("t").build());',
+			`TypedWebSocket<WsMessage, JsonNode> w = c.rooms().socket(${ROOMS}.build());`,
+			`TypedWebSocket<WsMessage, JsonNode> s = c.rooms().socket(${ROOMS}.since(3L).protocols(List.of("v2")).reconnectToken("t").build());`,
+			'TypedWebSocket<WsMessage, JsonNode> p = c.plain().socket(PlainSocketParams.builder().protocols(List.of("v1")).reconnectToken("t").build());',
 			"AutoCloseable d = w;",
 			"WsMessage m = w.receive();",
 			"WsMessage.Type kind = m.type();",
@@ -86,9 +88,9 @@ describe.skipIf(!JAVA)("a WebSocket method: its types, through javac", SLOW, () 
 			"w.onMessage(message -> note(message.text()));",
 			"w.onClosed(close -> note(close.reason()));",
 			"w.onError(error -> note(error.getMessage()));",
-			'w.send("t");',
-			"w.send(new byte[] {1});",
-			"w.sendJson(List.of(1));",
+			'w.sendText("t");',
+			"w.sendBinary(new byte[] {1});",
+			"w.send(JsonNodeFactory.instance.arrayNode().add(1));",
 			'w.close(4401, "x");',
 			"w.close();",
 			`c.rooms().socket(${ROOMS}.lastEventId("x").build());`,
@@ -106,7 +108,7 @@ describe.skipIf(!JAVA)("a WebSocket method: its types, through javac", SLOW, () 
 describe.skipIf(!JAVA)("a TypedWebSocket through the public API", SLOW, () => {
 	/* new: C# ws.test.ts:137 */
 	it("is an AutoCloseable whose try-with-resources closes 1000", async () => {
-		const body = `try (TypedWebSocket w = c.rooms().socket(${ROOMS}.build())) {
+		const body = `try (TypedWebSocket<WsMessage, JsonNode> w = c.rooms().socket(${ROOMS}.build())) {
   note(w.getClass().getSimpleName());
 }`
 		const { out, ran, streams } = await consume([ws([])], body)
@@ -122,10 +124,10 @@ describe.skipIf(!JAVA)("a TypedWebSocket through the public API", SLOW, () => {
 
 	/* new: C# ws.test.ts:255 */
 	it("exposes the server's choice as subprotocol(), null when it picked none", async () => {
-		const body = `TypedWebSocket w = c.plain().socket(PlainSocketParams.builder().protocols(List.of("v2", "v1")).build());
+		const body = `TypedWebSocket<WsMessage, JsonNode> w = c.plain().socket(PlainSocketParams.builder().protocols(List.of("v2", "v1")).build());
 note(w.subprotocol());
 w.close();
-TypedWebSocket bare = c.plain().socket(PlainSocketParams.builder().build());
+TypedWebSocket<WsMessage, JsonNode> bare = c.plain().socket(PlainSocketParams.builder().build());
 note(bare.subprotocol());
 bare.close();`
 		const { out, ran } = await consume([ws([], "v1"), ws([])], body)
@@ -134,11 +136,11 @@ bare.close();`
 
 	/* new: C# ws.test.ts:295 */
 	it("throws a send on an ended socket without the payload in its message or toString()", async () => {
-		const body = `TypedWebSocket w = c.rooms().socket(${ROOMS}.build());
+		const body = `TypedWebSocket<WsMessage, JsonNode> w = c.rooms().socket(${ROOMS}.build());
 note(w.receive());
 String secret = "SECRET-" + "x".repeat(64);
 try {
-  w.send(secret);
+  w.sendText(secret);
   note("sent");
 } catch (RuntimeException e) {
   note(e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -156,7 +158,7 @@ w.close();`
 describe.skipIf(!JAVA)("a TypedWebSocket's closes, through the public API (K6, W9)", SLOW, () => {
 	/* new: C# ws.test.ts:333 (W10: the JDK's own echo drops the reason; the SDK echoes it) */
 	it("echoes the server's close at once with its code and reason, the client never closing", async () => {
-		const body = `TypedWebSocket w = c.plain().socket(PlainSocketParams.builder().build());
+		const body = `TypedWebSocket<WsMessage, JsonNode> w = c.plain().socket(PlainSocketParams.builder().build());
 note(w.receive());
 Thread.sleep(500);`
 		const { out, ran, streams } = await consume([ws([{ close: { code: 1001, reason: "bye" } }])], body)
@@ -166,7 +168,7 @@ Thread.sleep(500);`
 
 	/* new: C# ws.test.ts:344 (W9 ruling: the cut never splits a code point; "é" would end at byte 124) */
 	it("fires Closed with the client's own code and reason, cut at 123 bytes on a code point, a throwing handler ignored", async () => {
-		const body = `TypedWebSocket w = c.plain().socket(PlainSocketParams.builder().build());
+		const body = `TypedWebSocket<WsMessage, JsonNode> w = c.plain().socket(PlainSocketParams.builder().build());
 w.onClosed(by -> {
   throw new IllegalStateException("boom");
 });
@@ -182,9 +184,9 @@ note(w.receive());`
 	/* new: C# ws.test.ts:388 (W6: the timeout bounds the handshake alone; the keepalive's 20 s is far past the idle) */
 	it("lets an open socket idle past the timeout: no read bound once it opened", async () => {
 		const body = `ExampleClient timed = ExampleClient.builder().baseUrl(BASE).timeout(java.time.Duration.ofMillis(300)).build();
-TypedWebSocket warm = timed.rooms().socket(${ROOMS}.build(), RequestOptions.builder().timeout(java.time.Duration.ZERO).build());
+TypedWebSocket<WsMessage, JsonNode> warm = timed.rooms().socket(${ROOMS}.build(), RequestOptions.builder().timeout(java.time.Duration.ZERO).build());
 warm.close();
-TypedWebSocket w = timed.rooms().socket(${ROOMS}.build());
+TypedWebSocket<WsMessage, JsonNode> w = timed.rooms().socket(${ROOMS}.build());
 note(w.receive().text());
 w.close();`
 		const { out, ran } = await consume([ws([]), ws([{ waitMs: 1000 }, { json: { late: true } }])], body)
@@ -194,7 +196,7 @@ w.close();`
 	/* new: C# ws.test.ts:458 */
 	it("closes from the main thread a socket dialed on one thread and read on another", async () => {
 		const body = `ExecutorService pool = Executors.newFixedThreadPool(2);
-TypedWebSocket w = pool.submit(() -> c.rooms().socket(${ROOMS}.build())).get();
+TypedWebSocket<WsMessage, JsonNode> w = pool.submit(() -> c.rooms().socket(${ROOMS}.build())).get();
 WsMessage m = pool.submit(w::receive).get();
 note(m.text());
 try {

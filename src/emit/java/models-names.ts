@@ -22,6 +22,8 @@ export type JavaTypeNames = {
 	/** the schema of the component `name` when Java declares nothing for it, so a ref to it is its use type */
 	alias(name: string): IRSchema | undefined
 	resolve(schema: IRSchema): IRSchema
+	/** whether `name` is held: by the runtime, a type the SDK spells, `taken`, or a declaration claimed so far */
+	has(name: string): boolean
 	/** each component emitted under another name than its own (`<Name>Model`), for the generation's notices */
 	readonly renamed: readonly Rename[]
 }
@@ -113,6 +115,7 @@ export function javaNames(
 			const schema = schemas[name] ?? UNKNOWN
 			return declares(schema) ? undefined : schema
 		},
+		has: (name) => scope.has(name),
 		hoist: (key, base) => {
 			const name = hoisted.get(key) ?? scope.claim(base)
 			hoisted.set(key, name)

@@ -369,6 +369,81 @@ public Task<TypedWebSocket> EchoAsync(...)                    // an operation wi
 public Task<ResumableConnection<JsonElement, JsonElement>> EchoAsync(...)  // an untyped realtime operation
 ```
 
+## The Java SDK's stream types are typed in what they read and send
+
+`EventStream<E>` yields the event itself: an untyped stream's `EventStream<String>` is `EventStream<SseEvent<String>>`,
+and a typed one's `EventStream<T>` is `EventStream<SseEvent<T>>`. `TypedWebSocket` is `TypedWebSocket<TIn, TOut>` and
+`ResumableConnection<T>` is `ResumableConnection<TIn, TOut>`. Java has no default type parameters and cannot overload a
+class by its type arity, and one generic type beats a second family of renamed classes, so every untyped spelling
+changes: an operation without messages answers `TypedWebSocket<WsMessage, JsonNode>` (was `TypedWebSocket`) and
+`ResumableConnection<JsonNode, JsonNode>` (was `ResumableConnection<JsonNode>`). An operation the document types now
+answers its own types:
+
+- An SSE operation with named events yields `EventStream<<Op>Event>`: a sealed interface with one nested record per
+  event name, each holding `data`, `event`, `id` and `retry`, and `Unknown` for a name it does not declare, its `data`
+  as text. An `instanceof` match reads `data()` typed. An unnamed event is `message`. A declared JSON event that does
+  not decode throws `DecodeException` and ends the stream, as before. A nested name that clashes takes the suffix
+  `Event`, as an event named `string` is `StringEvent`.
+- A WebSocket operation with declared messages answers `TypedWebSocket<TIn, TOut>`: `receive()` returns `TIn`, null
+  once the socket ended, `send(TOut)` sends it as JSON, and `onMessage`, `onClosed` and `onError` take its handlers. A
+  frame that is not JSON throws `DecodeException` from `receive()`, reaches `onError`, and the next `receive()` reads
+  on; a binary frame on a typed read side decodes as UTF-8 JSON, and a socket that declares no read side keeps
+  `WsMessage`.
+- A realtime operation with declared messages answers `ResumableConnection<TIn, TOut>`: `receive()` and the for-each
+  yield `TIn`, `send(TOut)` sends it as JSON, and `onMessage` runs as each message is read. A message that is not JSON
+  or does not decode throws `DecodeException` once from `receive()` or the iterator's `hasNext()`, which reads ahead,
+  the cursor already past it, and the next read reads on; an untyped connection still reads a non-JSON message as a
+  JSON string.
+- `sendJson(Object)`, `send(String)` and `send(byte[])` are gone from both: send a `TOut`, a `JsonNode` on an untyped
+  socket or connection, `sendText(String)` for text as is and `sendBinary(byte[])` for bytes. `send(TOut)` would clash
+  with `send(String)` when `TOut` is `String`, so the raw sends took new names, and an old `socket.send("raw")` no
+  longer compiles instead of sending a JSON string.
+- When the server's messages are a union keyed on one field, the read side is the sealed interface Java already
+  declares for it, a wrapper record per member and `<Union>Unknown(JsonNode value)` for a value the operation does not
+  declare, and the answer is `<Read>Socket<TOut>` or `<Read>Connection<TOut>`, whose `on<Value>(Consumer<Member>)` takes
+  a handler of that member's type, run inside the read, and returns the socket or the connection. A member named like a
+  handler (`message`, `closed`, `error`; on realtime only `message`) is heard only through `onMessage`.
+
+```text v0
+public EventStream<String> list(OutSseListParams params)        // Iterable<SseEvent<String>>, data as text
+public EventStream<String> list(...)                            // untyped
+public TypedWebSocket talk(WsTalkParams params)                 // receive(): WsMessage bytes; send(String), send(byte[]), sendJson(Object)
+public ResumableConnection<JsonNode> room(RtRoomParams params)  // receive(): JsonNode; a non-JSON message read as a JSON string; sendJson(Object)
+public TypedWebSocket echo(WsEchoParams params)                 // an operation without messages
+socket.send("raw"); socket.send(bytes); socket.sendJson(value);
+```
+
+```text
+public EventStream<OutSseListEvent> list(OutSseListParams params)    // yields OutSseListEvent: Data, Heartbeat, Unknown
+public EventStream<SseEvent<String>> list(...)                       // untyped
+public WsTalkSendSocket<WsTalkReceive> talk(WsTalkParams params)     // extends TypedWebSocket<WsTalkSend, WsTalkReceive>
+public RtRoomSendConnection<RtRoomReceive> room(RtRoomParams params) // extends ResumableConnection<RtRoomSend, RtRoomReceive>
+public TypedWebSocket<WsMessage, JsonNode> echo(WsEchoParams params) // an operation without messages
+public ResumableConnection<JsonNode, JsonNode> echo(...)             // an untyped realtime operation
+socket.sendText("raw"); socket.sendBinary(bytes); socket.send(node); // node: a JsonNode
+```
+
+```text v0
+for (SseEvent<String> e : client.ticks().stream(params)) System.out.println(e.data()); // data as text
+chat.sendJson(new Say("hi", "say"));
+```
+
+```java
+      for (TicksStreamEvent event : stream) {
+        if (event instanceof TicksStreamEvent.TickEvent tick) {
+          at.add(tick.data().at()); // the name picks the type: data() is a Tick
+        } else if (event instanceof TicksStreamEvent.Unknown other) {
+          System.out.println(other.event() + ": " + other.data());
+        }
+      }
+```
+
+```java
+      chat.onSaid(message -> System.out.println(message.text()));
+      chat.onError(error -> System.err.println(error.getMessage()));
+      chat.send(new ChatInSay(new Say("hi", "say"))); // a member of ChatIn, sent as JSON
+```
+
 ## The TS SDK's realtime `token?` and `onAuthExpired?` are gone
 
 Neither was ever read. A connection's `headers` may be a function read on every dial, and the client's

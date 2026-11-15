@@ -133,8 +133,21 @@ import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts"
  * - RequestOptions.java +132: `boxed(RawResponse)`, the caller's overrides with the twin's raw box;
  * - Decode.java -131: the body null past the cap, `exceeds` its one text; Exchange.java -6: `dial = true`.
  * Plan 55, +61 B to 154,755 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
+ * Backend plan 14, +6,317 B to 161,072 B: typed event streams, sockets and realtime connections. Dead code first:
+ *   `sendJson(Object)`, `send(String)` and `send(byte[])` are cut from both, EventStream's `decoded` folds into the
+ *   whole-event decode, Socket's own onMessage list moves to the socket that decodes, and a scan finds no runtime
+ *   function in the changed files without a caller. TypedWebSocket.java +2,167 (`TypedWebSocket<TIn, TOut>` over a
+ *   frame reader, `json` parsing a frame before it decodes, a decode error thrown from `receive` and fired at
+ *   onError, `send(TOut)`, `sendText`, `sendBinary`, the protected sharing constructor), ResumableConnection.java
+ *   +1,873 (`ResumableConnection<TIn, TOut>`, `send(TOut)`, `sendText`, onMessage run inside the read, the sharing
+ *   constructor, the strict `deliver` advancing the cursor before it decodes), Realtime.java +1,034 (`typed` beside
+ *   `open`, one `connected` setting `strict`; the socket and the stream at their untyped spellings),
+ *   EventStream.java +877 (`EventStream<E>` over a whole-event decode, `typed`, `data` and `nameOf` for the
+ *   named decode, the cursor taken before it decodes), WsDial.java +179 (the frame reader), Socket.java +106
+ *   (`report`, `run` shared with the socket and the connection), WsAdapter.java +66, Exchange.java +27,
+ *   SseAdapter.java +10, Flight.java -22 (the decode `Function` for the `TypeReference`).
  */
-const JAVA_RUNTIME_BYTES = 154755
+const JAVA_RUNTIME_BYTES = 161072
 
 describe("the Java runtime within its byte budget (bit 16, the G14 analog)", () => {
 	it(
@@ -179,6 +192,9 @@ const readJava = (app: string) => {
  * over it is fixed in the schema, never by raising the ceiling.
  * Plan 9 re-measured it over the backend's refreshed documents (76 surfaces): max 79 (kitchen/realtime.chat.connect), so
  * 79 + 20% = 95.
+ * Backend plan 14 types the stream answers, so a connection names what it reads and sends: max 85
+ * (kitchen/realtime.chat.connect, `ResumableConnection<JsonNode, JsonNode>` in the signature and the twin's), under
+ * 95, which stays.
  */
 const JAVA_SDK_CEILING = ceilingOf([79], HEADROOM)
 
@@ -259,8 +275,8 @@ describe("the v1 Java SDK within the budget (bit 16, G13)", () => {
 		expect({ at, ceiling: JAVA_SDK_CEILING, derived: ceilingOf([tokens], HEADROOM), tokens }).toEqual({
 			at: "kitchen/realtime.chat.connect",
 			ceiling: 95,
-			derived: 95,
-			tokens: 79,
+			derived: 102,
+			tokens: 85,
 		})
 	})
 })

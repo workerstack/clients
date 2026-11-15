@@ -112,7 +112,7 @@ import java.util.List;
 import java.util.concurrent.*;
 
 final class SocketProbe {
-  static List<String> ends(TypedWebSocket w) {
+  static List<String> ends(TypedWebSocket<?, ?> w) {
     List<String> runs = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
     w.onClosed(c -> runs.add("closed " + c.status() + " " + c.reason()));
     w.onError(e -> runs.add("error " + e.getMessage()));
@@ -146,9 +146,12 @@ ${FAKE}
 		return run.stdout.split("\n").filter((line) => line !== "")
 	}
 
-/** A socket over a fresh fake, its keepalive every `ms` ms, opened; `w` its TypedWebSocket, `runs` its ends. */
+/**
+ * A socket over a fresh fake, its keepalive every `ms` ms, opened; `w` its untyped TypedWebSocket, each frame read as it
+ * came, `runs` its ends.
+ */
 export const OPEN = (ms: number) => `Fake fake = new Fake();
 Socket socket = new Socket(Duration.ofMillis(${ms}));
-TypedWebSocket w = new TypedWebSocket(socket);
+TypedWebSocket<WsMessage, tools.jackson.databind.JsonNode> w = new TypedWebSocket<>(socket, m -> m);
 List<String> runs = ends(w);
 socket.onOpen(fake);`

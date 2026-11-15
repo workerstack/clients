@@ -5,12 +5,13 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * A realtime call (bit 16 phase d2b; C#'s Stream.cs LiveAsync): each grid {@code send} as its JSON
- * value through sendJson, else as text, until the first error; then {@code take} values read by
- * receive (Protocol refuses a realtime call without one), a read's error also kept in {@code
- * realtime.errors}; a connection that ends first ends them quietly. A send's error is observed as
- * a call's (Observe.graded, a DecodeException on the call's raw box: the connection's 2xx, since a
- * send's error holds no response). Then close(), and the trace: the frames, the cursor the options
- * settled on (null as ""), the proven transport and the read errors.
+ * value through send (an untyped connection's JsonNode), else through sendText, until the first
+ * error; then {@code take} values read by receive (Protocol refuses a realtime call without one), a
+ * read's error also kept in {@code realtime.errors}; a connection that ends first ends them
+ * quietly. A send's error is observed as a call's (Observe.graded, a DecodeException on the call's
+ * raw box: the connection's 2xx, since a send's error holds no response). Then close(), and the
+ * trace: the frames, the cursor the options settled on (null as ""), the proven transport and the
+ * read errors.
  */
 final class Live {
   private Live() {}
@@ -70,16 +71,16 @@ final class Live {
     return value == null ? "" : (String) value;
   }
 
-  /** The grid's sends, a JSON text through sendJson and any other as text; the first error. */
+  /** The grid's sends, a JSON text through send and any other through sendText; the first error. */
   private static RuntimeException sent(Object conn, JsonNode call) {
     try {
       for (JsonNode item : Wire.items(Wire.member(call, "send"))) {
         String text = item.asString();
         JsonNode json = parsed(text);
         if (json == null) {
-          Reflect.call(conn, "send", text);
+          Reflect.call(conn, "sendText", text);
         } else {
-          Reflect.call(conn, "sendJson", Wire.JSON.convertValue(json, Object.class));
+          Reflect.call(conn, "send", json);
         }
       }
       return null;
@@ -99,7 +100,10 @@ final class Live {
     }
   }
 
-  /** Values read into {@code read} until {@code take}, a null ending them; the error that ended them. */
+  /**
+   * Values read into {@code read} until {@code take}, a null ending them; the error that ended
+   * them.
+   */
   private static RuntimeException received(
       Streams.At at, Object conn, JsonNode take, ArrayNode read) {
     try {

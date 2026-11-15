@@ -79,7 +79,7 @@ ${body
 `
 
 /** The release point: the text stream opened and read on `c`, its answer held until stream 0's client left. */
-const NEXT = `try (EventStream<String> next = c.text().stream(TextStreamParams.builder().build())) {
+const NEXT = `try (EventStream<SseEvent<String>> next = c.text().stream(TextStreamParams.builder().build())) {
   for (SseEvent<String> ev : next) {
     note(ev.data());
   }
@@ -100,7 +100,7 @@ async function released(first: Reply, body: string, jdk: 17 | 21 = 21) {
 }
 
 /** A typed stream's read pending on another thread while the main thread closes it; the next open is the release point. */
-const CLOSED = `EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build());
+const CLOSED = `EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build());
 Iterator<SseEvent<Tick>> e = s.iterator();
 note(e.next().data().n());
 ExecutorService pool = Executors.newSingleThreadExecutor();
@@ -121,7 +121,7 @@ describe.skipIf(!JAVA)("an EventStream closed under a pending read", SLOW, () =>
 })
 
 /** R1: one event, then `break` inside try-with-resources; the next open on `c` timed. */
-const BROKEN = `try (EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build())) {
+const BROKEN = `try (EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build())) {
   for (SseEvent<Tick> ev : s) {
     note(ev.data().n());
     break;
@@ -132,13 +132,13 @@ ${NEXT}
 note("ms " + (System.nanoTime() - clock) / 1_000_000);`
 
 /** R2: the stream opened and left by try-with-resources, never read. */
-const UNREAD = `try (EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build())) {
+const UNREAD = `try (EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build())) {
   note("opened" + s.lastEventId());
 }
 ${NEXT}`
 
 /** R3: the reader's thread interrupted at 300 ms under a pending read; nothing closed; 3 s for the read to end. */
-const INTERRUPTED = `EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build());
+const INTERRUPTED = `EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build());
 Iterator<SseEvent<Tick>> e = s.iterator();
 note(e.next().data().n());
 ExecutorService pool = Executors.newSingleThreadExecutor();
@@ -150,7 +150,7 @@ ${NEXT}
 Reference.reachabilityFence(s);`
 
 /** R4: a typed stream whose first event does not decode, read by hand and never closed. */
-const UNDECODED = `EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build());
+const UNDECODED = `EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build());
 Iterator<SseEvent<Tick>> e = s.iterator();
 try {
   while (e.hasNext()) {
@@ -177,7 +177,7 @@ try {
 ${NEXT}`
 
 /** R7: the leak: one event read, then the stream kept open and reachable past the next open. */
-const KEPT = `EventStream<Tick> s = c.ticks().stream(TicksStreamParams.builder().build());
+const KEPT = `EventStream<SseEvent<Tick>> s = c.ticks().stream(TicksStreamParams.builder().build());
 Iterator<SseEvent<Tick>> e = s.iterator();
 note(e.next().data().n());
 ${NEXT}

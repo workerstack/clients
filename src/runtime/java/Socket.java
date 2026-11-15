@@ -25,7 +25,8 @@ import java.util.function.Function;
  * A WebSocket as the SDK holds it: the JDK's listener, assembling each message's partials up to 16
  * MiB and asking for more only as the reader takes what waits (no background reader); the one send
  * gate every frame goes through, since the JDK fails a frame sent beside another; and the socket's
- * one end, which fires exactly one of Closed or Error, once.
+ * one end, which fires exactly one of Closed or Error, once; a frame that does not decode fires
+ * Error besides, the socket still open.
  */
 final class Socket implements WebSocket.Listener {
   private static final int CAP = 16 << 20;
@@ -40,7 +41,6 @@ final class Socket implements WebSocket.Listener {
   private final Semaphore gate = new Semaphore(1);
   private final AtomicBoolean ended = new AtomicBoolean();
   private final CountDownLatch echo = new CountDownLatch(1);
-  final List<Consumer<WsMessage>> onMessage = new CopyOnWriteArrayList<>();
   final List<Consumer<WsClose>> onClosed = new CopyOnWriteArrayList<>();
   final List<Consumer<java.lang.Exception>> onError = new CopyOnWriteArrayList<>();
   volatile WebSocket ws;
@@ -219,7 +219,12 @@ final class Socket implements WebSocket.Listener {
     }
   }
 
-  private static <T> void run(Consumer<T> handler, T value) {
+  /** A frame that does not decode: Error fired, the socket still open. */
+  void report(RuntimeException error) {
+    onError.forEach(handler -> run(handler, error));
+  }
+
+  static <T> void run(Consumer<T> handler, T value) {
     try {
       handler.accept(value);
     } catch (RuntimeException e) {
@@ -237,7 +242,6 @@ final class Socket implements WebSocket.Listener {
       throw new CancellationException("the read was canceled");
     }
     if (item instanceof WsMessage message) {
-      onMessage.forEach(handler -> run(handler, message));
       if (!ended.get()) {
         ws.request(1);
       }
