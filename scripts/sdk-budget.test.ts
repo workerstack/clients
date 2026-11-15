@@ -638,8 +638,10 @@ describe("the Go runtime within its byte budget (bit 12, G14)", () => {
  *   `recv`, the untyped public opens split from the crate's typed one), events.rs +1,031 (`EventStream<E>` over a
  *   whole-event decode, `Named` and `named_data` naming the event), realtime_loop.rs +1,002 (`deliver` advancing the
  *   cursor before it decodes, the run split into `connect` and `typed`), transport_ws.rs +63, transport_sse.rs -8.
+ * Backend plan 18, +102 B to 144,911 B: sse.rs, `SseEvent` derives `Serialize`, as each `<Op>Event` does, so one
+ *   reader takes any stream's events as `{data, event, id, retry}`.
  */
-const RUST_RUNTIME_BYTES = 144_809
+const RUST_RUNTIME_BYTES = 144_911
 
 describe("the Rust runtime within its byte budget (bit 13, G14)", () => {
 	it(

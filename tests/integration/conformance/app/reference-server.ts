@@ -38,7 +38,7 @@ function positionOf(cursor: string | null | undefined): number {
 function relay(follow: (position: number, deliver: Listener) => () => void) {
 	return async (stream: SSEStream): Promise<void> => {
 		const stop = follow(positionOf(stream.lastEventId), (event) => {
-			void stream.send({ data: JSON.stringify(event.data), event: "message", id: String(event.id) })
+			void stream.send({ data: Payload.parse(event.data), event: "message", id: String(event.id) })
 		})
 		try {
 			if (!stream.signal.aborted) {

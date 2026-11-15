@@ -2,8 +2,9 @@
  * An SSE operation's answer (contract 20 §2.0–2.1) and its Opts' `last_event_id`, sent as Last-Event-ID only
  * when set and non-empty; a declared Last-Event-ID header param is folded into that field (Fd3). An operation that
  * names its events (D7) answers `EventStream<<Op>Event>`: an enum with one variant per event name, holding
- * `SseEvent<Data>` decoded by its name, and `Unknown(SseEvent<String>)` for a name it does not declare. Any other
- * answers `EventStream<SseEvent<T>>`, `T` the declared event schema's type, or `EventStream` for untyped events.
+ * `SseEvent<Data>` decoded by its name, and `Unknown(SseEvent<String>)` for a name it does not declare; it serializes
+ * as the `SseEvent` it holds (`{data, event, id, retry}`), so one reader takes any stream's events. Any other answers
+ * `EventStream<SseEvent<T>>`, `T` the declared event schema's type, or `EventStream` for untyped events.
  */
 import type { IRSchema, IRSseEvent } from "../../ir/model.ts"
 import { isJsonEventData, type SdkOp, sseEvents } from "../../ir/sdk-model.ts"
@@ -56,10 +57,11 @@ function namedEvents(op: SdkOp, events: readonly IRSseEvent[], at: RustTypeConte
 		name,
 		[
 			...lineComment(
-				`One event of ${op.id}: ${list}, or \`Unknown\` for a name the operation does not declare, its data as sent. A match on it reads the event's data.`,
+				`One event of ${op.id}: ${list}, or \`Unknown\` for a name the operation does not declare, its data as sent. A match on it reads the event's data; it serializes as the \`SseEvent\` it holds.`,
 				"///",
 			),
-			"#[derive(Debug, Clone, PartialEq)]",
+			"#[derive(Debug, Clone, PartialEq, serde::Serialize)]",
+			"#[serde(untagged)]",
 			`pub enum ${name} {`,
 			...variants.map((v) => `    ${v.variant}(crate::SseEvent<${v.data}>),`),
 			"    Unknown(crate::SseEvent<String>),",

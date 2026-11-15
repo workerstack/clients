@@ -9,8 +9,9 @@ use crate::errors::Error;
 const MAX_LINE: usize = 1 << 20;
 const MAX_EVENT: usize = 8 << 20;
 
-/// One server-sent event. `id` is the last event id seen on the stream so far, to resume from.
-#[derive(Debug, Clone, Default, PartialEq)]
+/// One server-sent event. `id` is the last event id seen on the stream so far, to resume from. It
+/// serializes as `{data, event, id, retry}`, as an operation's event enum does.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct SseEvent<T = String> {
     pub data: T,
     pub event: String,

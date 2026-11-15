@@ -32,17 +32,18 @@ pub fn streamed(
     Ok(outcome)
 }
 
-/// An SSE operation's `EventStream<SseEvent<T>>`, read until `take` events (absent: until its end), then
+/// An SSE operation's `EventStream<E>`, `E` an `SseEvent<T>` or a typed stream's `<Op>Event` (read
+/// through the `Serialize` both have), read until `take` events (absent: until its end), then
 /// dropped, which closes it. A yielded error is kept (the first) and the reads carry on, as Go's
 /// driver does, so a stream that does not end after its error shows in `yields`. The trace holds
 /// the yields (events and errors), each event's `retry` (null when unset) and the typed headers
 /// that were sent.
-pub async fn observe_events<T, S, H>(
-    p: Prepared<sdk::EventStream<sdk::SseEvent<T>>, S, H>,
+pub async fn observe_events<E, S, H>(
+    p: Prepared<sdk::EventStream<E>, S, H>,
     take: Option<u64>,
 ) -> Result<Outcome, String>
 where
-    T: Serialize + Send + 'static,
+    E: Serialize + Send + 'static,
     S: Settles,
     H: 'static,
 {
@@ -70,8 +71,9 @@ where
         match item {
             Ok(event) => {
                 ended = None;
-                retry.push(json!(event.retry));
-                events.push(event_of(event)?);
+                let (event, retried) = event_of(event)?;
+                retry.push(retried);
+                events.push(event);
             }
             Err(e) => {
                 if error.is_none() && !events.is_empty() {
@@ -102,17 +104,22 @@ fn no_answer(e: &sdk::Error) -> Option<&'static str> {
     }
 }
 
-/// An event as the grid observes it: its data as JSON (a string for text events), its event name
-/// and id only when set.
-fn event_of<T: Serialize>(e: sdk::SseEvent<T>) -> Result<Value, String> {
-    let data = serde_json::to_value(e.data).map_err(|e| format!("encode an event's data: {e}"))?;
+/// An event as the grid observes it, from the `{data, event, id, retry}` it serializes as: its data
+/// as JSON (a string for text events), its event name and id only when set; and its `retry` (null
+/// when unset).
+fn event_of<E: Serialize>(e: E) -> Result<(Value, Value), String> {
+    let mut e = match serde_json::to_value(e) {
+        Ok(Value::Object(e)) => e,
+        Ok(other) => return Err(format!("an event serialized as {other}, not as an SseEvent")),
+        Err(err) => return Err(format!("encode an event: {err}")),
+    };
+    let data = e.remove("data").ok_or("an event serialized without its data")?;
     let mut out = Map::new();
     out.insert("data".into(), data);
-    if !e.event.is_empty() {
-        out.insert("event".into(), json!(e.event));
+    for key in ["event", "id"] {
+        if let Some(v) = e.remove(key).filter(|v| v.as_str().is_some_and(|s| !s.is_empty())) {
+            out.insert(key.into(), v);
+        }
     }
-    if !e.id.is_empty() {
-        out.insert("id".into(), json!(e.id));
-    }
-    Ok(Value::Object(out))
+    Ok((Value::Object(out), e.remove("retry").unwrap_or(Value::Null)))
 }
