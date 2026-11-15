@@ -12,11 +12,12 @@ import refs from "../../../ir/__fixtures__/specs/python/refs.json" with { type: 
 import reservedWords from "../../../ir/__fixtures__/specs/python/reserved-words.json" with { type: "json" }
 import integerEnumStatus from "../../../ir/__fixtures__/specs/go/integer-enum-status.json" with { type: "json" }
 import nullablePrimitive from "../../../ir/__fixtures__/specs/go/nullable-primitive.json" with { type: "json" }
-import { docsDocument } from "../../shared/__fixtures__/docs-blocks.ts"
+import { docsStreamsDocument } from "../../shared/__fixtures__/docs-blocks.ts"
 import { longNames } from "../../shared/__fixtures__/documents-long.ts"
 import { errors } from "../../shared/__fixtures__/documents-http.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
 import { merged } from "../../shared/__fixtures__/merge.ts"
+import { typedStreams } from "../../shared/__fixtures__/documents-typed.ts"
 import type { CSharpSdkOptions } from "../sdk.ts"
 import { csharpHttp } from "./documents-http.ts"
 import { csharpRealtime } from "./documents-streams.ts"
@@ -143,8 +144,8 @@ export const FIXTURES = {
 		},
 	},
 	/** the declared error keys (Fc3): bit 13's `errors` document, shared (contract 47 §4.1) */
-	/** the docs' examples: the Kitchen e2e app's document (docs/sdk-recipes.md, docs/examples/) */
-	docs: { document: docsDocument },
+	/** the docs' examples: the Kitchen app's document, typed streams beside it (docs/sdk-recipes.md, docs/examples/) */
+	docs: { document: docsStreamsDocument },
 	errors: { document: errors },
 	fixtures: { document: fixtures },
 	/** the HTTP runtime's document (contract 47 §4.1): bit 13's `http`, the extra paths and `merge.patch`, both styles */
@@ -163,6 +164,8 @@ export const FIXTURES = {
 	sse: { document: streams.sse },
 	/** the call surface; every gate exercises the package and namespace rename (→ `AcmeClient`, `AcmeJsonContext`) */
 	surface: { document: surface, options: { packageId: "Acme.Sdk", rootNamespace: "Acme" } },
+	/** the declared events and messages (D7, D9): every typed stream shape the `*.typed.test.ts` legs compile and drive */
+	typed: { document: typedStreams },
 	/** no `servers` (R7), and every option at its default (`HttpSdk`, `HttpSdkClient`) */
 	types: { document: types },
 	/** the WebSockets (contract 50 §4.1): bit 13's `ws` document, shared; a WebSocket-only SDK ships no realtime files */

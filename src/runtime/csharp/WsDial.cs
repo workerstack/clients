@@ -2,12 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,6 +20,10 @@ internal sealed partial class Transport
     public async Task<TypedWebSocket> SocketAsync(Operation op, Call call, IReadOnlyList<string>? protocols, string? reconnectToken, CancellationToken cancellationToken) =>
         (await WsDial.DialAsync(this, new Exchange(this, op, call with { Query = [.. call.Query, Arg.Text("reconnect_token", reconnectToken)] }, stream: true), protocols ?? [], cancellationToken).ConfigureAwait(false))
             .Bound(cancellationToken);
+
+    /* a socket whose messages are declared: read as TIn, sent as TOut */
+    public async Task<TypedWebSocket<TIn, TOut>> TypedSocketAsync<TIn, TOut>(Operation op, Call call, IReadOnlyList<string>? protocols, string? reconnectToken, JsonTypeInfo<TIn> read, JsonTypeInfo<TOut> write, CancellationToken cancellationToken) =>
+        new(await SocketAsync(op, call, protocols, reconnectToken, cancellationToken).ConfigureAwait(false), read, write);
 }
 
 internal static class WsDial
@@ -42,7 +48,7 @@ internal static class WsDial
                 throw new ApiConnectionException($"the WebSocket handshake failed: {refusal}");
             }
             x.Raw?.Fill(101, headers, [], SocketUrl(url));
-            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            var stream = Connection(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false));
             var options = new WebSocketCreationOptions { SubProtocol = chosen, KeepAliveInterval = KeepAlive, KeepAliveTimeout = KeepAlive };
             return new TypedWebSocket(WebSocket.CreateFromStream(stream, options), chosen, response);
         }
@@ -52,6 +58,18 @@ internal static class WsDial
             throw;
         }
     }
+
+    /*
+     * a 101's content is the connection, no coded body: a handler's decoder over it for a Content-Encoding is
+     * read-only, so the dial takes what lies beneath; .NET's deflate decoder exposes nothing beneath it
+     */
+    private static Stream Connection(Stream stream) => stream switch
+    {
+        GZipStream gzip => gzip.BaseStream,
+        BrotliStream brotli => brotli.BaseStream,
+        { CanWrite: false } => throw new ApiConnectionException("the WebSocket handshake failed: the handler decoded the 101's content, so the connection is read-only"),
+        _ => stream,
+    };
 
     private static Uri SocketUrl(Uri url) => new UriBuilder(url) { Scheme = url.Scheme == Uri.UriSchemeHttps ? "wss" : "ws" }.Uri;
 

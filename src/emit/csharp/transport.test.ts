@@ -51,8 +51,8 @@ const CORE = [
 	"Wire.cs",
 ]
 
-/** What a WebSocket or realtime API adds (contract 50 §2): the socket and its dial, both after the core's last file. */
-const WS = ["Ws.cs", "WsDial.cs"]
+/** What a WebSocket or realtime API adds (contract 50 §2): the socket, its dial and its typed face, after the core's last file. */
+const WS = ["Ws.cs", "WsDial.cs", "WsTyped.cs"]
 
 /** What a realtime API adds on top of WS (contract 50 §2): the adapters, the connection, its loop, the three dials. */
 const REALTIME = [
@@ -95,6 +95,7 @@ const ALL = [
 	"Wire.cs",
 	"Ws.cs",
 	"WsDial.cs",
+	"WsTyped.cs",
 ]
 
 const MIXES = [
@@ -124,14 +125,14 @@ const isPublic = (line: string) => line.startsWith("public ")
 const namespaceLines = (text: string) => linesOf(text).filter((line) => line.startsWith("namespace "))
 
 describe("runtimeFileNames: which runtime files a feature mix ships", () => {
-	it("ships the 21 core files for plain HTTP, Ws.cs and WsDial.cs on top for a WebSocket API, and the realtime files on top of both for a realtime API", () => {
+	it("ships the 21 core files for plain HTTP, Ws.cs, WsDial.cs and WsTyped.cs on top for a WebSocket API, and the realtime files on top of both for a realtime API", () => {
 		expect(Object.fromEntries(MIXES.map((mix) => [JSON.stringify(mix), runtimeFileNames(mix)]))).toEqual({
 			'{"realtime":false,"ws":false}': CORE,
 			'{"realtime":false,"ws":true}': [...CORE, ...WS],
 			'{"realtime":true,"ws":false}': ALL,
 			'{"realtime":true,"ws":true}': ALL,
 		})
-		expect([CORE.length, WS.length, REALTIME.length, ALL.length]).toEqual([21, 2, 6, 29])
+		expect([CORE.length, WS.length, REALTIME.length, ALL.length]).toEqual([21, 3, 6, 30])
 		expect(ALL).toEqual([...CORE, ...WS, ...REALTIME].sort(compareCodeUnits))
 	})
 
@@ -285,9 +286,10 @@ const SURFACE: Readonly<Record<string, readonly string[]>> = {
 	"Wire.cs": [],
 	"Ws.cs": ["TypedWebSocket", "WsClose", "WsMessage"],
 	"WsDial.cs": [],
+	"WsTyped.cs": ["TypedWebSocket"],
 }
 
-/* contract 50 §1: EventsAsync, TextEventsAsync in Events.cs, SocketAsync in WsDial.cs, RealtimeAsync in Adapters.cs */
+/* contract 50 §1: EventsAsync, TextEventsAsync, NamedEventsAsync in Events.cs, SocketAsync and TypedSocketAsync in WsDial.cs, RealtimeAsync and TypedRealtimeAsync in Adapters.cs */
 const PARTIAL_TRANSPORT = ["Adapters.cs", "Events.cs", "Transport.cs", "WsDial.cs"]
 
 /** The public top-level type names `files` declare under `key`'s file names (`A.cs + B.cs`), in code-unit order. */
@@ -311,10 +313,14 @@ const declaring = (files: Record<string, string>, name: string) =>
 	})
 
 describe("runtimeTypeNames: the stream runtime's types (contract 50 §1, §3.1)", () => {
-	it("finds the runtime's public types, and a name in two files only for Transport, partial in each file that adds a stream entry point (one file may hold Result and Result<T>)", () => {
+	it("finds the runtime's public types, and a name in two files only for Transport, partial in each file that adds a stream entry point, and TypedWebSocket, one arity per file (one file may hold Result and Result<T>)", () => {
 		const files = runtimeFiles(FULL, "Acme")
 		const all = Object.values(files).flatMap((text) => [...new Set(runtimeTypeNames(text))])
-		expect([...new Set(all.filter((name, at) => all.indexOf(name) !== at))]).toEqual(["Transport"])
+		expect([...new Set(all.filter((name, at) => all.indexOf(name) !== at))]).toEqual(["Transport", "TypedWebSocket"])
+		expect(declaring(files, "TypedWebSocket")).toEqual([
+			["Ws.cs", ["public sealed class TypedWebSocket : IAsyncDisposable"]],
+			["WsTyped.cs", ["public sealed class TypedWebSocket<TIn, TOut> : IAsyncDisposable"]],
+		])
 		expect(all).toEqual(expect.arrayContaining(["ClientConfig", "RequestOptions", "Result", "Transport"]))
 		expect(declaring(files, "Transport")).toEqual(
 			PARTIAL_TRANSPORT.map((name) => [name, [expect.stringMatching(/^internal sealed partial class Transport\b/)]]),

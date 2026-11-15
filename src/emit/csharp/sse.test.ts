@@ -1,6 +1,6 @@
 /**
  * An SSE operation in the C# SDK (contract 50 §5.1; Python's `sse.test.ts` analog), on the shared `sse` document:
- * awaiting the method opens `EventStream<T>` (`string` untyped), read once by `await foreach`; leaving the loop,
+ * awaiting the method opens `EventStream<SseEvent<T>>` (`string` untyped), read once by `await foreach`; leaving the loop,
  * `DisposeAsync` or the end lets the connection go (Fd1). An error status throws before any event, in either mode;
  * the request carries `Accept`, `Last-Event-ID`, the merged headers, the params, the body and the token; a typed
  * stream ends at an event that does not decode. The timeout bounds the open up to the headers (Fd8), the method's
@@ -100,14 +100,14 @@ await foreach (var ev in last)
     Note(ev.Data);
 }`
 
-/** What csc holds of the stream methods: `EventStream<Tick>` and `EventStream<string>`, and what it refuses. */
-const WRONG = "EventStream<string> s = await c.Ticks.StreamAsync();"
+/** What csc holds of the stream methods: `EventStream<SseEvent<Tick>>` and `EventStream<SseEvent<string>>`, and what it refuses. */
+const WRONG = "EventStream<SseEvent<string>> s = await c.Ticks.StreamAsync();"
 const RESUMED = 'await c.Ticks.StreamAsync(reconnectToken: "x");'
 const TYPES = [
 	"using var c = Client();",
 	WRONG,
 	RESUMED,
-	"EventStream<string> t = await c.Text.StreamAsync();",
+	"EventStream<SseEvent<string>> t = await c.Text.StreamAsync();",
 	'var u = await c.Ticks.StreamAsync(since: 5, lastEventId: "7");',
 	"await foreach (SseEvent<Tick> ev in u)",
 	"{",
@@ -126,29 +126,33 @@ function findings(): string[] {
 	})
 }
 
-describe.skipIf(!DOTNET)("an SSE method: awaiting it opens EventStream<T>, read by await foreach", SLOW, () => {
-	/* ported: python sse.test.ts:129 (aclose and async with become await using and break) */
-	it("reads a typed event with its id and the stream's cursor, and await using and break let the connection go", async () => {
-		/* the second stream's answer waits until the typed stream's client left, the third's until the second's */
-		const [afterTyped, afterText] = [gone(sse(["data: a\n\n"], "hold")), gone(sse(["data: z\n\n"]), { stream: 1 })]
-		const replies = [sse(['id: 7\ndata: {"n":1}\n\n'], "hold"), afterTyped.reply, afterText.reply]
-		const run = await served(replies, (server) => consume("sse", "typed-stream", { base: server.url, body: TYPED }))
-		const released = [afterTyped.released(), afterText.released()]
-		expect({ ...seen(run), released }, run.stderr).toEqual({
-			out: ["", "1 7 7", "True", "a", "z"],
-			ran: true,
-			released: [true, true],
+describe.skipIf(!DOTNET)(
+	"an SSE method: awaiting it opens EventStream<SseEvent<T>>, read by await foreach",
+	SLOW,
+	() => {
+		/* ported: python sse.test.ts:129 (aclose and async with become await using and break) */
+		it("reads a typed event with its id and the stream's cursor, and await using and break let the connection go", async () => {
+			/* the second stream's answer waits until the typed stream's client left, the third's until the second's */
+			const [afterTyped, afterText] = [gone(sse(["data: a\n\n"], "hold")), gone(sse(["data: z\n\n"]), { stream: 1 })]
+			const replies = [sse(['id: 7\ndata: {"n":1}\n\n'], "hold"), afterTyped.reply, afterText.reply]
+			const run = await served(replies, (server) => consume("sse", "typed-stream", { base: server.url, body: TYPED }))
+			const released = [afterTyped.released(), afterText.released()]
+			expect({ ...seen(run), released }, run.stderr).toEqual({
+				out: ["", "1 7 7", "True", "a", "z"],
+				ran: true,
+				released: [true, true],
+			})
 		})
-	})
 
-	/* ported: python sse.test.ts:143 (a WebSocket cursor refused; C# has one client) */
-	it("types the methods EventStream<Tick> and EventStream<string>, and refuses a WebSocket cursor", () => {
-		expect(findings()).toEqual([
-			`${WRONG} → CS0029: Cannot implicitly convert type 'HttpSdk.EventStream<HttpSdk.Tick>' to 'HttpSdk.EventStream<string>'`,
-			`${RESUMED} → CS1739: The best overload for 'StreamAsync' does not have a parameter named 'reconnectToken'`,
-		])
-	})
-})
+		/* ported: python sse.test.ts:143 (a WebSocket cursor refused; C# has one client) */
+		it("types the methods EventStream<SseEvent<Tick>> and EventStream<SseEvent<string>>, and refuses a WebSocket cursor", () => {
+			expect(findings()).toEqual([
+				`${WRONG} → CS0029: Cannot implicitly convert type 'HttpSdk.EventStream<HttpSdk.SseEvent<HttpSdk.Tick>>' to 'HttpSdk.EventStream<HttpSdk.SseEvent<string>>'`,
+				`${RESUMED} → CS1739: The best overload for 'StreamAsync' does not have a parameter named 'reconnectToken'`,
+			])
+		})
+	},
+)
 
 describe.skipIf(!DOTNET)("an SSE stream's events: data decoded as T, the event and id, the stream's end", SLOW, () => {
 	/* ported: python sse.test.ts:163 */
@@ -264,17 +268,17 @@ const CONTEXT = "HttpSdkJsonContext.Default"
 const EMITTED = [
 	'    private static readonly Operation _stream = new("GET", "/ticks", [], Idempotent: false, Accept: "text/event-stream");',
 	"    /// <returns>The open stream: an error status throws before any event. No timeout bounds it after that; the token, leaving await foreach or DisposeAsync ends it.</returns>",
-	`    public Task<EventStream<Tick>> StreamAsync(long? since = null, string? xTenant = null, TicksStreamHeaders? headersInto = null, string? lastEventId = null, ${OPTIONS}) =>`,
+	`    public Task<EventStream<SseEvent<Tick>>> StreamAsync(long? since = null, string? xTenant = null, TicksStreamHeaders? headersInto = null, string? lastEventId = null, ${OPTIONS}) =>`,
 	`        _t.EventsAsync(_stream, new([], [Arg.Of("since", since, ${CONTEXT}.NullableInt64)], [Arg.Of("x-tenant", xTenant, ${CONTEXT}.String)], null, null, options, headersInto is null ? null : headersInto.Read), lastEventId, ${CONTEXT}.Tick, cancellationToken);`,
-	`    public Task<EventStream<string>> SendAsync(ChatSendBody body, string? model = null, string? lastEventId = null, ${OPTIONS}) =>`,
+	`    public Task<EventStream<SseEvent<string>>> SendAsync(ChatSendBody body, string? model = null, string? lastEventId = null, ${OPTIONS}) =>`,
 	`        _t.TextEventsAsync(_send, new([], [Arg.Of("model", model, ${CONTEXT}.String)], [], Body.Json(body, ${CONTEXT}.ChatSendBody), null, options), lastEventId, cancellationToken);`,
-	`    public Task<EventStream<string>> StreamAsync(string id, string? lastEventId = null, ${OPTIONS}) =>`,
+	`    public Task<EventStream<SseEvent<string>>> StreamAsync(string id, string? lastEventId = null, ${OPTIONS}) =>`,
 	"        _t.TextEventsAsync(_stream, new([id], [], [], null, null, options), lastEventId, cancellationToken);",
 ]
 
 /** The twin of a stream method's signature: the same parameters, a Result of the very stream. */
 const twinOf = (signature: string) =>
-	signature.replace(/^ {4}public Task<(EventStream<\w+>)>/, "    public Task<Result<$1>>")
+	signature.replace(/^ {4}public Task<(EventStream<SseEvent<\w+>>)>/, "    public Task<Result<$1>>")
 
 describe("generateCSharpSdk: an SSE method and its client.Safe twin (bit 21 i5)", () => {
 	/* ported: python sse.test.ts:284; R-i6's streams: the twin's Ok is the open stream, an opening error status its Err */

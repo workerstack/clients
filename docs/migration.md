@@ -322,6 +322,53 @@ pub fn list(&self, opts: &OutSseListOpts) -> Call<EventStream<OutSseListEvent>, 
 pub fn echo(&self, opts: &WsEchoOpts) -> Call<TypedWebSocket>  // an operation without messages
 ```
 
+## The C# SDK's stream types are typed in what they read and send
+
+`EventStream<TEvent>` yields the event itself: an untyped stream's `EventStream<string>` is
+`EventStream<SseEvent<string>>`, and a typed one's `EventStream<T>` is `EventStream<SseEvent<T>>`. `TypedWebSocket`
+keeps its spelling for an operation without messages, and `TypedWebSocket<TIn, TOut>` sits beside it. C# has no
+default type parameters, so `ResumableConnection<T>` is `ResumableConnection<TIn, TOut>`: an operation without
+messages spells `ResumableConnection<T, JsonElement>`, and one without an event schema either
+`ResumableConnection<JsonElement, JsonElement>`. An operation the document types now answers its own types:
+
+- An SSE operation with named events yields `EventStream<<Op>Event>`: an abstract record with one nested sealed record
+  per event name, each holding `Data`, `Event`, `Id` and `Retry`, and `Unknown` for a name it does not declare, its
+  `Data` as text. An `is` match reads `Data` typed. An unnamed event is `message`. A declared JSON event that does not
+  decode throws `DecodeException` and ends the stream, as before. A nested name that clashes takes the suffix `Event`,
+  as `OutSseListEvent.DataEvent` does.
+- A WebSocket operation with declared messages answers `TypedWebSocket<TIn, TOut>`: `ReceiveAsync` returns `TIn`, null
+  once the socket ended, `SendAsync(TOut)` sends it as JSON, `SendAsync(string)` sends text as is, and `Message`,
+  `Closed` and `Error` are its events. A frame that is not JSON throws `DecodeException` from `ReceiveAsync`, is raised
+  on `Error`, and the next `ReceiveAsync` reads on. The untyped `TypedWebSocket` is unchanged, its
+  `SendAsync(value, info)` too.
+- A realtime operation with declared messages answers `ResumableConnection<TIn, TOut>`: the enumeration yields `TIn`,
+  `SendAsync(TOut)` sends it as JSON, and `Message` fires as each message is read. A message that is not JSON or does
+  not decode throws `DecodeException` once from the enumeration, the cursor already past it, and a new `await foreach`
+  reads on; an untyped connection still reads a non-JSON message as a JSON string. `SendAsync<TValue>(TValue,
+  JsonTypeInfo<TValue>)` is gone: send a `TOut`, a `JsonElement` on an untyped connection, or text.
+- When the messages are a union keyed on one field, each direction is its own hierarchy beside the body union:
+  `<Op>Inbound` with a nested record per member wrapping its record (`Said(WsTalkSendSaid Value)`) and
+  `Unknown(JsonElement Raw)` for a value the operation does not declare, and `<Op>Outbound`, to which each member's
+  record converts implicitly. `On<Value>(Action<Member>)` is an extension per member on the read side, run as the
+  socket or the connection reads; a member named like a handler (`message`, `close`, `error`; on realtime only
+  `message`) is heard only through `Message`.
+
+```text v0
+public Task<EventStream<OutSseListEvent>> ListAsync(...)      // yields SseEvent<OutSseListEvent>, a nullable property per event
+public Task<EventStream<string>> ListAsync(...)               // untyped
+public Task<TypedWebSocket> TalkAsync(...)                    // ReceiveAsync: WsMessage bytes; SendAsync(value, info)
+public Task<ResumableConnection<JsonElement>> RoomAsync(...)  // a non-JSON message read as a JSON string
+```
+
+```text
+public Task<EventStream<OutSseListEvent>> ListAsync(...)      // yields OutSseListEvent: DataEvent, Heartbeat, Unknown
+public Task<EventStream<SseEvent<string>>> ListAsync(...)     // untyped
+public Task<TypedWebSocket<WsTalkInbound, WsTalkOutbound>> TalkAsync(...)
+public Task<ResumableConnection<RtRoomInbound, RtRoomOutbound>> RoomAsync(...)
+public Task<TypedWebSocket> EchoAsync(...)                    // an operation without messages: unchanged
+public Task<ResumableConnection<JsonElement, JsonElement>> EchoAsync(...)  // an untyped realtime operation
+```
+
 ## The TS SDK's realtime `token?` and `onAuthExpired?` are gone
 
 Neither was ever read. A connection's `headers` may be a function read on every dial, and the client's

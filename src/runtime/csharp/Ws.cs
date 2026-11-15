@@ -283,7 +283,7 @@ public sealed class TypedWebSocket : IAsyncDisposable
         return reason[..end];
     }
 
-    private static void Fire<T>(Action<T>? handlers, T value)
+    internal static void Fire<T>(Action<T>? handlers, T value)
     {
         foreach (var handler in handlers?.GetInvocationList() ?? [])
         {

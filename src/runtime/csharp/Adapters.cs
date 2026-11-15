@@ -155,12 +155,20 @@ internal sealed class Dial(Transport client, Operation op, Call call)
 
 internal sealed partial class Transport
 {
-    public async Task<ResumableConnection<T>> RealtimeAsync<T>(Operation op, Call call, TransportOptions options, JsonTypeInfo<T> info, CancellationToken cancellationToken)
+    /* a connection whose operation declares no messages: a message that is no JSON reads as a JSON string */
+    public Task<ResumableConnection<TIn, TOut>> RealtimeAsync<TIn, TOut>(Operation op, Call call, TransportOptions options, JsonTypeInfo<TIn> read, JsonTypeInfo<TOut> write, CancellationToken cancellationToken) =>
+        OpenRealtimeAsync(op, call, options, read, write, false, cancellationToken);
+
+    /* a connection whose operation declares its messages: a message that is no JSON throws */
+    public Task<ResumableConnection<TIn, TOut>> TypedRealtimeAsync<TIn, TOut>(Operation op, Call call, TransportOptions options, JsonTypeInfo<TIn> read, JsonTypeInfo<TOut> write, CancellationToken cancellationToken) =>
+        OpenRealtimeAsync(op, call, options, read, write, true, cancellationToken);
+
+    private async Task<ResumableConnection<TIn, TOut>> OpenRealtimeAsync<TIn, TOut>(Operation op, Call call, TransportOptions options, JsonTypeInfo<TIn> read, JsonTypeInfo<TOut> write, bool strict, CancellationToken cancellationToken)
     {
         var dial = new Dial(this, op, call);
         var url = dial.Url();
         cancellationToken.ThrowIfCancellationRequested();
-        var connection = new ResumableConnection<T>(url.ToString(), [new WsAdapter(dial), new SseAdapter(dial), new LongPollAdapter(dial)], info, options);
+        var connection = new ResumableConnection<TIn, TOut>(url.ToString(), [new WsAdapter(dial), new SseAdapter(dial), new LongPollAdapter(dial)], read, write, options) { Strict = strict };
         using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         bound.CancelAfter(RealtimeLoop.OpenLimit);
         try

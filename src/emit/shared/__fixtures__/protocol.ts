@@ -22,7 +22,10 @@
  * calls (`events`, `frames`, `live`), refusing `raw: true` on a stream and `ws.readLimit` for good; `protocols` and
  * `realtime` are the method's `protocols`, `maxReconnectAttempts` and `reconnectDelay` (a realtime method's on its
  * one `TransportOptions transport`); a cancel observes the stream's quiet end and traces its OCE (`canceled: true`,
- * `via: "stream"`); it never disposes a stream it observed, and records `closeError` when `CloseAsync` throws.
+ * `via: "stream"`); it never disposes a stream it observed, and records `closeError` when `CloseAsync` throws. On a
+ * `TypedWebSocket<TIn, TOut>` (declared messages) a frame and a handler's message are their JSON through the SDK's
+ * context, and a JSON send is decoded into `TOut` first; so is a realtime call's on its
+ * `ResumableConnection<TIn, TOut>`, whose `TIn` value is a frame.
  */
 
 /** The Java driver's error record (java-error.ts), beside the others. */
@@ -58,7 +61,7 @@ export type CallScript = {
 	readonly ws?: {
 		/** Close's code and reason, in place of 1000 and none */
 		readonly close?: { readonly code: number; readonly reason: string }
-		/** register a recording handler for message, close and error (Go OnMessage, OnClose, OnError; Rust on_message, on_close, on_error) */
+		/** register a recording handler for message, close and error (Go OnMessage, OnClose, OnError; Rust on_message, on_close, on_error; C# the Message, Closed and Error events) */
 		readonly on?: true
 		/** SetReadLimit before the reads (Go only: a Rust or Python socket caps a message at 16 MiB, and refuses it) */
 		readonly readLimit?: number

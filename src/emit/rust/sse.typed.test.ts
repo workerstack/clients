@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest"
 import { type Reply, served } from "../shared/__fixtures__/recording-server.ts"
-import { typedStreams } from "./__fixtures__/documents-specs.ts"
+import { typedStreams } from "../shared/__fixtures__/documents-typed.ts"
 import { consume, sections, seen } from "./__fixtures__/consumer.ts"
 import { withRust } from "./__fixtures__/rust-env.ts"
 import { generateRustSdk } from "./sdk.ts"

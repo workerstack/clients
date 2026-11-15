@@ -3,7 +3,7 @@
  * and nowhere else (the F8 mutation target), each emitted as committed but for its one `namespace Http.Runtime;`
  * line, which becomes the SDK's own namespace (Fb2), so `using <RootNamespace>;` reaches the client, the config,
  * the exceptions and the models alike. Every API ships the core, SSE among it; a WebSocket or realtime API adds the
- * socket and its dial, and a realtime API the adapters and the connection (contract 50 §2).
+ * socket, its dial and its typed face, and a realtime API the adapters and the connection (contract 50 §2).
  */
 import { readFileSync } from "node:fs"
 import { compareCodeUnits } from "../shared/lang.ts"
@@ -38,8 +38,8 @@ const CORE: readonly string[] = [
 	"Wire",
 ]
 
-/* a WebSocket or realtime operation: the socket and its own HTTP/1.1 upgrade */
-const WS: readonly string[] = ["Ws", "WsDial"]
+/* a WebSocket or realtime operation: the socket, its own HTTP/1.1 upgrade, and the socket of declared messages */
+const WS: readonly string[] = ["Ws", "WsDial", "WsTyped"]
 
 /* a realtime operation: the adapters, the resumable connection and its loop, and the three transports */
 const REALTIME: readonly string[] = [

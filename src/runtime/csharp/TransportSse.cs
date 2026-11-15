@@ -26,11 +26,11 @@ public sealed class SseAdapter : ITransportAdapter, IDialed
         var x = _dial.Stream(options);
         var live = await x.OpenAsync(cancellationToken).ConfigureAwait(false);
         _dial.Opened(x.Raw!);
-        return new SseConnection(new EventStream<string>(live, data => data, CancellationToken.None), _dial);
+        return new SseConnection(new EventStream<SseEvent<string>>(live, e => e, CancellationToken.None), _dial);
     }
 }
 
-internal sealed class SseConnection(EventStream<string> stream, Dial dial) : ITransportConnection
+internal sealed class SseConnection(EventStream<SseEvent<string>> stream, Dial dial) : ITransportConnection
 {
     private IAsyncEnumerator<SseEvent<string>>? _events;
 
@@ -38,7 +38,7 @@ internal sealed class SseConnection(EventStream<string> stream, Dial dial) : ITr
     public async Task<TransportMessage?> ReceiveAsync(CancellationToken cancellationToken)
     {
         _events ??= stream.GetAsyncEnumerator();
-        using var ended = cancellationToken.Register(static stream => ((EventStream<string>)stream!).DisposeAsync(), stream);
+        using var ended = cancellationToken.Register(static stream => ((EventStream<SseEvent<string>>)stream!).DisposeAsync(), stream);
         if (!await _events.MoveNextAsync().ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();

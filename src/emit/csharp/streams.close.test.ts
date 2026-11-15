@@ -146,7 +146,7 @@ internal sealed class Once : ITransportAdapter
 const BACKOFF = `${SETTLED}
 var once = new Once();
 var options = new TransportOptions { ReconnectDelay = TimeSpan.FromSeconds(5) };
-var rc = new ResumableConnection<Payload>("http://rt.test/feed", [once], HttpSdkJsonContext.Default.Payload, options);
+var rc = new ResumableConnection<Payload, JsonElement>("http://rt.test/feed", [once], HttpSdkJsonContext.Default.Payload, HttpSdkJsonContext.Default.JsonElement, options);
 await rc.ConnectAsync();
 var e = rc.GetAsyncEnumerator();
 var reader = e.MoveNextAsync().AsTask();

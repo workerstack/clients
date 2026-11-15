@@ -3,8 +3,8 @@
  * stream operation's call plan; SSE events read with `take`, the typed headers, `retry` and the stream's error; a
  * `take` that lets the connection go while the run goes on (the driver never disposes what it observed, so this is
  * the SDK's own `break` path); the method's token ending an open stream quietly, its OCE traced; the 10 s watchdog;
- * what the driver refuses on a stream, nothing sent; then a WebSocket's script and its ends, and a realtime
- * connection over WebSocket. Driven against the `sse`, `ws` and `realtime` registry documents
+ * what the driver refuses on a stream, nothing sent; then a WebSocket's script and its ends, a socket with declared
+ * messages, and a realtime connection over WebSocket. Driven against the `sse`, `ws`, `typed` and `realtime` registry documents
  * (shared/__fixtures__/documents-streams.ts, and C#'s `clash.feed` beside `realtime`). The refusals run on
  * hand-written plans against a dependency-free dll: they come before the SDK loads.
  */
@@ -26,7 +26,7 @@ const DOTNET = withDotnet()
 /** Every executed describe's bound: a cold gate builds the SDK and the driver first. */
 const SLOW = { timeout: 600_000 }
 
-type StreamKey = "realtime" | "sse" | "ws"
+type StreamKey = "realtime" | "sse" | "typed" | "ws"
 
 const route = (method: string, path: string) => ({ method, path })
 const ticks = (extra: Partial<Call> = {}): Call => ({
@@ -194,7 +194,7 @@ describe("csharpCallPlans: a stream operation's plan", () => {
 	})
 })
 
-describe.skipIf(!DOTNET)("the C# test driver: SSE, EventStream<T>", SLOW, () => {
+describe.skipIf(!DOTNET)("the C# test driver: SSE, EventStream<SseEvent<T>>", SLOW, () => {
 	it("observes typed events with event and id until take, and traces retry (null when unset) and the typed headers", async () => {
 		const reply: Reply = {
 			headers: { "x-stream-id": "s-1" },
@@ -384,6 +384,34 @@ describe.skipIf(!DOTNET)("the C# test driver: a WebSocket, TypedWebSocket", SLOW
 	})
 })
 
+describe.skipIf(!DOTNET)(
+	"the C# test driver: a WebSocket with declared messages, TypedWebSocket<TIn, TOut>",
+	SLOW,
+	() => {
+		it("sends the scripted JSON as the send type, reads each frame and runs each handler with the message's JSON", async () => {
+			const script: Script = { calls: [{ ws: { on: true, send: [{ json: { text: "hi", type: "say" } }] } }] }
+			const reply = ws([{ receive: 1 }, { json: { text: "yo", type: "said" } }, { json: { type: "wave" } }])
+			const chat: Call = { operation: "keyed.chat.open", route: route("GET", "/keyed/chat"), take: 2 }
+			const { run, streams } = await drive(on("typed"), [reply], [chat], script)
+			expect({ observed: run.observed, stream: run.trace?.calls[0]?.stream }, run.stderr).toEqual({
+				observed: [{ frames: [{ text: "yo", type: "said" }, { type: "wave" }], kind: "frames" }],
+				stream: {
+					handlers: [
+						{ data: '{"text":"yo","type":"said"}', event: "message" },
+						{ data: '{"type":"wave"}', event: "message" },
+						{ data: "", event: "close" },
+					],
+					yields: 2,
+				},
+			})
+			expect(streams[0]?.received).toEqual([
+				{ kind: "text", text: '{"text":"hi","type":"say"}' },
+				{ code: 1000, kind: "close", reason: "" },
+			])
+		})
+	},
+)
+
 describe.skipIf(!DOTNET)("the C# test driver: how a WebSocket read ends", SLOW, () => {
 	it("ends on the server's close frame as closedBy, and on a drop with the error traced via stream, each end fired once", async () => {
 		const replies = [
@@ -444,7 +472,7 @@ describe.skipIf(!DOTNET)("the C# test driver: how a WebSocket read ends", SLOW, 
 	})
 })
 
-describe.skipIf(!DOTNET)("the C# test driver: realtime, ResumableConnection<T>", SLOW, () => {
+describe.skipIf(!DOTNET)("the C# test driver: realtime, ResumableConnection<TIn, TOut>", SLOW, () => {
 	it("opens over WebSocket with the resume cursor, sends the grid's JSON, reads take frames, and traces the settled cursor", async () => {
 		const reply = ws([
 			{ receive: 1 },

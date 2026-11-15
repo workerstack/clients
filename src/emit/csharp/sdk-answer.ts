@@ -6,7 +6,9 @@
  * in the JSON context) with one nullable `{ get; private set; }` property per header in code-unit order of its
  * name, typed by the header's scalar (`long?`, `double?`, `bool?`, else `string?`), and an `internal` `Read` the
  * transport calls on a 2xx; a WebSocket or realtime operation, whose 2xx no caller receives, gets none. A
- * stream operation answers as its `CsStream` says (`sse.ts`, `ws.ts`, `realtime.ts`).
+ * stream operation answers as its `CsStream` says (`sse.ts`, `ws.ts`, `realtime.ts`), its call passing the arguments
+ * and type infos its answer adds (a named-event stream's decode, a socket's or a connection's two types) before
+ * the type info.
  */
 import type { IRResponse, IRSchema } from "../../ir/model.ts"
 import type { SdkOp } from "../../ir/sdk-model.ts"
@@ -18,9 +20,15 @@ import { csTypeOf } from "./types.ts"
 
 const UNKNOWN: IRSchema = { kind: "unknown" }
 
-/** A method's answer: its JSON type (null for any other kind), and its return type and transport method. */
+/**
+ * A method's answer: its JSON type (null for any other kind), the arguments its call passes before that type's info
+ * (a named-event stream's decode), the types whose infos it passes after them (a typed socket's or a realtime
+ * connection's read and send types), and its return type and transport method.
+ */
 export type CsAnswer = {
 	readonly type: string | null
+	readonly args?: readonly string[]
+	readonly infos?: readonly string[]
 	readonly render: (spell: Spelling) => readonly [returns: string, run: string]
 }
 

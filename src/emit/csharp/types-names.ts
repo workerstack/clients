@@ -27,7 +27,7 @@ export type CsTypeNames = {
 
 /* the BCL names emitted text spells unqualified, by the namespace a `using` brings them from (§4.7) */
 export const BCL: Readonly<Record<string, readonly string[]>> = {
-	System: ["Exception", "Func", "IDisposable", "Object", "String", "TimeSpan", "Type"],
+	System: ["Action", "Exception", "Func", "IDisposable", "Object", "String", "TimeSpan", "Type"],
 	"System.Collections.Generic": ["IDictionary", "IReadOnlyDictionary", "IReadOnlyList"],
 	"System.Text.Json": [
 		"JsonElement",
@@ -60,8 +60,8 @@ export const BCL: Readonly<Record<string, readonly string[]>> = {
  * the emitted types share the runtime's namespace (Fb2), so each is reserved, never a `using`
  */
 export const RUNTIME_BCL: readonly string[] = [
-	"Action",
 	"Array",
+	"BrotliStream",
 	"ByteArrayContent",
 	"CancellationTokenRegistration",
 	"CancellationTokenSource",
@@ -73,6 +73,7 @@ export const RUNTIME_BCL: readonly string[] = [
 	"Encoding",
 	"Enum",
 	"EqualityComparer",
+	"GZipStream",
 	"Guid",
 	"HashCode",
 	"HashSet",

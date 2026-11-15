@@ -99,20 +99,19 @@ internal static class Streams
     }
 
     /// <summary>
-    /// An <c>EventStream&lt;T&gt;</c> read until <c>take</c> events (absent: until its end). A thrown error counts as a
+    /// An <c>EventStream&lt;TEvent&gt;</c> read until <c>take</c> events (absent: until its end), each an
+    /// <c>SseEvent&lt;T&gt;</c> or a named event's nested record. A thrown error counts as a
     /// yield and ends the reads. The trace holds the yields, each event's <c>Retry</c> in ms (null when unset) and
     /// the typed headers the open filled.
     /// </summary>
     private static async Task<Outcome> EventsAsync(StreamCall at, object stream)
     {
         var reader = Reader.Of(stream);
-        var data = reader.Element.GetProperty("Data")?.PropertyType
-            ?? throw new DriverException($"{reader.Element.Name} has no Data");
         var (events, retry) = (new JsonArray(), new JsonArray());
         var failure = await ReadAsync(reader, at.Call.Take, item =>
         {
             retry.Add(Sdk.Get(item, "Retry") is TimeSpan wait ? JsonValue.Create((long)wait.TotalMilliseconds) : null);
-            events.Add(EventOf(at.Sdk, item, data));
+            events.Add(EventOf(at.Sdk, item));
         });
         var trace = new JsonObject { ["yields"] = events.Count + (failure is null ? 0 : 1) };
         if (retry.Count > 0)
@@ -128,8 +127,10 @@ internal static class Streams
     }
 
     /// <summary>An event as the grid observes it: its data through the SDK's context (a string as it is), its event name and id only when set.</summary>
-    private static JsonObject EventOf(Sdk sdk, object item, Type data)
+    private static JsonObject EventOf(Sdk sdk, object item)
     {
+        var data = item.GetType().GetProperty("Data")?.PropertyType
+            ?? throw new DriverException($"{item.GetType().Name} has no Data");
         var value = Sdk.Get(item, "Data");
         var seen = new JsonObject
         {
@@ -175,23 +176,23 @@ internal static class Streams
     }
 
     /// <summary>
-    /// A <c>TypedWebSocket</c>: a recording handler per event under <c>ws.on</c>; the grid's <c>send</c> as text,
-    /// then the script's, which a failure ends but not the reads (what the server sent first still waits to be
+    /// A <c>TypedWebSocket</c> or a <c>TypedWebSocket&lt;TIn, TOut&gt;</c> (each frame its JSON): a recording handler
+    /// per event under <c>ws.on</c>; the grid's <c>send</c> as text, then the script's, which a failure ends but not the reads (what the server sent first still waits to be
     /// read); <c>take</c> frames (absent: until the socket ends); then <c>ClosedBy</c>, and <c>CloseAsync</c> with
     /// the script's code and reason (1000 and none by default). The trace holds the frames read, the server's close,
     /// the close's failure and every handler run, those the driver's own close fires included.
     /// </summary>
     private static async Task<Outcome> FramesAsync(StreamCall at, object ws, WsScript script)
     {
-        var handlers = new Handlers();
+        var handlers = new Handlers(at.Sdk);
         if (script.On == true)
         {
             handlers.Attach(ws);
         }
         var messages = (at.Call.Send ?? []).Select(text => new WsSend(Text: text)).Concat(script.Send ?? []);
-        var unsent = await SentAsync(ws, messages, Calls.Send);
+        var unsent = await SentAsync(ws, messages, (target, message) => Calls.Send(at.Sdk, target, message));
         var read = new JsonArray();
-        var unread = await ReceivedAsync(ws, at.Call.Take, read);
+        var unread = await ReceivedAsync(at.Sdk, ws, at.Call.Take, read);
         var trace = new JsonObject { ["yields"] = read.Count };
         if (Sdk.Get(ws, "ClosedBy") is { } closed)
         {
@@ -229,18 +230,18 @@ internal static class Streams
     }
 
     /// <summary>Frames read into <paramref name="read"/> until <paramref name="take"/> (absent: until null); the error that ended them.</summary>
-    private static async Task<Exception?> ReceivedAsync(object ws, int? take, JsonArray read)
+    private static async Task<Exception?> ReceivedAsync(Sdk sdk, object ws, int? take, JsonArray read)
     {
         try
         {
             while (take is null || read.Count < take)
             {
                 var message = await Invoke.ResultAsync(ws, Calls.Method(ws, "ReceiveAsync", [typeof(CancellationToken)]), [CancellationToken.None]);
-                if (message is null)
+                if (Frames.Ended(message))
                 {
                     break;
                 }
-                read.Add(Observe.BodyOf((byte[])Sdk.Get(message, "Data")!));
+                read.Add(Frames.Node(sdk, ws, message!));
             }
             return null;
         }
@@ -251,17 +252,17 @@ internal static class Streams
     }
 
     /// <summary>
-    /// A <c>ResumableConnection&lt;T&gt;</c>: each grid <c>send</c> as its JSON value through the SDK's JSON overload,
-    /// else as text, until the first error; then <c>take</c> values read by enumeration (Protocol.cs refuses a
-    /// realtime call without one), a read error also kept in <c>realtime.errors</c>; a connection that ends first
-    /// ends them quietly. A send's error is observed as a call's, a <c>DecodeException</c> on the call's raw response
+    /// A <c>ResumableConnection&lt;TIn, TOut&gt;</c>: each grid <c>send</c> that is JSON decoded into <c>TOut</c>
+    /// through the SDK's context and sent, else sent as text, until the first error; then <c>take</c> values read by
+    /// enumeration (Protocol.cs refuses a realtime call without one), a read error also kept in
+    /// <c>realtime.errors</c>; a connection that ends first ends them quietly. A send's error is observed as a call's, a <c>DecodeException</c> on the call's raw response
     /// (the connection's 2xx: a send's error holds no response). Then <c>CloseAsync</c>, and the trace: the frames, the
     /// cursor <c>Options</c> settled on (null as ""), the proven transport and the read errors.
     /// </summary>
     private static async Task<Outcome> LiveAsync(StreamCall at, object conn)
     {
         var unsent = await SentAsync(conn, at.Call.Send ?? [], (target, text) => Calls.TryParse(text, out var node)
-            ? Calls.SendJson(target, node)
+            ? Calls.Send(at.Sdk, target, new WsSend(Json: node))
             : Calls.Run(target, "SendAsync", [typeof(string), typeof(CancellationToken)], [text, CancellationToken.None]));
         var failure = unsent;
         var (read, errors) = (new JsonArray(), new JsonArray());

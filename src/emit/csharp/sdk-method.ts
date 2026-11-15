@@ -6,11 +6,12 @@
  * the op declares response headers (Fc7), a stream's own fields, `options` and `cancellationToken` (C#4). Its body
  * by kind is sdk-body.ts's, its answer sdk-answer.ts's, a stream's its `CsStream`'s (contract 50 §2): a stream takes
  * no idempotency key, an SSE one asks for `text/event-stream`, and a declared param a stream field carries gets no
- * parameter. Its body is one call into the transport, the signature on one line and the call on the next (Fb8). Its
- * `client.Safe` twin (C#2, bit 21 i5) restates the signature and answers `Task<Result<T>>` (`Task<Result>` for no
- * body) through `Transport.Safe` and the very method, its options given a response box; a connection's twin is the
- * very method. A param named like one of the method's own locals or its stream's fields is `…2`, a keyword
- * `@`-escaped (H52); the twin's lambda takes `_o`, which no param is (a `_` leads a name only before a digit).
+ * parameter. Its body is one call into the transport, a stream's arguments then its answer's (and their type infos) after the `Call`, the
+ * signature on one line and the call on the next (Fb8). Its `client.Safe` twin (C#2, bit 21 i5) restates the
+ * signature and answers `Task<Result<T>>` (`Task<Result>` for no body) through `Transport.Safe` and the very method,
+ * its options given a response box; a connection's twin is the very method. A param named like one of the method's
+ * own locals or its stream's fields is `…2`, a keyword `@`-escaped (H52); the twin's lambda takes `_o`, which no
+ * param is (a `_` leads a name only before a digit).
  */
 import type { IRParam } from "../../ir/model.ts"
 import type { SdkOp, SdkStream } from "../../ir/sdk-model.ts"
@@ -166,12 +167,14 @@ function call({ body, headers, keyed, params, path }: Parts, spell: Spelling): s
 	].join(", ")
 }
 
-/** The method's lines: its docs (its error statuses' exceptions), its signature, the one call into the transport (a stream's arguments after the `Call`). */
+/** The method's lines: its docs (its error statuses' exceptions), its signature, the one call into the transport (a stream's arguments, then its answer's, after the `Call`). */
 function methodLines(parts: Parts, spell: Spelling): string[] {
 	const { answer, stream } = parts
 	const [returns, run] = answer.render(spell)
 	const args = [
 		...(stream?.args ?? []),
+		...(answer.args ?? []),
+		...(answer.infos ?? []).map(spell.info),
 		...(answer.type === null ? [] : [spell.info(answer.type)]),
 		"cancellationToken",
 	]
@@ -269,6 +272,11 @@ export function csMethod(op: SdkOp, name: string, field: string, env: MethodEnv)
 		lines: (spell) => methodLines(parts, spell),
 		plan: planOf(parts),
 		twin: (spell) => twinLines(parts, spell),
-		types: [...params.map(({ type }) => type), ...body.types, ...(answer.type === null ? [] : [answer.type])],
+		types: [
+			...params.map(({ type }) => type),
+			...body.types,
+			...(answer.infos ?? []),
+			...(answer.type === null ? [] : [answer.type]),
+		],
 	}
 }

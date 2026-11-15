@@ -247,15 +247,43 @@ async def room(client: AsyncSDK) -> None:
 
 ## C#
 
-`await using` disposes a stream, and with it its connection.
+`await using` disposes a stream, and with it its connection. A named event is a nested record of the operation's
+`<Op>Event`, matched with `is`.
 
 ```csharp
         await using var stream = await client.Events.ListAsync(); // disposing it frees the connection
         await foreach (var ev in stream)
         {
-            seen.Add(ev.Data);
+            if (ev is EventsListEvent.Message message) seen.Add(message.Data);
             if (seen.Count == limit) break;
         }
+```
+
+A stream the document types is typed end to end. An SSE operation with named events yields `<Op>Event`, an abstract
+record with one nested sealed record per name holding `Data`, `Event`, `Id` and `Retry`, so an `is` match reads `Data`
+typed, each JSON event decoded by its name; a name the operation does not declare is `Unknown`, its data as text. A
+WebSocket operation with declared messages answers `TypedWebSocket<TIn, TOut>` and a realtime one
+`ResumableConnection<TIn, TOut>`: `SendAsync` takes what the server receives, as JSON, the read gives what it sends,
+and `SendAsync(string)` sends text as is. When those are a union keyed on one field, the read side is `<Op>Inbound`,
+with a nested record per member and `Unknown(JsonElement Raw)`, and `On<Value>` takes a handler of that member's type,
+run as the socket reads; on the send side each member's record converts to `<Op>Outbound` implicitly. A socket's frame
+that is not JSON is a `DecodeException` from `ReceiveAsync`, raised on `Error`, and the socket reads on; a realtime
+connection throws it once from its enumeration, and a new `await foreach` reads on. A member named like a handler
+(`message`, `close`, `error`; on realtime only `message`) is heard only through `Message`. This excerpt runs against
+the small streaming API the TypeScript one calls.
+
+```csharp
+    public static async Task Chat(HttpSdkClient client)
+    {
+        await using var chat = await client.Chat.OpenAsync();
+        chat.OnSaid(message => Console.WriteLine(message.Text));
+        chat.Error += error => Console.Error.WriteLine(error.Message);
+        await chat.SendAsync(new Say { Text = "hi", Type = "say" }); // a Say converts to ChatOpenOutbound
+        if (await chat.ReceiveAsync() is ChatOpenInbound.Unknown other)
+        {
+            Console.WriteLine($"undeclared {other.Raw}"); // the handlers ran as ReceiveAsync read it
+        }
+    }
 ```
 
 ## Java

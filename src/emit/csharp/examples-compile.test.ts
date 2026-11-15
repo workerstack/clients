@@ -1,6 +1,7 @@
 /**
  * The docs' C# example (docs/examples/csharp/Example.cs) compiles with csc against an SDK generated from the docs' API,
- * and every C# block on a docs page is a verbatim excerpt of it (bit 20).
+ * the Kitchen document and the typed streams beside it, and every C# block on a docs page is a verbatim excerpt of it
+ * (bit 20).
  */
 import { describe, expect, it } from "vitest"
 import { allBlocks, exampleOf, strayExcerpts } from "../shared/__fixtures__/docs-blocks.ts"

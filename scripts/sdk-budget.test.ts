@@ -448,6 +448,8 @@ describe("the v1 Python SDK within the budget (bit 14, G13)", () => {
  * 107 + 20% = 129.
  * Plan 9 re-measured it over the backend's refreshed documents (76 surfaces): max 104 (surface/WsResource.JoinRoomAsync),
  * so 104 + 20% = 125.
+ * Backend plan 13 re-measured it with typed streams (76 surfaces): max still 104 (surface/WsResource.JoinRoomAsync),
+ * so the ceiling stays 125.
  */
 const CSHARP_SDK_CEILING = ceilingOf([104], HEADROOM)
 
@@ -760,8 +762,19 @@ describe("the Python runtime within its byte budget (bit 14, G14)", () => {
  * Plan 55, +19 B to 134,922 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
  * Plan 9, -306 B to 134,616 B: Adapters.cs's `Of` and its flat options cut for `Copy`, the connection's own
  * MemberwiseClone of the caller's TransportOptions.
+ * Backend plan 13, +8,779 B to 143,395 B: typed event streams, sockets and realtime connections. Dead code first: the
+ *   realtime `SendAsync<TValue>(TValue, JsonTypeInfo<TValue>)` is cut, and a scan finds no runtime function in the
+ *   changed files without a caller. WsTyped.cs +4,534 (new: `TypedWebSocket<TIn, TOut>` over the untyped socket, its
+ *   typed `ReceiveAsync` and `SendAsync`, `Message`, `Closed` and `Error`, a frame parsed before it decodes),
+ *   Realtime.cs +1,381 (`ResumableConnection<TIn, TOut>`, `SendAsync(TOut)`, `Message`, the strict `Deliver` advancing
+ *   the cursor before it decodes), WsDial.cs +1,135 (`TypedSocketAsync`, and `Connection`: a 101's connection taken
+ *   from beneath the gzip or br decoder a handler put over it, a read-only one an ApiConnectionException),
+ *   Adapters.cs +906 (`TypedRealtimeAsync` beside `RealtimeAsync`, one open setting `Strict`), Events.cs +790
+ *   (`EventStream<TEvent>` over a whole-event decode, `NamedEventsAsync`, `EventData` for the named decode),
+ *   TransportSse.cs +24, RealtimeLoop.cs +8, Ws.cs +1 (`Fire` internal, shared with the typed socket and the
+ *   connection).
  */
-const CSHARP_RUNTIME_BYTES = 134_616
+const CSHARP_RUNTIME_BYTES = 143_395
 
 describe("the C# runtime within its byte budget (bit 15, G14)", () => {
 	it(

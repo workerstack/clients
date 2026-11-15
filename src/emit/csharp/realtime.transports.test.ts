@@ -4,8 +4,9 @@
  * `LongPollAdapter`) in their chain, a custom order of them, and `RequestOptions.Raw` per transport; the SSE and
  * long-poll adapters alone through the call's exchange (the hooks, the advancing cursor, one message per answer, a
  * 204 polling again, a poll bounded at 60 s whatever the client's timeout, a POSTed send and its 405); and
- * `ResumableConnection<JsonElement>` over a caller's in-process C# adapters (`decls`): fallback, resume with the
- * advanced cursor, clean ends, give-up, a cancelled connect, a session, a cancel-safe enumeration, a close race.
+ * `ResumableConnection<JsonElement, JsonElement>` over a caller's in-process C# adapters (`decls`): fallback, resume
+ * with the advanced cursor, clean ends, give-up, a cancelled connect, a session, a cancel-safe enumeration, a close
+ * race.
  * Consumers on `realtime`: `realtime-transports` (in process; its server sees nothing) and one
  * `realtime-adapters-<section>` per server-backed section, each on its own server. Every section runs guarded: a
  * throwing one notes `raised <Type>: <text>`, and the program goes on.
@@ -55,7 +56,7 @@ internal sealed class Fake(TransportKind kind, IEnumerable<Conn?> conns) : ITran
     public TransportKind Kind => kind;
     public List<string> Got { get; } = [];
     public List<string> States { get; } = [];
-    public ResumableConnection<JsonElement>? Rc { get; set; }
+    public ResumableConnection<JsonElement, JsonElement>? Rc { get; set; }
     public TaskCompletionSource Redialed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public async Task<ITransportConnection> ConnectAsync(string url, TransportOptions options, System.Threading.CancellationToken token)
     {
@@ -71,18 +72,16 @@ internal sealed class Fake(TransportKind kind, IEnumerable<Conn?> conns) : ITran
 internal static class Rt
 {
     public static readonly System.Text.Json.Serialization.Metadata.JsonTypeInfo<JsonElement> Element = HttpSdkJsonContext.Default.JsonElement;
-    private static readonly System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Text.Json.Nodes.JsonNode> Node =
-        (System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Text.Json.Nodes.JsonNode>)JsonSerializerOptions.Default.GetTypeInfo(typeof(System.Text.Json.Nodes.JsonNode));
     public static string J(params object?[] items) => JsonSerializer.Serialize(items);
     public static string Json(object? value) => JsonSerializer.Serialize(value);
     public static string Failed(Exception e) => $"{e.GetType().Name}: {e.Message}";
-    public static string Proven<T>(ResumableConnection<T> c) => c.ProvenTransport?.ToString().ToLowerInvariant() ?? "none";
-    public static string Cursor(ResumableConnection<JsonElement> c) => $"{c.Options.LastEventId}/{c.Options.ReconnectToken} {c.ProvenTransport} {c.State}";
-    public static Task SendJson(ResumableConnection<JsonElement> rc, string json) => rc.SendAsync(System.Text.Json.Nodes.JsonNode.Parse(json)!, Node);
+    public static string Proven<TIn, TOut>(ResumableConnection<TIn, TOut> c) => c.ProvenTransport?.ToString().ToLowerInvariant() ?? "none";
+    public static string Cursor(ResumableConnection<JsonElement, JsonElement> c) => $"{c.Options.LastEventId}/{c.Options.ReconnectToken} {c.ProvenTransport} {c.State}";
+    public static Task SendJson(ResumableConnection<JsonElement, JsonElement> rc, string json) => rc.SendAsync(JsonSerializer.Deserialize(json, Element));
     public static object[] Named(ITransportAdapter a) => [a.Name, a.Kind.ToString(), a switch { WsAdapter => a.Kind == TransportKind.Ws, SseAdapter => a.Kind == TransportKind.Sse, LongPollAdapter => a.Kind == TransportKind.LongPoll, _ => false }];
     public static Func<RequestContext, System.Threading.CancellationToken, Task> Hook(List<string[]> into) =>
         (ctx, _) => { into.Add([ctx.Url.PathAndQuery, ctx.Url.AbsolutePath]); return Task.CompletedTask; };
-    public static async Task<List<object?>> Take(ResumableConnection<JsonElement> rc, int n)
+    public static async Task<List<object?>> Take(ResumableConnection<JsonElement, JsonElement> rc, int n)
     {
         var taken = new List<object?>();
         var e = rc.GetAsyncEnumerator();
@@ -97,7 +96,7 @@ internal static class Rt
         await e.DisposeAsync();
         return taken;
     }
-    public static async Task<string> Send(ResumableConnection<JsonElement> rc, int n)
+    public static async Task<string> Send(ResumableConnection<JsonElement, JsonElement> rc, int n)
     {
         try { await SendJson(rc, $$"""{"hi":{{n}}}"""); return J("sent"); }
         catch (Exception e) { return J(Failed(e), rc.State.ToString()); }
@@ -129,7 +128,7 @@ function body(sections: Readonly<Record<string, string>>): string {
 
 /** A connection over the in-process adapters `adapters` at an address nothing serves, with `options`. */
 const rc = (adapters: string, options = "") =>
-	`var rc = new ResumableConnection<JsonElement>("http://rt.test/feed", [${adapters}], Rt.Element${options === "" ? "" : `, ${options}`});`
+	`var rc = new ResumableConnection<JsonElement, JsonElement>("http://rt.test/feed", [${adapters}], Rt.Element, Rt.Element${options === "" ? "" : `, ${options}`});`
 const delay = (ms: number, more = "") =>
 	`new TransportOptions { ${more}ReconnectDelay = TimeSpan.FromMilliseconds(${ms}) }`
 
@@ -146,7 +145,7 @@ Note(Rt.Json(await Rt.Take(rc, 2)));
 await rc.CloseAsync();
 Note(Rt.J(rc.State.ToString(), (await Rt.Take(rc, 1))[0]));`,
 	custom: `var one = new Fake(TransportKind.Ws, [new Conn(["""{"kind":"custom","seq":1}""", """{"kind":"custom","seq":2}"""])]);
-var rc = new ResumableConnection<JsonElement>(_base + "/feed", [one], Rt.Element);
+var rc = new ResumableConnection<JsonElement, JsonElement>(_base + "/feed", [one], Rt.Element, Rt.Element);
 await rc.ConnectAsync();
 Note(Rt.Json(await Rt.Take(rc, 2)));
 Note(Rt.J(one.Got, rc.ProvenTransport.ToString(), rc.State.ToString()));
@@ -168,7 +167,7 @@ ${rc("plan", delay(1, "MaxReconnectAttempts = 2, "))}
 await rc.ConnectAsync();
 Note(Rt.Json(await Rt.Take(rc, 5)));
 Note(Rt.J(plan.Got.Count, Array.ConvertAll(conns, conn => conn.Closed), rc.State.ToString()));
-var late = new ResumableConnection<JsonElement>("http://rt.test/feed", [new Fake(TransportKind.Ws, [new Conn([], delayMs: 10_000)])], Rt.Element);
+var late = new ResumableConnection<JsonElement, JsonElement>("http://rt.test/feed", [new Fake(TransportKind.Ws, [new Conn([], delayMs: 10_000)])], Rt.Element, Rt.Element);
 using var cts = new System.Threading.CancellationTokenSource(300);
 try { await late.ConnectAsync(cts.Token); Note(Rt.J("opened")); }
 catch (OperationCanceledException) { Note(Rt.J("canceled", late.State != ConnectionState.Connected)); }`,
@@ -228,7 +227,7 @@ const hooked = (config = "") => `var hooked = new List<string[]>();
 using var c = Client(new ClientConfig { BearerToken = "tok", ${config}OnRequest = [Rt.Hook(hooked)] });`
 /** A connection over the setup's adapter `i` with `options`, connected, then `text` on it. */
 const alone = (i: number, options: string, text: string) =>
-	`await using (var rc = new ResumableConnection<JsonElement>(url, [adapters[${i}]], Rt.Element${options}))
+	`await using (var rc = new ResumableConnection<JsonElement, JsonElement>(url, [adapters[${i}]], Rt.Element, Rt.Element${options}))
 {
     await rc.ConnectAsync();
 ${text}
@@ -266,7 +265,7 @@ await using (var first = await c.Feed.LiveAsync("c"))
 {
     Note(Rt.Proven(first));
     var a = first.Adapters;
-    await using var custom = new ResumableConnection<JsonElement>(first.Url, [a[1], a[0], a[2]], Rt.Element);
+    await using var custom = new ResumableConnection<JsonElement, JsonElement>(first.Url, [a[1], a[0], a[2]], Rt.Element, Rt.Element);
     await custom.ConnectAsync();
     Note(Rt.Proven(custom));
 }
@@ -303,7 +302,7 @@ Note(Rt.Json(hooked));`,
 		body: `using var c = Client(new ClientConfig { BearerToken = "tok" });
 ${SETUP}
 ${alone(2, NO_RETRY, "    Note(Rt.Json(await Rt.Take(rc, 2)));")}
-try { await new ResumableConnection<JsonElement>(url, [adapters[1]], Rt.Element).ConnectAsync(); Note(Rt.J("opened")); }
+try { await new ResumableConnection<JsonElement, JsonElement>(url, [adapters[1]], Rt.Element, Rt.Element).ConnectAsync(); Note(Rt.J("opened")); }
 catch (Exception e) { Note(Rt.J(Rt.Failed(e))); }`,
 		replies: [refused, refused, bad, bad],
 	},

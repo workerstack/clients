@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Http.Runtime;
 
-/* ResumableConnection<T>'s loop (Python's realtime.py), its behavior documented there */
+/* ResumableConnection<TIn, TOut>'s loop (Python's realtime.py), its behavior documented there */
 internal sealed class RealtimeLoop(IReadOnlyList<ITransportAdapter> adapters, TransportOptions options, string url)
 {
     public static readonly TimeSpan OpenLimit = TimeSpan.FromSeconds(30);

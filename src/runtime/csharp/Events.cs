@@ -10,21 +10,22 @@ using System.Threading.Tasks;
 
 namespace Http.Runtime;
 
-/// <summary>One server-sent event: its decoded data, its type, the stream's last event id when it came, and its <c>retry</c>.</summary>
+/// <summary>One server-sent event: its data, its type, the stream's last event id when it came, and its <c>retry</c>.</summary>
 public sealed record SseEvent<T>(T Data, string? Event, string? Id, TimeSpan? Retry);
 
 /// <summary>
-/// An open event stream, read once by <c>await foreach</c>. No timeout bounds it. An event that does not decode, a
-/// cap or a failed read is thrown once and ends it. The method's token or the read's own token ends it with an
+/// An open event stream, read once by <c>await foreach</c>, each event decoded whole into <typeparamref name="TEvent"/>:
+/// an <see cref="SseEvent{T}"/>, or a named-event operation's own record. No timeout bounds it. An event that does not
+/// decode, a cap or a failed read is thrown once and ends it. The method's token or the read's own token ends it with an
 /// OperationCanceledException; leaving the loop or <see cref="DisposeAsync"/> ends it quietly. Each end lets the
 /// connection go: dispose it, or read it to its end.
 /// </summary>
-public sealed class EventStream<T> : IAsyncEnumerable<SseEvent<T>>, IAsyncDisposable
+public sealed class EventStream<TEvent> : IAsyncEnumerable<TEvent>, IAsyncDisposable
 {
     private const int ReadBuffer = 65_536;
 
     private readonly HttpResponseMessage _response;
-    private readonly Func<string, T> _decode;
+    private readonly Func<SseEvent<string>, TEvent> _decode;
     private readonly CancellationToken _call;
     private readonly CancellationTokenSource _end = new();
     private readonly CancellationTokenRegistration _registration;
@@ -36,19 +37,19 @@ public sealed class EventStream<T> : IAsyncEnumerable<SseEvent<T>>, IAsyncDispos
     private int _taken;
     private int _released;
 
-    internal EventStream(HttpResponseMessage response, Func<string, T> decode, CancellationToken call)
+    internal EventStream(HttpResponseMessage response, Func<SseEvent<string>, TEvent> decode, CancellationToken call)
     {
         _response = response;
         _decode = decode;
         _call = call;
-        _registration = call.Register(static stream => ((EventStream<T>)stream!).Release(), this);
+        _registration = call.Register(static stream => ((EventStream<TEvent>)stream!).Release(), this);
     }
 
-    /// <summary>The id of the last event read, to resume from; empty before any.</summary>
+    /// <summary>The id of the last event read, to resume from, taken before the event decodes; empty before any.</summary>
     public string LastEventId { get; private set; } = "";
 
     /// <summary>The stream's events in order; a second enumeration throws InvalidOperationException.</summary>
-    public IAsyncEnumerator<SseEvent<T>> GetAsyncEnumerator(CancellationToken cancellationToken = default) =>
+    public IAsyncEnumerator<TEvent> GetAsyncEnumerator(CancellationToken cancellationToken = default) =>
         Interlocked.Exchange(ref _taken, 1) == 0
             ? EventsAsync(cancellationToken)
             : throw new InvalidOperationException("an EventStream is read once");
@@ -71,7 +72,7 @@ public sealed class EventStream<T> : IAsyncEnumerable<SseEvent<T>>, IAsyncDispos
         }
     }
 
-    private async IAsyncEnumerator<SseEvent<T>> EventsAsync(CancellationToken token)
+    private async IAsyncEnumerator<TEvent> EventsAsync(CancellationToken token)
     {
         using var read = CancellationTokenSource.CreateLinkedTokenSource(token, _end.Token);
         try
@@ -81,9 +82,8 @@ public sealed class EventStream<T> : IAsyncEnumerable<SseEvent<T>>, IAsyncDispos
                 var cap = await PullAsync(token, read.Token).ConfigureAwait(false);
                 foreach (var raw in _pending)
                 {
-                    var data = _decode(raw.Data);
                     LastEventId = raw.Id ?? "";
-                    yield return new SseEvent<T>(data, raw.Event, raw.Id, raw.Retry);
+                    yield return _decode(new SseEvent<string>(raw.Data, raw.Event, raw.Id, raw.Retry));
                 }
                 _pending.Clear();
                 if (cap is not null)
@@ -132,16 +132,21 @@ public sealed class EventStream<T> : IAsyncEnumerable<SseEvent<T>>, IAsyncDispos
 
 internal sealed partial class Transport
 {
-    public async Task<EventStream<T>> EventsAsync<T>(Operation op, Call call, string? lastEventId, JsonTypeInfo<T> info, CancellationToken cancellationToken) =>
-        new(await OpenedAsync(op, call, lastEventId, cancellationToken).ConfigureAwait(false), data => Event(data, info), cancellationToken);
+    public async Task<EventStream<SseEvent<T>>> EventsAsync<T>(Operation op, Call call, string? lastEventId, JsonTypeInfo<T> info, CancellationToken cancellationToken) =>
+        new(await OpenedAsync(op, call, lastEventId, cancellationToken).ConfigureAwait(false), e => new(EventData(e.Data, info), e.Event, e.Id, e.Retry), cancellationToken);
 
-    public async Task<EventStream<string>> TextEventsAsync(Operation op, Call call, string? lastEventId, CancellationToken cancellationToken) =>
-        new(await OpenedAsync(op, call, lastEventId, cancellationToken).ConfigureAwait(false), data => data, cancellationToken);
+    public async Task<EventStream<SseEvent<string>>> TextEventsAsync(Operation op, Call call, string? lastEventId, CancellationToken cancellationToken) =>
+        new(await OpenedAsync(op, call, lastEventId, cancellationToken).ConfigureAwait(false), e => e, cancellationToken);
+
+    /* a named-event operation's events, each decoded by its name through the context's options */
+    public async Task<EventStream<TEvent>> NamedEventsAsync<TEvent>(Operation op, Call call, string? lastEventId, Func<SseEvent<string>, JsonSerializerOptions, TEvent> named, CancellationToken cancellationToken) =>
+        new(await OpenedAsync(op, call, lastEventId, cancellationToken).ConfigureAwait(false), e => named(e, Json), cancellationToken);
 
     private Task<HttpResponseMessage> OpenedAsync(Operation op, Call call, string? lastEventId, CancellationToken cancellationToken) =>
         new Exchange(this, op, call with { Headers = [.. call.Headers, Arg.Text("Last-Event-ID", lastEventId)] }, stream: true).OpenAsync(cancellationToken);
 
-    private static T Event<T>(string data, JsonTypeInfo<T> info)
+    /// <summary>An event's data decoded into <typeparamref name="T"/>; a misfit or null is a <see cref="DecodeException"/>.</summary>
+    internal static T EventData<T>(string data, JsonTypeInfo<T> info)
     {
         try
         {

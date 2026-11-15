@@ -23,24 +23,33 @@ public enum ConnectionState
 
 /// <summary>
 /// A connection over a chain of transports, tried in order, read by <c>await foreach</c>: each message decoded as
-/// <typeparamref name="T"/> (a message that does not decode throws once, the connection kept), the cursor in
-/// <see cref="Options"/> advanced past it. After a drop it reopens the chain from the cursor, backing off from the
-/// delay (an SSE <c>retry</c> first), doubling to 30 s, for up to <c>MaxReconnectAttempts</c> in a row; giving up
-/// throws the last failure once, and the enumeration then ends. Leaving a loop keeps the connection; a canceled read
-/// leaves it reconnecting. <see cref="CloseAsync"/> from any task ends a pending read with no message.
+/// <typeparamref name="TIn"/>, what the server sends, the cursor in <see cref="Options"/> advanced past it first, and
+/// <see cref="Message"/> fired before it is yielded; <see cref="SendAsync(TOut, CancellationToken)"/> sends the JSON
+/// of a <typeparamref name="TOut"/>, what the server receives. A message that does not decode throws
+/// <see cref="DecodeException"/> once and ends that enumeration, the connection kept, and a new <c>await foreach</c>
+/// reads the next one; a connection of declared messages reads only JSON, any other reads a message that is no JSON
+/// as a JSON string. After a drop it reopens the chain from the cursor, backing off from the delay (an SSE
+/// <c>retry</c> first), doubling to 30 s, for up to <c>MaxReconnectAttempts</c> in a row; giving up throws the last
+/// failure once, and the enumeration then ends. Leaving a loop keeps the connection; a canceled read leaves it
+/// reconnecting. <see cref="CloseAsync"/> from any task ends a pending read with no message.
 /// </summary>
-public sealed class ResumableConnection<T> : IAsyncEnumerable<T>, IAsyncDisposable
+public sealed class ResumableConnection<TIn, TOut> : IAsyncEnumerable<TIn>, IAsyncDisposable
 {
-    private readonly JsonTypeInfo<T> _info;
+    private readonly JsonTypeInfo<TIn> _read;
+    private readonly JsonTypeInfo<TOut> _write;
     private readonly RealtimeLoop _loop;
 
-    /// <summary>A connection to <paramref name="url"/> over <paramref name="adapters"/>, its messages read through <paramref name="info"/>; it opens at <see cref="ConnectAsync"/>.</summary>
-    public ResumableConnection(string url, IReadOnlyList<ITransportAdapter> adapters, JsonTypeInfo<T> info, TransportOptions? options = null)
+    /// <summary>
+    /// A connection to <paramref name="url"/> over <paramref name="adapters"/>, its messages read through
+    /// <paramref name="read"/> and sent through <paramref name="write"/>; it opens at <see cref="ConnectAsync"/>.
+    /// </summary>
+    public ResumableConnection(string url, IReadOnlyList<ITransportAdapter> adapters, JsonTypeInfo<TIn> read, JsonTypeInfo<TOut> write, TransportOptions? options = null)
     {
         Url = url;
         Adapters = adapters;
         Options = options ?? new TransportOptions();
-        _info = info;
+        _read = read;
+        _write = write;
         _loop = new RealtimeLoop(adapters, Options, url);
     }
 
@@ -59,18 +68,24 @@ public sealed class ResumableConnection<T> : IAsyncEnumerable<T>, IAsyncDisposab
     /// <summary>The transport that last opened; null after a drop, until the next open.</summary>
     public TransportKind? ProvenTransport => _loop.Proven;
 
+    /// <summary>Each message as it is decoded, before the enumeration yields it; a handler that throws is ignored.</summary>
+    public event Action<TIn>? Message;
+
+    /* the operation declares its messages: a message that is no JSON is no message */
+    internal bool Strict { get; init; }
+
     /// <summary>Opens the first adapter in order that opens; the last failure when none does.</summary>
     public Task ConnectAsync(CancellationToken cancellationToken = default) => _loop.ConnectAsync(cancellationToken);
 
     /// <summary>The messages in order; its token, once fired, leaves the connection reconnecting.</summary>
-    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default) => MessagesAsync(cancellationToken);
+    public IAsyncEnumerator<TIn> GetAsyncEnumerator(CancellationToken cancellationToken = default) => MessagesAsync(cancellationToken);
+
+    /// <summary>Sends <paramref name="value"/> as its JSON text over the open transport.</summary>
+    public Task SendAsync(TOut value, CancellationToken cancellationToken = default) =>
+        _loop.SendAsync(JsonSerializer.Serialize(value, _write), cancellationToken);
 
     /// <summary>Sends <paramref name="text"/> as it is over the open transport (an SSE or long-poll one POSTs it).</summary>
     public Task SendAsync(string text, CancellationToken cancellationToken = default) => _loop.SendAsync(text, cancellationToken);
-
-    /// <summary>Sends <paramref name="value"/> as its JSON text.</summary>
-    public Task SendAsync<TValue>(TValue value, JsonTypeInfo<TValue> info, CancellationToken cancellationToken = default) =>
-        _loop.SendAsync(JsonSerializer.Serialize(value, info), cancellationToken);
 
     /// <summary>Closes the open transport and ends a pending read in any task with no message.</summary>
     public Task CloseAsync() => _loop.CloseAsync();
@@ -78,41 +93,53 @@ public sealed class ResumableConnection<T> : IAsyncEnumerable<T>, IAsyncDisposab
     /// <summary>Closes the connection, as <see cref="CloseAsync"/> does.</summary>
     public ValueTask DisposeAsync() => new(CloseAsync());
 
-    internal ResumableConnection<T> Bound(CancellationToken call)
+    internal ResumableConnection<TIn, TOut> Bound(CancellationToken call)
     {
         _loop.Bind(call);
         return this;
     }
 
-    private async IAsyncEnumerator<T> MessagesAsync(CancellationToken token)
+    private async IAsyncEnumerator<TIn> MessagesAsync(CancellationToken token)
     {
         while (await _loop.NextAsync(token).ConfigureAwait(false) is { } message)
         {
-            yield return Deliver(message);
+            var value = Deliver(message);
+            TypedWebSocket.Fire(Message, value);
+            yield return value;
         }
     }
 
-    /* the message as JSON, else as a JSON string of its text; the cursor advanced before it decodes */
-    private T Deliver(TransportMessage message)
+    /* the message as JSON, else (unless strict) as a JSON string of its text; the cursor advanced before it decodes */
+    private TIn Deliver(TransportMessage message)
     {
-        JsonElement payload;
+        JsonElement payload = default;
+        JsonException? malformed = null;
         try
         {
             using var document = JsonDocument.Parse(message.Text);
             payload = document.RootElement.Clone();
+        }
+        catch (JsonException e) when (Strict)
+        {
+            malformed = e;
         }
         catch (JsonException)
         {
             payload = JsonSerializer.SerializeToElement(message.Text, Arg.StringInfo);
         }
         Options.Advance(message.Id, payload);
+        if (malformed is not null)
+        {
+            throw new DecodeException($"realtime message is not valid JSON: {malformed.Message}", malformed);
+        }
+        var what = Strict ? "realtime message" : "a message";
         try
         {
-            return JsonSerializer.Deserialize(payload, _info) ?? throw new DecodeException("a message does not decode: it is null");
+            return JsonSerializer.Deserialize(payload, _read) ?? throw new DecodeException($"{what} does not decode: it is null");
         }
         catch (JsonException e)
         {
-            throw new DecodeException($"a message does not decode: {e.Message}", e);
+            throw new DecodeException($"{what} does not decode: {e.Message}", e);
         }
     }
 }

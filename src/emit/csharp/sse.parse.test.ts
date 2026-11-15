@@ -350,7 +350,7 @@ foreach (var (lines, streams) in new[] { (12_500, 1024), (200_000, 64) })
     var (fastest, sizes) = (double.MaxValue, new SortedSet<int>());
     for (var round = 0; round < 5; round++)
     {
-        var opened = new List<EventStream<string>>();
+        var opened = new List<EventStream<SseEvent<string>>>();
         for (var i = 0; i < streams; i++)
         {
             opened.Add(await c.Text.StreamAsync());

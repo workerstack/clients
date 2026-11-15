@@ -19,7 +19,8 @@ import { longNames } from "../../shared/__fixtures__/documents-long.ts"
 import { merged } from "../../shared/__fixtures__/merge.ts"
 import type { RustSdkOptions } from "../sdk.ts"
 import { errors, http, httpExtraPaths } from "../../shared/__fixtures__/documents-http.ts"
-import { relative, surface, typedStreams, types } from "./documents-specs.ts"
+import { typedStreams } from "../../shared/__fixtures__/documents-typed.ts"
+import { relative, surface, types } from "./documents-specs.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
 
 /**

@@ -3,9 +3,10 @@
  * legs): `RequestOptions.Raw` holds the answer the upgrade really got, an accepted `101` with the `ws://` URL it
  * dialed and its headers, or a refusal with its status, headers and body; a refused handshake is its status's
  * exception with that body; a closed origin, a redirect the dial never follows (a caller primary that follows them
- * included), and a slow handshake under the call's timeout each fail the method itself, nothing read; and the three
- * RFC 6455 §4.1 checks no BCL layer makes (Q-d1, the 2b probe): `Upgrade: websocket`, `Sec-WebSocket-Accept` against
- * the key the SDK sent, and a chosen subprotocol that was offered. Driven on the `ws` registry document; `Raw` is a consumer.
+ * included), and a slow handshake under the call's timeout each fail the method itself, nothing read; a 101 marked
+ * with a content coding opens all the same (its content is the connection); and the three RFC 6455 §4.1 checks no
+ * BCL layer makes (Q-d1, the 2b probe): `Upgrade: websocket`, `Sec-WebSocket-Accept` against the key the SDK sent,
+ * and a chosen subprotocol that was offered. Driven on the `ws` registry document; `Raw` is a consumer.
  */
 import { describe, expect, it } from "vitest"
 import type { Call, Setup } from "../../../tests/integration/conformance/matrix.ts"
@@ -42,6 +43,12 @@ const handshake = (why: string) => ({
 	type: "ApiConnectionException",
 	via: "return",
 })
+
+/** An accepted upgrade whose 101 carries `Content-Encoding: coding`, echoing the client's first message. */
+const echoed = (coding: string) =>
+	ws([{ receive: 1 }, { text: `echo:${coding}` }], { headers: { "content-encoding": coding } })
+/** A socket that read the echo of `coding`. */
+const opened = (coding: string) => ({ frames: [`echo:${coding}`], kind: "frames" })
 
 /** The `ws` SDK with the driver aimed at it, which must build. */
 function driven(): DrivenCSharpSdk {
@@ -138,6 +145,35 @@ describe.skipIf(!DOTNET)("what fails at the handshake: the method throws, nothin
 		})
 	})
 })
+
+describe.skipIf(!DOTNET)(
+	"a 101 marked with a content coding: its content is the connection, no coded body",
+	SLOW,
+	() => {
+		/*
+		 * workerd (wrangler dev) answers an upgrade that offers gzip with `Content-Encoding: gzip` on its 101; the
+		 * default handler's decompression wrapped the connection in a read-only decoder, and CreateFromStream threw
+		 * "The base stream is not writeable"; .NET's deflate decoder is internal and exposes no connection beneath it
+		 */
+		it("opens under gzip and br on the 101, sends and reads the echo; deflate is ApiConnectionException", async () => {
+			const codings = ["gzip", "br", "deflate"]
+			const script: Script = { calls: codings.map((coding) => ({ ws: { send: [{ text: coding }] } })) }
+			const { hops, run } = await drive(
+				codings.map(echoed),
+				codings.map(() => rooms({ take: 1 })),
+				script,
+			)
+			expect(
+				{ errors: run.trace?.calls.map((call) => failed(call.error)), observed: run.observed },
+				run.stderr,
+			).toEqual({
+				errors: [null, null, handshake("the handler decoded the 101's content, so the connection is read-only")],
+				observed: [opened("gzip"), opened("br"), null],
+			})
+			expect(hops.map((hop) => hop.headers["accept-encoding"])).toEqual(codings.map(() => "gzip, deflate, br"))
+		})
+	},
+)
 
 describe.skipIf(!DOTNET)("the dial follows no redirect and waits no longer than the call's timeout", SLOW, () => {
 	/*
