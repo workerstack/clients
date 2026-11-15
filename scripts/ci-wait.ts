@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
-// Managed by ~/Development/standards (files/scripts/ci-wait.ts). Edit it there, then run `bun sync.ts`.
 // `bun scripts/ci-wait.ts [sha] [--workflow ci.yml] [--branch main] [--grace 600] [--poll 30]`: wait for CI's push run on
 // a commit (HEAD by default) and say how it ended. CI is the full gate, so this is how a push is checked: on a failure
-// it names the failed jobs and saves their logs under .tmp/grunt/ci/, so the loop is read the log, fix, commit, push,
+// it names the failed jobs and saves their logs under .tmp/ci/, so the loop is read the log, fix, commit, push,
 // wait again. Only `push` runs on the branch count, as the release gate counts them.
 //
 // Exit 0: passed. 1: failed, canceled, or no run within the grace (the commit was never pushed). 2: a newer push
@@ -155,7 +154,7 @@ function settle(deps: CiWaitDeps, opts: CiWaitOptions, run: RunState): Outcome {
 	}
 	const id = String(run.databaseId)
 	const jobs = parseFailedJobs(gh(deps, ["run", "view", id, "--json", "jobs"]))
-	const log = `.tmp/grunt/ci/${opts.sha.slice(0, 12)}-${id}.log`
+	const log = `.tmp/ci/${opts.sha.slice(0, 12)}-${id}.log`
 	// A run that failed before any job did (startup_failure, action_required, a run-level timeout) has no failed log, and
 	// gh exits nonzero for it. The outcome still names the run; the log file says why it holds no job output.
 	const args = ["run", "view", id, "--log-failed"]

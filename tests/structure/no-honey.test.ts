@@ -52,7 +52,7 @@ describe("no honey", () => {
 
 	it("points every lesson's paths at files that exist", { timeout: SPAWN_TIMEOUT }, () => {
 		const files = tracked()
-		const lessons = files.filter((path) => /^\.rulesync\/lessons\/[^/]+\.md$/.test(path))
+		const lessons = files.filter((path) => /^\.repo\/lessons\/[^/]+\.md$/.test(path))
 		const dangling = lessons.flatMap((path) =>
 			danglingGlobs(readFileSync(join(ROOT, path), "utf8"), files).map((glob) => `${path}: ${glob}`),
 		)

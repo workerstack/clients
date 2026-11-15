@@ -1,6 +1,4 @@
-// Managed by ~/Development/standards (files/scripts/brand-names.ts). Edit it there, then run `bun sync.ts`.
-// The brand names a rename removed, and where they may still stand: shared by the rename codemod, its inventory and
-// each repo's no-<brand> structure test, so the three never disagree on what counts.
+// The brand names a rename removed, and where they may still stand, as the no-<brand> structure tests count them.
 //
 // A brand counts as a segment of a name, never inside an ordinary word: lowercase `honey` needs a non-lowercase
 // letter on each side, `Honey` a non-uppercase letter before and a non-lowercase letter after, `HONEY` a non-letter
@@ -9,7 +7,7 @@
 // and the names of the history files that keep it (`migrating-from-honey` in a link, `no-honey` in a files.tsv path).
 //
 // History is the record of the old names and keeps them: changelogs, migration docs, the maps a rename ran from,
-// `blueprint/**`, each `no-<brand>` test, the exports a past release shipped, this module and the rename tools, and
+// `blueprint/**`, each `no-<brand>` test, the exports a past release shipped, this module, and
 // a README's dated upgrade sections. Two files are partly live: `blueprint/files.tsv`, whose path column check-tree
 // reads, and each lesson, whose `paths:` and commands agents run; only its `evidence:` line is history.
 
@@ -69,7 +67,6 @@ const HISTORY = [
 	/* a directory named by an exact version pins a published release: its package names and bins are that release's */
 	/(^|\/)\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?\//,
 	/(^|\/)brand-names(\.test)?\.ts$/,
-	/(^|\/)rename-brand\//,
 ]
 
 /** Where `path` stands: all history, partly live (`files-tsv`, `lesson`), or live, with `maps` the rename's maps. */
@@ -77,7 +74,7 @@ export function historyOf(path: string, maps: readonly string[] = []): Area {
 	if (maps.includes(path) || HISTORY.some((re) => re.test(path))) return "history"
 	if (path === "blueprint/files.tsv") return "files-tsv"
 	if (path.startsWith("blueprint/")) return "history"
-	if (/^\.rulesync\/lessons\/.*\.md$/.test(path)) return "lesson"
+	if (/^\.repo\/lessons\/.*\.md$/.test(path)) return "lesson"
 	return "live"
 }
 

@@ -1,6 +1,5 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"extends": ["./oxlint.base.json"],
 	"plugins": ["typescript", "unicorn", "oxc"],
 	"jsPlugins": [{ "name": "clients", "specifier": "./lint/index.js" }],
 	"env": {
@@ -13,9 +12,13 @@
 		".agents/**",
 		".claude/**",
 		".codex/**",
-		".gemini/**",
 		".grok/**",
-		".rulesync/**",
+		".cursor/**",
+		".repo/**",
+		"**/dist/**",
+		"**/coverage/**",
+		"**/_gen/**",
+		".tmp/**",
 		"src/_tokenizer/**"
 	],
 	"categories": {

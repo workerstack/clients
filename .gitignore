@@ -1,6 +1,25 @@
-node_modules/
-.tmp/
-coverage/
 dist/
-.worktrees/
 **/.cache/
+
+# repo:ignore a2521b1c
+.tmp/
+.worktrees/
+coverage/
+.vitest/
+repo.config.local.ts
+**/.repo/plans/
+**/.repo/plans-fast/
+**/.repo/roadmaps/
+**/.repo/roadmaps-fast/
+**/.repo/handoffs/
+**/.repo/implementations/
+**/.repo/scratch/
+**/.repo/tmp/
+**/.repo/backlog.md
+node_modules/
+.agents/
+.claude/
+.codex/
+.cursor/
+.grok/
+# /repo:ignore

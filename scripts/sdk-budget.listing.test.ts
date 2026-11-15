@@ -33,8 +33,8 @@ function runtimeRepo(): string {
 describe("a runtime directory's listing", () => {
 	it("leaves out an ignored entry: a hook's .tmp receipt is no runtime file", { timeout: SPAWN_TIMEOUT }, () => {
 		const dir = runtimeRepo()
-		mkdirSync(join(dir, ".tmp/grunt"), { recursive: true })
-		writeFileSync(join(dir, ".tmp/grunt/receipt.txt"), "session\n")
+		mkdirSync(join(dir, ".tmp/session"), { recursive: true })
+		writeFileSync(join(dir, ".tmp/session/receipt.txt"), "session\n")
 		expect(runtimeBytes(dir, ".py")).toEqual({ bytes: 6, names: ["a.py"], others: [] })
 	})
 

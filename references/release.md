@@ -1,3 +1,7 @@
+---
+description: Release public packages
+---
+
 # Releasing a product's public packages
 
 `@workerstack/clients` releases a product's public packages from the private repo that generates them. One
