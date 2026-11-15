@@ -29,7 +29,7 @@ const spec = (name: string) =>
 		components: { schemas: Json }
 	}
 
-/** The keyed WebSocket ops and the named-event streams, with a socket that receives one object type. */
+/** The keyed WebSocket ops and the named-event streams, with a socket that receives one object type and one a string. */
 function document(): Json {
 	const [keyed, events] = [spec("ws-keyed"), spec("sse-item-schema")]
 	const count = { properties: { n: { type: "integer" } }, required: ["n"], type: "object" }
@@ -40,11 +40,18 @@ function document(): Json {
 			"x-websocket": { receive: { $ref: "#/components/schemas/Count" }, send: { $ref: "#/components/schemas/Count" } },
 		},
 	}
+	const word = {
+		get: {
+			operationId: "word.open",
+			responses: { 101: { description: "Switching Protocols" } },
+			"x-websocket": { receive: { type: "string" }, send: { type: "string" } },
+		},
+	}
 	return {
 		components: { schemas: { ...keyed.components.schemas, ...events.components.schemas, Count: count } },
 		info: { title: "Typed", version: "1.0.0" },
 		openapi: "3.2.1",
-		paths: { ...keyed.paths, ...events.paths, "/echo": echo },
+		paths: { ...keyed.paths, ...events.paths, "/echo": echo, "/word": word },
 	}
 }
 
@@ -118,6 +125,32 @@ describe.skipIf(!GO)("a typed WebSocket command's input lines", SLOW, () => {
 		])
 		expect(refused?.error.message).toMatch(/^input line 1 not sent: json: cannot unmarshal string into .*\bn\b/)
 	})
+})
+
+describe.skipIf(!GO)("a WebSocket command that receives no object", SLOW, () => {
+	beforeAll(() => void built(), SLOW.timeout)
+
+	it(
+		"checks a line against a type the server receives that is no object: a string is sent, a number refused",
+		HOLD,
+		async () => {
+			const ran = await call(
+				["word", "open"],
+				[ws([{ receive: 1 }, { close: { code: 1000, reason: "" } }])],
+				'"hi"\n5\n',
+			)
+			const [refused, ended] = jsonLines(ran.stderr) as { error: { kind: string; message: string } }[]
+			expect([ran.status, ran.streams[0]?.received[0], refused?.error.kind, ended]).toEqual([
+				4,
+				{ kind: "text", text: '"hi"' },
+				"usage",
+				usage("input lines not sent: 1"),
+			])
+			expect(refused?.error.message).toMatch(
+				/^input line 2 not sent: json: cannot unmarshal number into Go value of type string/,
+			)
+		},
+	)
 })
 
 describe.skipIf(!GO)("a typed WebSocket command's messages", SLOW, () => {
