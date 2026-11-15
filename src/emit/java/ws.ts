@@ -14,7 +14,7 @@
  * Result.
  */
 import type { SdkOp } from "../../ir/sdk-model.ts"
-import { javaTypeName, NameScope } from "../shared/lang.ts"
+import { NameScope } from "../shared/lang.ts"
 import type { Dispatch } from "./json.ts"
 import {
 	bin,
@@ -100,7 +100,7 @@ export const handledArms = (reader: Reader, arms: readonly Dispatch[]) =>
 	arms.filter((arm) => !reader.handlers.includes(handlerName(arm)))
 
 /* the handler an arm's first value spells */
-const handlerName = (arm: Dispatch) => `on${javaTypeName(arm.values[0] ?? "")}`
+const handlerName = (arm: Dispatch) => `on${arm.spelled}`
 
 /**
  * `<read><Suffix>`, hoisted into `ctx.decls` once per read type and reader with an `on<Value>` per arm of `arms` but

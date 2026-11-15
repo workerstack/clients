@@ -24,7 +24,14 @@ import {
 } from "./layout.ts"
 
 /** One dispatch: the values that select a wrapper, the wrapper, and the payload type it reads. */
-export type Dispatch = { readonly values: readonly string[]; readonly wrapper: string; readonly payload: string }
+/** A keyed union's arm: the values that select it, its wrapper, its payload, and what its first value spells. */
+export type Dispatch = {
+	readonly values: readonly string[]
+	readonly wrapper: string
+	readonly payload: string
+	/** its first value as a Java type name, `Variant<index>` when none selects it */
+	readonly spelled: string
+}
 
 /* a payload's erasure: `Class` takes no type arguments */
 const erased = (type: string) => type.replace(/<.*$/, "")

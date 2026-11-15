@@ -80,13 +80,14 @@ export const isKeyed = (union: Of<"union">): union is Discriminated =>
 export function dispatchOf(name: string, union: Discriminated, scope: UnionScope): Dispatch[] {
 	return selectedBy(union, scope.at).map(({ index, schema, values }) => {
 		const first = values[0] ?? `Variant${index}`
+		const spelled = javaTypeName(first)
 		const payload =
 			schema.kind === "ref"
 				? scope.member(schema, first)
-				: scope.declare(schema, `${name}.variant${index}`, `${name}${javaTypeName(first)}Body`)
-		const wrapper = scope.at.names.hoist(`${name}.wrap${index}`, `${name}${javaTypeName(first)}`)
+				: scope.declare(schema, `${name}.variant${index}`, `${name}${spelled}Body`)
+		const wrapper = scope.at.names.hoist(`${name}.wrap${index}`, `${name}${spelled}`)
 		scope.at.decls.set(wrapper, wrapperText(wrapper, name, payload))
-		return { payload, values, wrapper }
+		return { payload, spelled, values, wrapper }
 	})
 }
 
