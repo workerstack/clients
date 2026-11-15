@@ -1,0 +1,24 @@
+{
+	"openapi": "3.2.1",
+	"info": { "title": "Realtime messages", "version": "1.0.0" },
+	"paths": {
+		"/room/{roomId}": {
+			"get": {
+				"operationId": "room.join",
+				"x-realtime": true,
+				"x-websocket": {
+					"receive": { "$ref": "#/components/schemas/RoomIn" },
+					"send": { "$ref": "#/components/schemas/RoomOut" }
+				},
+				"parameters": [{ "in": "path", "name": "roomId", "required": true, "schema": { "type": "string" } }],
+				"responses": { "101": { "description": "Switching Protocols" } }
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"RoomIn": { "type": "object", "properties": { "say": { "type": "string" } }, "required": ["say"] },
+			"RoomOut": { "type": "object", "properties": { "said": { "type": "string" } }, "required": ["said"] }
+		}
+	}
+}

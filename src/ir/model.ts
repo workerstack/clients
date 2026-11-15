@@ -82,6 +82,12 @@ export type IRBody =
 			schema: IRSchema
 	  }
 
+/** One named event an SSE response streams (an OpenAPI 3.2 `itemSchema` member): `message` when it names none. */
+export type IRSseEvent = { name: string; data: IRSchema }
+
+/** A WebSocket's message schemas from the rich `x-websocket`, named from the server's side: what it receives and sends. */
+export type IRWebSocketMessages = { receive?: IRSchema; send?: IRSchema }
+
 export type IRResponse = {
 	/** the status key as written: `200`, `4XX`, `default` */
 	status: string
@@ -94,6 +100,8 @@ export type IRResponse = {
 	contents?: { contentType: string; schema?: IRSchema }[]
 	/** a response a declared error produces (`x-backend-error`), never a declared output */
 	error?: true
+	/** the named events an SSE response's `itemSchema` declares, in order */
+	events?: IRSseEvent[]
 }
 
 export type IROperationExtensions = {
@@ -128,6 +136,8 @@ export type IROperation = {
 	bodies?: IRBody[]
 	responses: Record<string, IRResponse>
 	extensions: IROperationExtensions
+	/** the rich `x-websocket` object's messages, on a websocket or realtime operation */
+	messages?: IRWebSocketMessages
 }
 
 export type IRTreeEntry = { kind: "method"; op: IROperation } | { kind: "namespace"; ns: IRNamespace }

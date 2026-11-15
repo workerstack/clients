@@ -1,0 +1,31 @@
+{
+	"openapi": "3.2.1",
+	"info": { "title": "WebSocket messages", "version": "1.0.0" },
+	"paths": {
+		"/chat": {
+			"get": {
+				"operationId": "chat.open",
+				"x-websocket": {
+					"receive": { "$ref": "#/components/schemas/ClientFrame" },
+					"send": { "$ref": "#/components/schemas/ServerFrame" }
+				},
+				"responses": { "101": { "description": "Switching Protocols" } }
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"ClientFrame": {
+				"oneOf": [{ "$ref": "#/components/schemas/Say" }, { "$ref": "#/components/schemas/Leave" }],
+				"discriminator": { "propertyName": "type" }
+			},
+			"Say": {
+				"type": "object",
+				"properties": { "type": { "const": "say" }, "text": { "type": "string" } },
+				"required": ["type", "text"]
+			},
+			"Leave": { "type": "object", "properties": { "type": { "const": "leave" } }, "required": ["type"] },
+			"ServerFrame": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] }
+		}
+	}
+}

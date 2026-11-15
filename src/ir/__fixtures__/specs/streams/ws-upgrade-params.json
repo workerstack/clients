@@ -1,0 +1,28 @@
+{
+	"openapi": "3.2.1",
+	"info": { "title": "WebSocket upgrade", "version": "1.0.0" },
+	"paths": {
+		"/chat/{id}": {
+			"get": {
+				"operationId": "chat",
+				"x-websocket": { "receive": { "type": "string" }, "send": { "type": "string" } },
+				"parameters": [
+					{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } },
+					{ "in": "header", "name": "x-tenant", "required": true, "schema": { "type": "string" } },
+					{ "in": "cookie", "name": "session", "required": true, "schema": { "type": "string" } }
+				],
+				"responses": {
+					"101": { "description": "Switching Protocols" },
+					"401": {
+						"description": "Unauthorized",
+						"content": {
+							"application/json": {
+								"schema": { "type": "object", "properties": { "error": { "type": "string" } }, "required": ["error"] }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

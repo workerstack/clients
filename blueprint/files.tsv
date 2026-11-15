@@ -84,6 +84,7 @@ src/ir/schema.ts	gen	src	09	schemaToIR + irResolver (the JSON Schema to IR reade
 src/ir/build.ts	gen	src	09	build the IR from the OpenAPI/spec	codegen-ir.ts
 src/ir/resource-tree.ts	gen	src	09	resource tree from dotted operationId	codegen-ir.ts
 src/ir/slots.ts	gen	src	09	request/response slots + realtime/sse/ws markers; bit 11 extends responsesOf to carry declared response headers for A2 (additive, H13, g) — its slots.test gains a header-carried case; bit 15 e step 0b: a multipart body with a file part outranks urlencoded in requestBodies (urlencoded cannot carry a file; a text-only form keeps urlencoded first, JSON still leads), surfaced by Fe6 — slots.test gains the both-ways file and no-file legs (874ceba)	codegen-ir.ts
+src/ir/streams.ts	gen	src	22	roadmap 1 slice 2 (honey): an OpenAPI 3.2 SSE itemSchema's named events and the rich x-websocket's receive/send messages, read into optional IR fields no emitter reads yet; a malformed shape is left out, never refused	—
 src/ir/__fixtures__/	gen	corpus	09	v0 SDK spec fixtures (python/go/rust) copied byte-for-byte; the toIR round-trip (build.test) reads them; kept so tests stay valid after _v0 goes at bit 20	tests/unit/codegen/fixtures/*
 src/ir/sdk-model.ts	gen	src	09	the SDK model over the IR; bit 12 additively moves sseEventSchema + SdkOp.events here (H13) so the TS and Go emitters share one SSE-schema source — emit/ts service-map.ts/sdk-types.ts imports follow the move	codegen-sdk-model.ts
 src/ir/route-tree-intern.ts	gen	src	09	route-tree interning	codegen-route-tree-intern.ts

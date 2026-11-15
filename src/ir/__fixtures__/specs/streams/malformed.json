@@ -1,0 +1,100 @@
+{
+	"openapi": "3.2.1",
+	"info": {
+		"title": "Malformed stream shapes",
+		"version": "1.0.0"
+	},
+	"paths": {
+		"/not-an-object": {
+			"get": {
+				"operationId": "sse.notObject",
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"text/event-stream": {
+								"itemSchema": "tick"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/bad-members": {
+			"get": {
+				"operationId": "sse.badMembers",
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"text/event-stream": {
+								"itemSchema": {
+									"anyOf": [
+										7,
+										{
+											"type": "object",
+											"properties": {
+												"event": {
+													"const": 3
+												},
+												"data": {
+													"type": "string"
+												}
+											}
+										},
+										{
+											"type": "object",
+											"properties": {
+												"event": {
+													"const": "kept"
+												},
+												"data": {
+													"type": "string"
+												}
+											}
+										},
+										{
+											"type": "object"
+										}
+									]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/bad-directions": {
+			"get": {
+				"operationId": "ws.badDirections",
+				"x-websocket": {
+					"receive": "ClientFrame",
+					"send": {
+						"type": "string"
+					}
+				},
+				"responses": {
+					"101": {
+						"description": "Switching Protocols"
+					}
+				}
+			}
+		},
+		"/receive-only": {
+			"get": {
+				"operationId": "ws.receiveOnly",
+				"x-websocket": {
+					"receive": {
+						"type": "string"
+					},
+					"send": true
+				},
+				"responses": {
+					"101": {
+						"description": "Switching Protocols"
+					}
+				}
+			}
+		}
+	}
+}

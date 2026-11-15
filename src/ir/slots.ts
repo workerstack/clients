@@ -15,6 +15,7 @@ import {
 	type IRWebhookEvent,
 } from "./model.ts"
 import { schemaToIR } from "./schema.ts"
+import { sseEventsOf, websocketMessagesOf } from "./streams.ts"
 
 import { compareCodeUnits } from "../emit/shared/lang.ts"
 
@@ -196,7 +197,12 @@ export function responsesOf(op: Json, components: Components): { responses: Reco
 		const type = ordered(content)[0]
 		const out: IRResponse = { status }
 		if (type !== undefined) {
-			if (Object.keys(content).some((key) => essenceOf(key) === "text/event-stream")) sse = true
+			const stream = Object.keys(content).find((key) => essenceOf(key) === "text/event-stream")
+			if (stream !== undefined) {
+				sse = true
+				const events = sseEventsOf(content[stream]?.itemSchema, (value) => deref(value, components))
+				if (events !== undefined) out.events = events
+			}
 			out.contentType = type
 			const schema = content[type]?.schema as Json | undefined
 			if (schema !== undefined) out.schema = schemaToIR(schema)
@@ -213,10 +219,10 @@ export function responsesOf(op: Json, components: Components): { responses: Reco
 	return { responses, sse }
 }
 
-/** The backend extensions: each only when it is literally `true`; invalidation targets as strings. */
+/** The backend extensions: each only when it is literally `true` (`x-websocket` also as its rich object); invalidation targets as strings. */
 export function extensionsOf(op: Json, sse: boolean): IROperationExtensions {
 	const out: IROperationExtensions = {}
-	if (op["x-websocket"] === true) out.websocket = true
+	if (op["x-websocket"] === true || websocketMessagesOf(op["x-websocket"]) !== undefined) out.websocket = true
 	if (op["x-realtime"] === true) out.realtime = true
 	if (sse) out.sse = true
 	if (op["x-deprecated"] === true || op.deprecated === true) out.deprecated = true

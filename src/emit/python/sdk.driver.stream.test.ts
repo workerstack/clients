@@ -7,6 +7,8 @@
  * against the `sse`, `ws` and `realtime` registry documents (shared/__fixtures__/documents-streams.ts).
  */
 import { createHash } from "node:crypto"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import type { Call, Observed } from "../../../tests/integration/conformance/matrix.ts"
 import type { PythonError, Script } from "../shared/__fixtures__/protocol.ts"
@@ -15,7 +17,7 @@ import { type Reply, served } from "../shared/__fixtures__/recording-server.ts"
 import { FIXTURES } from "./__fixtures__/documents.ts"
 import { type DrivenPythonSdk, drivenPythonSdk } from "./__fixtures__/driven.ts"
 import { withPython } from "./__fixtures__/python-env.ts"
-import { pythonCallPlans } from "./sdk.ts"
+import { generatePythonSdk, pythonCallPlans } from "./sdk.ts"
 
 /** Whether Python is here: a missing interpreter fails where it is required and skips these legs elsewhere (python-env). */
 const PY = withPython()
@@ -135,6 +137,21 @@ describe("pythonCallPlans: a stream operation's plan", () => {
 				sync: false,
 			},
 		})
+	})
+})
+
+describe("generatePythonSdk: a rich x-websocket's upgrade inputs", () => {
+	it("opens the socket with the path param and the upgrade header, from the object form of x-websocket", () => {
+		const document = JSON.parse(
+			readFileSync(join(import.meta.dirname, "../../ir/__fixtures__/specs/streams/ws-upgrade-params.json"), "utf8"),
+		) as Record<string, unknown>
+		const plan = pythonCallPlans(document)["chat"]
+		const source = Object.values(generatePythonSdk(document).files).join("\n")
+		expect([plan?.stream, plan?.headers, source.includes("async def chat(self, id: str, *, x_tenant: str,")]).toEqual([
+			"ws",
+			{ "x-tenant": "x_tenant" },
+			true,
+		])
 	})
 })
 

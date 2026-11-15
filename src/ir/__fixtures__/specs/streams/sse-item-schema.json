@@ -1,0 +1,62 @@
+{
+	"openapi": "3.2.1",
+	"info": { "title": "SSE events", "version": "1.0.0" },
+	"paths": {
+		"/ticks": {
+			"get": {
+				"operationId": "ticks.stream",
+				"responses": {
+					"200": {
+						"description": "Ticks",
+						"content": {
+							"text/event-stream": {
+								"itemSchema": {
+									"oneOf": [
+										{
+											"type": "object",
+											"properties": {
+												"event": { "const": "tick" },
+												"data": {
+													"type": "string",
+													"contentMediaType": "application/json",
+													"contentSchema": { "$ref": "#/components/schemas/Tick" }
+												}
+											},
+											"required": ["event", "data"]
+										},
+										{ "$ref": "#/components/schemas/PlainEvent" }
+									]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/beats": {
+			"get": {
+				"operationId": "beats.stream",
+				"responses": {
+					"200": {
+						"description": "Beats",
+						"content": {
+							"text/event-stream": {
+								"itemSchema": {
+									"type": "object",
+									"properties": { "event": { "const": "beat" }, "data": { "type": "integer" } },
+									"required": ["event", "data"]
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"Tick": { "type": "object", "properties": { "at": { "type": "integer" } }, "required": ["at"] },
+			"PlainEvent": { "type": "object", "properties": { "data": { "type": "string" } }, "required": ["data"] }
+		}
+	}
+}

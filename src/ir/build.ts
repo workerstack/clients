@@ -16,6 +16,7 @@ import {
 	requestBodies,
 	responsesOf,
 } from "./slots.ts"
+import { websocketMessagesOf } from "./streams.ts"
 
 type Json = Record<string, unknown>
 
@@ -80,6 +81,8 @@ function operationOf(id: string, op: Json, { components, item, method, path }: S
 	if (bodies.length > 1) operation.bodies = bodies
 	if (typeof op.description === "string") operation.description = op.description
 	if (typeof op.summary === "string") operation.summary = op.summary
+	const messages = websocketMessagesOf(op["x-websocket"])
+	if (messages !== undefined) operation.messages = messages
 	return operation
 }
 
