@@ -1,0 +1,8 @@
+// The runtime is read as text and vendored into every generated TS and MCP SDK, so it keeps the style the
+// emitters format SDKs in (EMIT_STYLE in src/emit/shared/format.ts), not the repo's: tabs, no semicolons, imports
+// as written. Its byte locks in scripts/sdk-budget*.test.ts measure the shipped text.
+{
+	"printWidth": 120,
+	"semi": false,
+	"useTabs": true,
+}

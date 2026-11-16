@@ -1,7 +1,7 @@
 dist/
 **/.cache/
 
-# repo:ignore 6bfbc92f
+# repo:ignore 7d468bac
 .tmp/
 .worktrees/
 coverage/
@@ -17,14 +17,14 @@ repo.config.local.ts
 **/.repo/tmp/
 **/.repo/backlog.md
 node_modules/
-knip.jsonc
+/knip.jsonc
 knip.unignored-*.jsonc
-.oxfmtrc.jsonc
-.oxlintrc.jsonc
+/.oxfmtrc.jsonc
+/.oxlintrc.jsonc
 .oxlintrc.unskipped-*.jsonc
-.agents/
-.claude/
-.codex/
-.cursor/
-.grok/
+/.agents/
+/.claude/
+/.codex/
+/.cursor/
+/.grok/
 # /repo:ignore
