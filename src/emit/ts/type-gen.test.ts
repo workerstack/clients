@@ -460,7 +460,7 @@ describe("the operationId slot: WebSocket ids", () => {
 expectType<Equal<OperationId, "feed" | "ping" | "rooms.live">>()
 expectType<Equal<HttpOperationId, never>>()
 expectType<Same<OperationCtx<"feed">["params"], { room: string }>>()
-expectType<Same<OperationCtx<"rooms.live">["input"], { search: { token?: string }; headers: { "x-tenant": string }; cookies: { session: string } }>>()
+expectType<Same<OperationCtx<"rooms.live">["input"], { search: { token?: string | undefined }; headers: { "x-tenant": string }; cookies: { session: string } }>>()
 expectType<Equal<OperationCtx<"ping">, BaseCtx>>()
 expectType<Equal<"input" extends keyof OperationCtx<"feed"> ? true : false, false>>()`;
 
@@ -472,7 +472,7 @@ expectType<Equal<"input" extends keyof OperationCtx<"feed"> ? true : false, fals
         ['"ping"', '{ kind: "ws"; ctx: BaseCtx }'],
         [
           '"rooms.live"',
-          '{ kind: "ws"; ctx: BaseCtx & { readonly input: { search: { token?: string }; headers: { "x-tenant": string }; cookies: { session: string } }; readonly params: { room: string } } }',
+          '{ kind: "ws"; ctx: BaseCtx & { readonly input: { search: { token?: string | undefined }; headers: { "x-tenant": string }; cookies: { session: string } }; readonly params: { room: string } } }',
         ],
       ],
     });

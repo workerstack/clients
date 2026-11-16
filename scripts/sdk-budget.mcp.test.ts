@@ -90,7 +90,9 @@ const SLOW = { timeout: 120_000 };
 // SdkClient's `safe` and the twin walked, +11; the header naming the twin, +49), result.ts -47 (Answer the Result's
 // shape, failureOf's own two fields), mount.ts -55 (the dead `throwOnError: false`, field and value, cut). Bit 21 in all: +37,443 B over its start, 31,165 -> 68,608.
 // Plan 55, +6 B to 58,598 B: the rename's names (`Http*`, the runtime namespaces and packages), no behavior moved.
-const MCP_PORTABLE_BYTES = 58598;
+// The standards pack, +109 B to 58,707 B: `| undefined` on the optional fields a strict consumer's
+// `exactOptionalPropertyTypes` would refuse an undefined in (http.ts, protocol.ts, files.ts, mount.ts).
+const MCP_PORTABLE_BYTES = 58707;
 
 // the node part's own tail of that history: bit 21 g, +38 B to 10,016 B; the standards pack, -20 B to 9,996 B:
 // listen.ts's `as ReadableStream` cast on Readable.toWeb cut, which bun's types refuse beside the DOM's and the

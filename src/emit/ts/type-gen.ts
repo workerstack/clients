@@ -12,7 +12,7 @@ import { isJsonMedia, mediaEssence } from "../../ir/sdk-model.ts";
 import { bodiesOf } from "../../ir/slots.ts";
 import { tsString } from "../shared/escape.ts";
 import { compareCodeUnits } from "../shared/lang.ts";
-import { literalType, quoteKey } from "../shared/literals.ts";
+import { literalType, optionalType, quoteKey } from "../shared/literals.ts";
 import { statusKeyOf } from "../shared/status-keys.ts";
 import { irToTs, type TypeOptions } from "../shared/type-emitter.ts";
 import type { RouteTree } from "./route-tree.ts";
@@ -96,7 +96,11 @@ function wireInput(op: IROperation, ctx: Ctx): Field[] {
     objectText(
       [...params]
         .sort((a, b) => compareCodeUnits(a.name, b.name))
-        .map((p) => [`${quoteKey(p.name)}${p.required === true ? "" : "?"}`, ctx.resolve(p.schema)]),
+        .map((p): Field =>
+          p.required === true
+            ? [quoteKey(p.name), ctx.resolve(p.schema)]
+            : [`${quoteKey(p.name)}?`, optionalType(ctx.resolve(p.schema))],
+        ),
     );
 
   const fields: Field[] = [];

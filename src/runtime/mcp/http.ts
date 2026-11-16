@@ -9,7 +9,11 @@ import { ErrorCode, failure, isId, type Reply } from "./jsonrpc.ts"
 import { BATCHED, claimed, isObject, MODERN, type Protocol, PROTOCOL_VERSIONS, unserved, VERSION } from "./protocol.ts"
 
 /** What the transport serves beside its own origin, its body cap in bytes, and its calls' files (a mount's). */
-export type HttpOptions = { readonly origins?: readonly string[]; readonly max?: number; readonly files?: Files }
+export type HttpOptions = {
+	readonly origins?: readonly string[] | undefined
+	readonly max?: number | undefined
+	readonly files?: Files | undefined
+}
 
 const SSE = { "cache-control": "no-cache", "content-type": "text/event-stream", "x-accel-buffering": "no" }
 
@@ -103,7 +107,7 @@ function streamed(
 	protocol: Protocol,
 	body: unknown,
 	version: string,
-	{ closed, files }: { closed?: AbortSignal; files?: Files },
+	{ closed, files }: { closed?: AbortSignal | undefined; files?: Files | undefined },
 ) {
 	const call = new AbortController()
 	const signal = closed ? AbortSignal.any([closed, call.signal]) : call.signal

@@ -96,7 +96,7 @@ describe("gen adversarial: names in emitted source", () => {
 
     const outputs = [names, names.toReversed(), ["Z", "a", "B", "_", "b"]].map(emit);
     expect(new Set(outputs).size).toBe(1);
-    expect(outputs[0]).toBe("{ B?: string; Z?: string; _?: string; a?: string; b?: string }");
+    expect(outputs[0]).toBe(`{ ${["B", "Z", "_", "a", "b"].map((n) => `${n}?: string | undefined`).join("; ")} }`);
   });
 });
 

@@ -3,8 +3,17 @@
  * escape layer (F2), never `JSON.stringify` alone.
  */
 import { tsString } from "./escape.ts";
+import { UNKNOWN_TYPE } from "./unknown-type.constants.ts";
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * An optional property's type: under `exactOptionalPropertyTypes` a `k?: T` refuses the `undefined` a zod
+ * `.optional()` infers, so the generated type says it too; `unknown` already holds it.
+ */
+export function optionalType(type: string): string {
+  return type === UNKNOWN_TYPE ? type : `${type} | undefined`;
+}
 
 /** A property key in a type or object literal: bare when it is an identifier, a string literal otherwise. */
 export function quoteKey(key: string): string {

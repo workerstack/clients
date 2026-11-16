@@ -28,8 +28,8 @@ export type MountConfig = {
  */
 export type Mount = {
 	readonly dispatch: (request: Request) => Promise<Response>
-	readonly origins?: readonly string[]
-	readonly max?: number
+	readonly origins?: readonly string[] | undefined
+	readonly max?: number | undefined
 	readonly uploads?: Uploads | undefined
 	readonly fetchFile?: FetchFile | undefined
 }

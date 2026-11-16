@@ -93,7 +93,7 @@ describe("irToTs: objects", () => {
       ts({ type: "object" }),
       ts({ additionalProperties: { type: "string" } }),
     ]).toEqual([
-      '{ "2d"?: unknown; B?: number; b: string; class?: string; "x-y"?: unknown }',
+      '{ "2d"?: unknown; B?: number | undefined; b: string; class?: string | undefined; "x-y"?: unknown }',
       "{ id: string } & { [k: string]: number }",
       "{ id: string }",
       "Record<string, unknown>",

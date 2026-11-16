@@ -17,7 +17,7 @@ import {
 import { bodiesOf } from "../../ir/slots.ts";
 import { blockCommentText, tsString } from "../shared/escape.ts";
 import { compareCodeUnits, NameTable, pascalWords } from "../shared/lang.ts";
-import { quoteKey } from "../shared/literals.ts";
+import { optionalType, quoteKey } from "../shared/literals.ts";
 import { irToTs, type TypeOptions } from "../shared/type-emitter.ts";
 import { runtimeFeatures } from "./http.ts";
 import { importText, RESERVED, shared } from "./sdk-types-preamble.ts";
@@ -35,7 +35,9 @@ function paramsPart(field: string, params: readonly IRParam[], value: (p: IRPara
 
   const entries = [...params]
     .sort((a, b) => compareCodeUnits(a.name, b.name))
-    .map((p) => `${quoteKey(p.name)}${p.required === true ? "" : "?"}: ${value(p)}`);
+    .map((p) =>
+      p.required === true ? `${quoteKey(p.name)}: ${value(p)}` : `${quoteKey(p.name)}?: ${optionalType(value(p))}`,
+    );
 
   return { field, required: params.some((p) => p.required === true), type: objectText(entries) };
 }
@@ -99,7 +101,7 @@ function inputOf(op: SdkOp, ctx: Context): { required: boolean; type: string } {
   ].filter((part): part is Part => part !== null);
 
   const ordered = [...parts.filter((p) => p.required), ...parts.filter((p) => !p.required)];
-  const fields = ordered.map((p) => `${p.field}${p.required ? "" : "?"}: ${p.type}`);
+  const fields = ordered.map((p) => (p.required ? `${p.field}: ${p.type}` : `${p.field}?: ${optionalType(p.type)}`));
 
   return { required: parts.some((p) => p.required), type: objectText(fields) };
 }

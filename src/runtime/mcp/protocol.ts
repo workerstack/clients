@@ -60,7 +60,7 @@ export type Context = {
 	readonly signal: AbortSignal
 	readonly notify: (message: object) => void
 	readonly connection: Connection
-	readonly files?: Files
+	readonly files?: Files | undefined
 }
 
 /** Each message's reply, a batch's, or none; a promise only for a call, never rejected. */

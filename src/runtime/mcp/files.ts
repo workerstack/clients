@@ -41,7 +41,7 @@ export type Files = {
 	readonly uploads?: Uploads
 	readonly credential?: string
 	readonly asked?: Record<string, unknown>
-	readonly client?: { readonly extensions?: Record<string, unknown> }
+	readonly client?: { readonly extensions?: Record<string, unknown> } | undefined
 }
 
 /* canonical base64: whole quads, the last padded, its unused bits zero */

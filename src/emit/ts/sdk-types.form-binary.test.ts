@@ -31,12 +31,12 @@ const op = (requestBody: Json) => ({
 
 describe("a multipart form's binary field", () => {
   it("is a Blob when the form's schema is written inline", () => {
-    expect(typesOf(op(form(SHAPE)))).toContain("form: { file?: Blob; text?: string }");
+    expect(typesOf(op(form(SHAPE)))).toContain("form: { file?: Blob | undefined; text?: string | undefined }");
   });
 
   it("is a Blob when the form's schema is a $ref to a component", () => {
     const text = typesOf(op(form({ $ref: "#/components/schemas/UploadRequest" })), { UploadRequest: SHAPE });
-    expect(text).toContain("form: { file?: Blob; text?: string }");
+    expect(text).toContain("form: { file?: Blob | undefined; text?: string | undefined }");
   });
 
   it("stays a string on the component itself, which a JSON body reads", () => {
@@ -52,8 +52,8 @@ describe("a multipart form's binary field", () => {
     };
 
     const text = typesOf(paths, { UploadRequest: SHAPE });
-    expect(text).toContain("export type UploadRequest = { file?: string; text?: string }");
+    expect(text).toContain("export type UploadRequest = { file?: string | undefined; text?: string | undefined }");
     expect(text).toContain("json: UploadRequest");
-    expect(text).toContain("form: { file?: Blob; text?: string }");
+    expect(text).toContain("form: { file?: Blob | undefined; text?: string | undefined }");
   });
 });

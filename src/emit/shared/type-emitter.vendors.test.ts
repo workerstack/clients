@@ -200,7 +200,7 @@ const CASES: readonly (readonly [name: string, schema: Json, type: string])[] = 
   [
     "an optional property, a defaulted one going in among them",
     object({ id: STRING, note: STRING }, ["id"]),
-    "{ id: string; note?: string }",
+    "{ id: string; note?: string | undefined }",
   ],
   // v0: 6343b34759
   // v0: c24a0fd981
@@ -210,7 +210,7 @@ const CASES: readonly (readonly [name: string, schema: Json, type: string])[] = 
   // v0: 99fda2fec4
   // v0: f5b29df222
   // v0: 1299a7554a
-  ["a nullable optional property", object({ note: NULLABLE }, []), "{ note?: string | null }"],
+  ["a nullable optional property", object({ note: NULLABLE }, []), "{ note?: string | null | undefined }"],
   // v0: 59429fa4c7
   // v0: b28d788143
   // v0: 0d8b0fded3
@@ -221,7 +221,7 @@ const CASES: readonly (readonly [name: string, schema: Json, type: string])[] = 
   [
     "required, optional and nullable together",
     object({ a: STRING, b: STRING, c: NULLABLE, d: NULLABLE }, ["a", "c"]),
-    "{ a: string; b?: string; c: string | null; d?: string | null }",
+    "{ a: string; b?: string | undefined; c: string | null; d?: string | null | undefined }",
   ],
   // v0: 22eac6cf47
   // v0: 710e529f3a
@@ -248,7 +248,7 @@ const CASES: readonly (readonly [name: string, schema: Json, type: string])[] = 
   [
     "an array of objects with an optional property",
     { items: object({ id: STRING, tag: STRING }, ["id"]), type: "array" },
-    "{ id: string; tag?: string }[]",
+    "{ id: string; tag?: string | undefined }[]",
   ],
   // v0: 600014a001
   ["an array of arrays", { items: { items: STRING, type: "array" }, type: "array" }, "string[][]"],

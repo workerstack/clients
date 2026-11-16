@@ -4,7 +4,7 @@
  */
 import type { IRSchema } from "../../ir/model.ts";
 import { compareCodeUnits } from "./lang.ts";
-import { literalType, quoteKey } from "./literals.ts";
+import { literalType, optionalType, quoteKey } from "./literals.ts";
 
 export type TypeOptions = {
   /** the type of a binary string: `string` in JSON (the default), `Blob` in a multipart form */
@@ -78,7 +78,11 @@ function objectOf(ir: Extract<IRSchema, { kind: "object" }>, emit: Emit): string
 
   const fields = [...ir.fields]
     .sort((a, b) => compareCodeUnits(a.name, b.name))
-    .map((field) => `${quoteKey(field.name)}${field.required ? "" : "?"}: ${emit(field.schema)}`);
+    .map((field) =>
+      field.required
+        ? `${quoteKey(field.name)}: ${emit(field.schema)}`
+        : `${quoteKey(field.name)}?: ${optionalType(emit(field.schema))}`,
+    );
 
   const shape = `{ ${fields.join("; ")} }`;
 
