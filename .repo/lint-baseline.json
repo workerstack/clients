@@ -10,9 +10,6 @@
     "typescript(no-unsafe-member-access)": 5,
     "typescript(strict-boolean-expressions)": 1
   },
-  ".github/release-fixture/release.config.ts": {
-    "typescript(no-unsafe-call)": 1
-  },
   "assets/installers/examples/github.config.ts": {
     "typescript(no-base-to-string)": 4,
     "typescript(restrict-template-expressions)": 4
@@ -34,17 +31,15 @@
     "repo(env-in-config)": 6,
     "repo(max-line-width)": 1,
     "typescript(no-unsafe-argument)": 2,
-    "typescript(no-unsafe-assignment)": 3,
+    "typescript(no-unsafe-assignment)": 2,
     "typescript(no-unsafe-call)": 2,
     "typescript(no-unsafe-member-access)": 1,
-    "typescript(no-unsafe-return)": 2,
+    "typescript(no-unsafe-return)": 1,
     "typescript(strict-boolean-expressions)": 4
   },
   "bin/installgen.js": {
     "repo(entry-file)": 5,
-    "typescript(no-unsafe-assignment)": 1,
-    "typescript(no-unsafe-call)": 1,
-    "typescript(no-unsafe-return)": 1
+    "typescript(no-unsafe-call)": 1
   },
   "docs/examples/ts/example.ts": {
     "repo(env-in-config)": 1,
