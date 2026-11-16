@@ -6,6 +6,11 @@ import { existsSync } from "node:fs";
 
 const checkout = existsSync(new URL("../tsconfig.json", import.meta.url));
 
+/**
+ * The module to run: the source, or the build compiled from it, typed as the source.
+ *
+ * @returns {Promise<typeof import("../src/installers/cli.ts")>}
+ */
 async function entry() {
   if (checkout) {
     if (typeof globalThis.Bun !== "undefined") return import("../src/installers/cli.ts");
@@ -14,7 +19,8 @@ async function entry() {
     return createJiti(import.meta.url).import("../src/installers/cli.ts");
   }
 
-  return import("../dist/installers/cli.js");
+  // typed as the source it compiles from, so lint reads the same types with or without a build
+  return /** @type {Promise<typeof import("../src/installers/cli.ts")>} */ (import("../dist/installers/cli.js"));
 }
 
 const { start } = await entry();

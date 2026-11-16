@@ -70,6 +70,11 @@ const sourceEnv = checkout
     }
   : {};
 
+/**
+ * The module to run: the source, or the build compiled from it, typed as the source.
+ *
+ * @returns {Promise<typeof import("../src/cli.ts")>}
+ */
 async function entry() {
   if (checkout) {
     if (isBun) return import("../src/cli.ts");
@@ -79,7 +84,8 @@ async function entry() {
   }
 
   try {
-    return await import("../dist/cli.js");
+    // typed as the source it compiles from, so lint reads the same types with or without a build
+    return /** @type {typeof import("../src/cli.ts")} */ (await import("../dist/cli.js"));
   } catch (error) {
     if (error?.code === "ERR_MODULE_NOT_FOUND" && String(error.url).endsWith("/dist/cli.js")) {
       console.error("clients: dist/ is missing from this install. Reinstall it, or run it with Bun.");

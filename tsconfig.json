@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    // the bins are JavaScript: in this program lint types them as it does the rest, where an inferred one lacks Node
+    "allowJs": true,
     "customConditions": ["clients-source", "backend-source"],
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
@@ -8,6 +10,8 @@
     },
     "target": "ESNext"
   },
+  // the vendored tokenizer's own JavaScript stays out; its .d.ts files type it
+  "exclude": ["src/_tokenizer/**/*.js"],
   "extends": "@workerstack/repo/tsconfig/bun",
-  "include": ["src/**/*", "tests/**/*", "scripts/**/*", "assets/**/*.ts"]
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*", "assets/**/*.ts", ".github/release-fixture/*.ts", "bin/*.js"]
 }

@@ -30,16 +30,15 @@
     "repo(entry-file)": 12,
     "repo(env-in-config)": 6,
     "repo(max-line-width)": 1,
-    "typescript(no-unsafe-argument)": 2,
-    "typescript(no-unsafe-assignment)": 2,
-    "typescript(no-unsafe-call)": 2,
+    "typescript(no-unsafe-argument)": 1,
+    "typescript(no-unsafe-assignment)": 1,
+    "typescript(no-unsafe-call)": 1,
     "typescript(no-unsafe-member-access)": 1,
     "typescript(no-unsafe-return)": 1,
     "typescript(strict-boolean-expressions)": 4
   },
   "bin/installgen.js": {
-    "repo(entry-file)": 5,
-    "typescript(no-unsafe-call)": 1
+    "repo(entry-file)": 5
   },
   "docs/examples/ts/example.ts": {
     "repo(env-in-config)": 1,

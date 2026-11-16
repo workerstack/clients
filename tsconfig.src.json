@@ -1,5 +1,6 @@
 {
   "exclude": [
+    "src/_tokenizer/**/*.js",
     "**/*.test.ts",
     "**/*.typetest.ts",
     "**/__fixtures__/**",
@@ -7,7 +8,9 @@
     // the SDK runtimes, copied as text into generated SDKs and held to each SDK's own build, as tsconfig.build.json
     // leaves them out of the package; and the installgen config templates `installgen init` copies into a project
     "src/runtime/**",
-    "assets/installers/examples/**"
+    "assets/installers/examples/**",
+    // the release fixture's config, which tsconfig.json includes only so lint resolves its import from source
+    ".github/**"
   ],
   // exclude replaces tsconfig.json's own: its entries, then the tests and their helpers
   "extends": ["./tsconfig.json", "@workerstack/repo/tsconfig/strict"]
