@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The clients bin (bit 17 phase h). A repository checkout (marked by tsconfig.json, which is not published)
-// runs the TypeScript source, natively on Bun (under the backend-source condition) and through jiti on Node, so a stale
-// dist/ never runs; an installed package runs the compiled JavaScript on any runtime (the tarball ships dist/, not src/).
+// runs the TypeScript source natively (on Bun under the backend-source condition, on Node by its type stripping), so a
+// stale dist/ never runs; an installed package runs the compiled JavaScript on any runtime (the tarball ships dist/,
+// not src/).
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
@@ -77,10 +78,8 @@ const sourceEnv = checkout
  */
 async function entry() {
   if (checkout) {
-    if (isBun) return import("../src/cli.ts");
-    const { createJiti } = await import("jiti");
-
-    return createJiti(import.meta.url).import("../src/cli.ts");
+    // Node strips the source's types by default from 22.18
+    return import("../src/cli.ts");
   }
 
   try {

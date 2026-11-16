@@ -1,7 +1,8 @@
 /**
  * The generate CLI's child process (bit 17 phase h): watch mode runs each generation as a fresh `clients`, so
  * nothing one run loads outlives it. The child is the package's own bin on this runtime, which picks the entry as it
- * does for a user (Bun the TypeScript source, a checkout the source through jiti, an install the compiled one).
+ * does for a user (Bun the TypeScript source, a checkout the source by Node's type stripping, an install the compiled
+ * one).
  */
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";

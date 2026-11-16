@@ -2,7 +2,7 @@
  * Loads a `release.config.ts` the way an installgen config loads: a config outside any install (a fixture dir, a repo
  * that runs `bunx`) has no `node_modules` to resolve `@workerstack/clients/release` from, so that one import is
  * mapped to the running package's own entry while the config is imported (a Node resolve hook, deregistered after;
- * a Bun virtual module). jiti would resolve it against a local install, which is exactly what is missing.
+ * a Bun virtual module). A plain resolve would look in a local install, which is exactly what is missing.
  */
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";

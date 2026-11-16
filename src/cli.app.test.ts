@@ -250,7 +250,7 @@ describe.skipIf(!PINNED_BUN)(`generate --app through the bin under Bun ${pinnedB
   }, 90_000);
 });
 
-/** The bin started by Bun itself from `cwd`, a fresh TMPDIR (a cold jiti cache) and `env` over the rest, its run marked. */
+/** The bin started by Bun itself from `cwd`, a fresh TMPDIR (no cache left by an earlier run) and `env` over the rest, its run marked. */
 function onBun(cwd: string, env: NodeJS.ProcessEnv = {}) {
   const tmp = join(cwd, "cold-tmp");
   mkdirSync(tmp, { recursive: true });
@@ -280,9 +280,9 @@ describe.skipIf(!PINNED_BUN)(`generate --app on Bun ${pinnedBunVersion()}, by Bu
     ]);
   }, 90_000);
 
-  // Vite's Node chunk makes follow-redirects' errors with a non-Error captureStackTrace at load: once jiti's Babel has
-  // hooked Error.prepareStackTrace, Bun throws "First argument must be an Error object" there
-  it("generates from a module importing vite, a cold jiti cache", () => {
+  // Vite's Node chunk makes follow-redirects' errors with a non-Error captureStackTrace at load: a loader that hooks
+  // Error.prepareStackTrace makes Bun throw "First argument must be an Error object" there
+  it("generates from a module importing vite, from a cold cache", () => {
     const dir = project({
       "src/app.ts": `import { defaultClientConditions } from "vite"\n${HTTP_APP}export const app = httpApp().get("/health").meta({ operationId: "health" }).handler((c) => c.res.text("ok", "ok"))\nexport const conditions = defaultClientConditions\n`,
     });
