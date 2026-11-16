@@ -128,7 +128,7 @@ describe("types: objects, lib types, enums and cycles", () => {
       instance: "{ readonly shown: 4 }",
       mapped: "{ a: number; b: number }",
       mixed: "{ a: 1; [key: string]: number }",
-      object: '{ "a-b": 1; ok?: string; nil?: null | string; readonly r: number }',
+      object: '{ "a-b": 1; ok?: string | undefined; nil?: null | string | undefined; readonly r: number }',
       record: "Record<string, number>",
       vague: "{ u?: unknown }",
     });

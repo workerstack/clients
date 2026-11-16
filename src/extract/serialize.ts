@@ -11,7 +11,7 @@
  */
 import type { ts } from "ts-morph";
 
-import { quoteKey } from "../emit/shared/literals.ts";
+import { optionalType, quoteKey } from "../emit/shared/literals.ts";
 import { arrayOf, intersectionOf, unionOf } from "../emit/shared/type-emitter.ts";
 
 export type Compiler = typeof ts;
@@ -293,7 +293,8 @@ export class Serializer {
       const readonly = decls.some((d) => compiler.getCombinedModifierFlags(d) & M.Readonly);
       const optional = (p.flags & compiler.SymbolFlags.Optional) !== 0;
       const member = checker.getTypeOfSymbol(p);
-      const value = optional ? this.optional(member) : this.serialize(member);
+      // `| undefined` said out loud: under exactOptionalPropertyTypes a bare `k?: T` refuses the undefined zod infers
+      const value = optional ? optionalType(this.optional(member)) : this.serialize(member);
       entries.push(`${readonly ? "readonly " : ""}${quoteKey(p.getName())}${optional ? "?" : ""}: ${value}`);
     }
 

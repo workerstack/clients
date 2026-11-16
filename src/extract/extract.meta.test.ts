@@ -23,7 +23,7 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
         "meta/declared.ts",
         lines(
           'import { httpApp } from "@workerstack/backend/http"',
-          'type AppMeta = { tenant?: "organization" | "project"; worker: "extract" }',
+          'type AppMeta = { tenant?: "organization" | "project" | undefined; worker: "extract" }',
           'export const app = httpApp<{}>().metaType<AppMeta>().meta({ worker: "extract" })',
           'app.get("/tables").handler((c) => c.res.text("ok", "ok"))',
         ),
@@ -38,7 +38,9 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
         ),
       );
 
-      expect(extract(declared).types.meta).toBe('{ tenant?: "organization" | "project"; worker: "extract" }');
+      expect(extract(declared).types.meta).toBe(
+        '{ tenant?: "organization" | "project" | undefined; worker: "extract" }',
+      );
       expect(extract(none).types.meta).toBeNull();
     },
     SLOW,
@@ -51,14 +53,16 @@ describe("the base: the meta type the app declares (bit 22 a)", () => {
         "meta/type-only.ts",
         lines(
           'import { httpApp } from "@workerstack/backend/http"',
-          'type AppMeta = { tenant?: "organization" | "project"; worker: "extract" }',
+          'type AppMeta = { tenant?: "organization" | "project" | undefined; worker: "extract" }',
           "export const app = httpApp<{}>().metaType<AppMeta>()",
           'app.get("/tables").meta({ worker: "extract" }).handler((c) => c.res.text("ok", "ok"))',
         ),
       );
 
       const notAnApp = project.write("meta/not-an-app.ts", lines("export const app = { get: 1 }"));
-      expect(extract(typeOnly).types.meta).toBe('{ tenant?: "organization" | "project"; worker: "extract" }');
+      expect(extract(typeOnly).types.meta).toBe(
+        '{ tenant?: "organization" | "project" | undefined; worker: "extract" }',
+      );
       expect(() => extract(notAnApp)).toThrow('Export "app" is not a backend app: it carries no $ctx, $env');
     },
     SLOW,
