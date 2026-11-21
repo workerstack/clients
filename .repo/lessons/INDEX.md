@@ -5,4 +5,6 @@
 - `run-the-gates-that-read-your-source` (hits 5): Changed source reds the gates that read it, not only its own tests
 - `slow-leg-default-timeout` (hits 2): A heavy leg without an explicit timeout reds only under load
 - `ci-env-differs-from-local` (hits 1): CI runs the same scripts as local, not the same environment
+- `docs-gate-type-checks-plain-fences` (hits 1): The docs gate type-checks every plain ts fence on its own
+- `parallel-slices-share-a-module` (hits 1): Parallel slices fix the same shared module, each its own way
 - `workerd-refuses-cross-request-io` (hits 1): On workerd, one request never writes another request's stream
