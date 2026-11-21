@@ -17,7 +17,7 @@ language's client in a slice of a compiled example; the
 clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen
 ```
 
-```ts sdk
+```sdk ts
 import { DecodeError, Kitchen, NotFoundError } from "./kitchen"
 
 export function newClient(): Kitchen {

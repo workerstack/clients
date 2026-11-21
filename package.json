@@ -27,7 +27,8 @@
   "files": [
     "assets",
     "bin",
-    "dist"
+    "dist",
+    "references"
   ],
   "type": "module",
   "sideEffects": false,
@@ -52,7 +53,8 @@
       "types": "./dist/release/index.d.ts",
       "default": "./dist/release/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./references/*": "./references/*"
   },
   "publishConfig": {
     "access": "public",

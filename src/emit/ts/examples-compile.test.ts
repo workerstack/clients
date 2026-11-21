@@ -112,11 +112,16 @@ export function sdkTypeErrors(sources: Readonly<Record<string, string>>, dir: st
   return out.split("\n").filter((line) => / error TS\d+/.test(line));
 }
 
-/** Each `ts sdk` block as a source named after its page and line. */
+/**
+ * Each `ts sdk` block as a source named after its page and line; a reference page spells it `sdk ts`, because
+ * `repo docs` type-checks every block whose first word is `ts` on its own, and these import a generated SDK.
+ */
+const SDK_INFOS = new Set(["ts sdk", "sdk ts"]);
+
 const sourcesOf = (blocks: readonly Block[]) =>
   Object.fromEntries(
     blocks
-      .filter((block) => block.info === "ts sdk")
+      .filter((block) => SDK_INFOS.has(block.info))
       .map((block) => [`${block.at.replaceAll(/[/:.]/g, "_")}.ts`, block.code]),
   );
 

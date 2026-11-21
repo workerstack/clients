@@ -5,7 +5,7 @@
  * runs the repo's own dev tools, and the postinstall one (`repo sync`) failed every install of rc.30, npx's included.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -86,4 +86,15 @@ describe("scripts/pack.ts", () => {
       ]);
     },
   );
+
+  it("ships and exports the repository's reference pages", () => {
+    const text = readFileSync(new URL("../package.json", import.meta.url), "utf8");
+
+    const { exports, files } = JSON.parse(text) /* the repo's own manifest */ as {
+      exports: { "./references/*"?: string };
+      files: string[];
+    };
+
+    expect([files.includes("references"), exports["./references/*"]]).toStrictEqual([true, "./references/*"]);
+  });
 });
