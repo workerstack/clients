@@ -5500,7 +5500,6 @@
   },
   "src/emit/ts/sdk.ts": {
     "eslint(func-style)": 3,
-    "eslint(max-params)": 1,
     "eslint(no-nested-ternary)": 1,
     "repo(as-needs-reason)": 2,
     "repo(magic-regex)": 1,
@@ -7062,7 +7061,6 @@
     "repo(class-file)": 19,
     "repo(magic-number)": 2,
     "repo(magic-string)": 1,
-    "repo(member-ordering)": 4,
     "repo(no-boolean-param)": 2,
     "repo(no-known-value-widening)": 1,
     "repo(no-reflect-get)": 3,

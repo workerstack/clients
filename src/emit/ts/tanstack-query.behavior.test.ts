@@ -20,18 +20,20 @@ const SDK_NAME = "acme";
 const serviceMap: ServiceMap = {
   extract: {
     stream: {
+      id: "extract.stream",
       invalidate: ["GET /v1/projects/rows"],
       method: "POST",
       path: "/v1/projects/extract-stream",
       sse: true,
     },
-    watch: { method: "GET", path: "/v1/projects/watch", ws: true },
+    watch: { id: "extract.watch", method: "GET", path: "/v1/projects/watch", ws: true },
   },
   org: {
-    create: { invalidate: ["GET /v1/organizations"], method: "POST", path: "/v1/organizations" },
-    get: { method: "GET", params: ["organization_id"], path: "/v1/organizations/{organization_id}" },
-    list: { method: "GET", path: "/v1/organizations" },
+    create: { id: "org.create", invalidate: ["GET /v1/organizations"], method: "POST", path: "/v1/organizations" },
+    get: { id: "org.get", method: "GET", params: ["organization_id"], path: "/v1/organizations/{organization_id}" },
+    list: { id: "org.list", method: "GET", path: "/v1/organizations" },
     update: {
+      id: "org.update",
       invalidate: ["GET /v1/organizations", "GET /v1/organizations/:organization_id"],
       method: "PATCH",
       params: ["organization_id"],
@@ -39,8 +41,8 @@ const serviceMap: ServiceMap = {
     },
   },
   other: {
-    noop: { method: "POST", path: "/v1/other" },
-    unknown: { invalidate: ["GET /v1/nope"], method: "POST", path: "/v1/other/unknown" },
+    noop: { id: "other.noop", method: "POST", path: "/v1/other" },
+    unknown: { id: "other.unknown", invalidate: ["GET /v1/nope"], method: "POST", path: "/v1/other/unknown" },
   },
 };
 
@@ -129,12 +131,18 @@ describe("the adapter's surfaces follow the service map, not method names", () =
 // the queryFn sends req.search, so two searches are two cache entries; keying on params alone merged them
 const searchMap: ServiceMap = {
   auth: {
-    listSecurityEvents: { method: "GET", path: "/v1/auth/events" },
-    revokeSession: { invalidate: ["GET /v1/auth/events"], method: "POST", path: "/v1/auth/sessions/revoke" },
+    listSecurityEvents: { id: "auth.listSecurityEvents", method: "GET", path: "/v1/auth/events" },
+    revokeSession: {
+      id: "auth.revokeSession",
+      invalidate: ["GET /v1/auth/events"],
+      method: "POST",
+      path: "/v1/auth/sessions/revoke",
+    },
   },
   org: {
-    get: { method: "GET", params: ["organization_id"], path: "/v1/organizations/{organization_id}" },
+    get: { id: "org.get", method: "GET", params: ["organization_id"], path: "/v1/organizations/{organization_id}" },
     update: {
+      id: "org.update",
       invalidate: ["GET /v1/organizations/:organization_id"],
       method: "PATCH",
       params: ["organization_id"],
@@ -258,8 +266,14 @@ describe("a write invalidates what its x-invalidate names", () => {
   it("reads a `{id}` path and a `:id` selector as one key", async () => {
     const braced: ServiceMap = {
       item: {
-        get: { method: "GET", params: ["id"], path: "/v1/items/{id}" },
-        patch: { invalidate: ["GET /v1/items/:id"], method: "PATCH", params: ["id"], path: "/v1/items/{id}" },
+        get: { id: "item.get", method: "GET", params: ["id"], path: "/v1/items/{id}" },
+        patch: {
+          id: "item.patch",
+          invalidate: ["GET /v1/items/:id"],
+          method: "PATCH",
+          params: ["id"],
+          path: "/v1/items/{id}",
+        },
       },
     };
 

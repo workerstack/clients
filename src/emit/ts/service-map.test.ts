@@ -37,9 +37,9 @@ describe("serviceMapOf: what an entry carries, each only when set", () => {
     );
 
     expect(map).toEqual({
-      a: { headers: ["x-cursor", "x-rate"], idempotent: true, method: "POST", path: "/a" },
-      pdf: { accept: "application/pdf", method: "GET", path: "/pdf" },
-      plain: { method: "GET", path: "/plain" },
+      a: { headers: ["x-cursor", "x-rate"], id: "a", idempotent: true, method: "POST", path: "/a" },
+      pdf: { accept: "application/pdf", id: "pdf", method: "GET", path: "/pdf" },
+      plain: { id: "plain", method: "GET", path: "/plain" },
     });
   });
 
@@ -62,8 +62,8 @@ describe("serviceMapOf: what an entry carries, each only when set", () => {
     ) as Record<string, Json>;
 
     expect([map.files, map.live]).toEqual([
-      { get: { method: "GET", params: ["path"], path: "/files/{path}", wildcard: "path" } },
-      { method: "GET", path: "/live", sse: true },
+      { get: { id: "files.get", method: "GET", params: ["path"], path: "/files/{path}", wildcard: "path" } },
+      { id: "live", method: "GET", path: "/live", sse: true },
     ]);
   });
 });
@@ -96,10 +96,10 @@ describe("serviceMapOf: how a socket reads its declared messages", () => {
     ) as Record<string, Json>;
 
     expect([map.bare, map.hears, map.says, map.room]).toEqual([
-      { method: "GET", path: "/bare", ws: true },
-      { encode: true, method: "GET", path: "/hears", ws: true },
-      { decode: true, dispatch: "type", method: "GET", path: "/says", ws: true },
-      { dispatch: "type", method: "GET", path: "/room", realtime: true, ws: true },
+      { id: "bare", method: "GET", path: "/bare", ws: true },
+      { encode: true, id: "hears", method: "GET", path: "/hears", ws: true },
+      { decode: true, dispatch: "type", id: "says", method: "GET", path: "/says", ws: true },
+      { dispatch: "type", id: "room", method: "GET", path: "/room", realtime: true, ws: true },
     ]);
   });
 });
@@ -139,10 +139,12 @@ describe("serviceMapText: the map module", () => {
 
 export const serviceMap: ServiceMap = {
 	Z: {
+		id: "Z",
 		method: "GET",
 		path: "/z",
 	},
 	"b-c": {
+		id: "b-c",
 		method: "GET",
 		path: "/b",
 	},

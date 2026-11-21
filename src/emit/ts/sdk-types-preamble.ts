@@ -19,6 +19,8 @@ export const RESERVED: readonly string[] = [
   "HttpSafe",
   "HttpStream",
   "HttpOptions",
+  "InvalidateEvent",
+  "InvalidateTarget",
   "Omit",
   "Promise",
   "ReadableStream",
@@ -40,6 +42,8 @@ export const RESERVED: readonly string[] = [
 
 /** What the types file may import from the runtime module, in the order the import lists them. */
 const RUNTIME_TYPES = [
+  "InvalidateEvent",
+  "InvalidateTarget",
   "RealtimeOptions",
   "Result",
   "ResumableConnection",

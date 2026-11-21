@@ -2,6 +2,7 @@
  * Where each operation sits on a generated TS client, and the service map the runtime dispatches
  * by: the resource tree with every member name a client can expose, and one entry per operation.
  */
+import { type InvalidatedRead, invalidateReads } from "../../ir/invalidate-reads.ts";
 import type { IR, IRNamespace, IROperation, IRSchema, IRTreeEntry } from "../../ir/model.ts";
 import {
   isJsonMedia,
@@ -26,11 +27,15 @@ type ServiceEntry = {
   /** the operation declares no success body: a 2xx reads as null, its body only through `raw` */
   empty?: true;
   headers?: string[];
+  /** the operationId, which `onInvalidate` names a write and its reads by; the member path may be renamed */
+  id: string;
   idempotent?: true;
   invalidate?: string[];
   method: string;
   params?: string[];
   path: string;
+  /** the reads a successful call makes stale, resolved from `invalidate` at generation */
+  reads?: InvalidatedRead[];
   realtime?: true;
   /** an event stream; `"json"` when its declared event schema is not a string, its JSON events' names when it names them */
   sse?: "json" | string[] | true;
@@ -157,7 +162,7 @@ function socketEntry(op: IROperation, resolve: (schema: IRSchema) => IRSchema): 
 
 /** The service entry of `op`; `success` is its success answer as the SDK model reads it. */
 function entryOf(op: IROperation, success: SdkSuccess, resolve: (schema: IRSchema) => IRSchema): ServiceEntry {
-  const entry: ServiceEntry = { method: op.method, path: op.path };
+  const entry: ServiceEntry = { id: op.id, method: op.method, path: op.path };
   const params = openApiPathParams(op.path);
 
   if (params.length > 0) entry.params = params;
@@ -208,6 +213,7 @@ class Identifier {
 function mapOf(ir: IR, calls: boolean): Record<string, ServiceMapNode> {
   const model = sdkModel(ir);
   const ops = model.opsById;
+  const { reads } = invalidateReads(ir);
 
   const walk = (ns: IRNamespace): Record<string, ServiceMapNode> => {
     const node: Record<string, ServiceMapNode> = Object.create(null);
@@ -219,7 +225,11 @@ function mapOf(ir: IR, calls: boolean): Record<string, ServiceMapNode> {
       }
 
       const op = ops.get(entry.op.id) as (typeof model.ops)[number];
+
       const value: ServiceEntry & { call?: Identifier } = entryOf(entry.op, op.success, model.resolve);
+      const invalidated = reads.get(entry.op.id);
+
+      if (invalidated !== undefined) value.reads = invalidated;
 
       if (calls && op.stream !== null) value.call = new Identifier(OPERATION_CALLS[op.stream]);
       node[key] = value;

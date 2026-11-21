@@ -4,6 +4,7 @@ import { HTTPClient } from "./http.ts"
 import { interpolatePath, PathParamError } from "./path.ts"
 import { newClientRequestId, type RequestOptions } from "./request.ts"
 import { type Answer, resultOf } from "./response.ts"
+import { runInvalidateHooks, type ServiceRead } from "./sdk-invalidate.ts"
 import { resolveInvalidationTargets, StaleIndex } from "./stale.ts"
 
 /** One operation as the service map holds it: where it goes and how its answer is read. */
@@ -14,12 +15,16 @@ export type ServiceEntry = {
 	empty?: boolean
 	/** the declared response headers, lower case (A2) */
 	headers?: readonly string[]
+	/** the operationId: what `onInvalidate` names a write by, whatever member path it is renamed to */
+	id: string
 	idempotent?: boolean
 	invalidate?: readonly string[]
 	method: string
 	params?: readonly string[]
 	/** the OpenAPI path template, `{param}` kept */
 	path: string
+	/** the reads a successful call makes stale, resolved from `invalidate` at generation */
+	reads?: readonly ServiceRead[]
 	realtime?: boolean
 	/** an event stream; `"json"` when its events carry JSON `data` the client parses, or the names of the events that
 	    do when the operation names its events (an unnamed one is `message`) */
@@ -109,13 +114,6 @@ export class SdkCore {
 		this.#stale = this.#newIndex()
 	}
 
-	#newIndex(): StaleIndex | null {
-		const invalidation = this.#config.invalidation
-		if (!invalidation || invalidation.staleTime <= 0) return null
-		const maxSources = Math.max(invalidation.maxSourcesPerTarget ?? 16, 1)
-		return new StaleIndex({ maxEntries: invalidation.staleMaxEntries ?? 1000, maxSources })
-	}
-
 	dispose(): void {
 		this.#disposal.abort(new Error("The client was disposed"))
 		this.#stale = this.#newIndex()
@@ -136,7 +134,16 @@ export class SdkCore {
 		for (const target of resolveInvalidationTargets(entry.invalidate, params)) this.#stale.mark(target, selector, at)
 	}
 
-	/** A REST op's answer, its `x-invalidate` targets marked and its stale mark cleared once it is a 2xx. */
+	/** Tell the `onInvalidate` hooks what the successful call `entry` with `params` made stale; it never rejects. */
+	invalidated(entry: ServiceEntry, params: RequestOptions["params"]): Promise<void> {
+		const operation = `${entry.method} ${entry.path}`
+		return runInvalidateHooks(this.#config, { by: entry.id, operation, params, reads: entry.reads })
+	}
+
+	/**
+	 * A REST op's answer, its `x-invalidate` targets marked and its stale mark cleared once it is a 2xx; it resolves
+	 * after the `onInvalidate` hooks settle.
+	 */
 	async request(entry: ServiceEntry, input: CallInput): Promise<Answer> {
 		const template = templateOf(entry)
 		let path: string
@@ -152,16 +159,25 @@ export class SdkCore {
 		const settle = () => {
 			this.mark(entry, input.params, selector)
 			if (meta?.isStale) this.#stale?.clear(selector, path, entry.method, meta.seqSnapshot)
+			return this.invalidated(entry, input.params)
 		}
+		let answer: Answer
 		try {
-			const answer = await this.http.requestOperation({ declared, meta, method: entry.method, opts, path: template })
-			settle()
-			return answer
+			answer = await this.http.requestOperation({ declared, meta, method: entry.method, opts, path: template })
 		} catch (e) {
 			/* a 2xx whose body does not decode still changed what it invalidates */
-			if (e instanceof DecodeError) settle()
+			if (e instanceof DecodeError) await settle()
 			throw e
 		}
+		await settle()
+		return answer
+	}
+
+	#newIndex(): StaleIndex | null {
+		const invalidation = this.#config.invalidation
+		if (!invalidation || invalidation.staleTime <= 0) return null
+		const maxSources = Math.max(invalidation.maxSourcesPerTarget ?? 16, 1)
+		return new StaleIndex({ maxEntries: invalidation.staleMaxEntries ?? 1000, maxSources })
 	}
 }
 

@@ -901,7 +901,12 @@ describe("the C# runtime within its byte budget (bit 15, G14)", () => {
 // realtime-connection.ts +994 (ResumableConnection's In and K, on and off beside the iterator), sdk-sse.ts +674 (the
 // per-name parse, an unnamed typed event read as message), sdk.ts +423 (the map entry's decode, dispatch and encode),
 // sse.ts +350 (SSEEventOf), realtime-transports.ts +145, sdk-ws.ts +71 and sdk-realtime.ts +16 (passing them on).
-const TS_RUNTIME_BYTES = 138_464;
+// Plan 2 (sdk-on-invalidate), +5,918 B to 144,382 B: config hooks called once per successful write with the reads
+// it made stale. sdk-invalidate.ts +3,354 (new: the targets a write's params fill, the hooks run in order, a hook's
+// error sent to onLog and never to the write), config.ts +1,452 (InvalidateEvent, InvalidateTarget and the
+// onInvalidate field with its docs), sdk.ts +799 (the map entry's id and reads, the call after a 2xx), sdk-ws.ts
+// +166 and sdk-sse.ts +147 (the call once a socket or stream opens, detached).
+const TS_RUNTIME_BYTES = 144_382;
 
 describe("the TS runtime within its byte budget (bit 11, G14)", () => {
   it(

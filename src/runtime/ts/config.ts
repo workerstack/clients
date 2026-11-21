@@ -71,6 +71,24 @@ export type LogEntry = {
 	status?: number
 }
 
+/**
+ * One read a write made stale: its operationId, and the write's values for the read's own path params it knows. A
+ * generated SDK's config narrows `Read` to the reads its API invalidates.
+ */
+export type InvalidateTarget<Read extends string = string> = {
+	operationId: Read
+	params: Record<string, string | number | boolean>
+}
+
+/**
+ * What a successful write made stale: `by` is the write's operationId, `targets` the reads it invalidates. A
+ * generated SDK's config narrows `Write` and `Read` to its API's operationIds.
+ */
+export type InvalidateEvent<Write extends string = string, Read extends string = string> = {
+	by: Write
+	targets: InvalidateTarget<Read>[]
+}
+
 export type AuthExpiredContext = {
 	/** The token the 401 rejected (read from the auth header), so concurrent 401s can share one refresh. */
 	rejectedToken: string | null
@@ -103,6 +121,15 @@ export type ClientConfig = {
 	 * is a stream are not retried.
 	 */
 	onAuthExpired?: (ctx: AuthExpiredContext) => Promise<string | null | undefined> | string | null | undefined
+	/**
+	 * Called once per call, never once per attempt, after a write's final answer (an auth refresh or an `onResponse`
+	 * retry included) is a 2xx, or a 2xx whose body does not decode, with the reads its `x-invalidate` makes stale. A
+	 * write with no such reads calls none. `onResponse` runs once per attempt, so do not rebuild this there. Each hook
+	 * runs in order and is awaited, and the write resolves after the last: a hook that never settles holds the write
+	 * past `timeout`. A hook's error never changes the write's result; it goes to `onLog` as an `error` entry, and is
+	 * dropped with no `onLog`. An event stream or WebSocket calls them once it opens, detached: nothing waits on them.
+	 */
+	onInvalidate?: Array<(event: InvalidateEvent) => Promise<void> | void>
 	/** Called at each exchange's start, its answer and its failure (v0's entry shape). */
 	onLog?: (entry: LogEntry) => void
 	onReconnected?: () => void

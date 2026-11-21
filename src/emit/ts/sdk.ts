@@ -5,7 +5,8 @@
  * `verifyWebhook` on its own so a receiver imports nothing else. Read from the IR alone (H2).
  */
 import { type OpenApiDocument, toIR } from "../../ir/build.ts";
-import type { IRAuth } from "../../ir/model.ts";
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
+import type { IR } from "../../ir/model.ts";
 import { tsString } from "../shared/escape.ts";
 import { compareCodeUnits, words } from "../shared/lang.ts";
 import { MIRROR, mirrorNotice } from "../shared/mirror.ts";
@@ -29,7 +30,7 @@ export type SdkOptions = {
 
 /**
  * The SDK's files, its stem, the document's own version, and what the generation tells its caller: a root group
- * renamed off the safe mirror.
+ * renamed off the safe mirror, an `x-invalidate` selector that names no read.
  */
 export type GeneratedSdk = {
   readonly files: Readonly<Record<string, string>>;
@@ -76,7 +77,15 @@ const RUNTIME_EXPORTS = {
 } as const satisfies Record<"core" | "realtime" | "sse" | "ws", readonly string[]>;
 
 const RUNTIME_TYPES = {
-  core: ["ClientConfig", "InvalidationConfig", "LogEntry", "RequestOptions", "Result"],
+  core: [
+    "ClientConfig",
+    "InvalidateEvent",
+    "InvalidateTarget",
+    "InvalidationConfig",
+    "LogEntry",
+    "RequestOptions",
+    "Result",
+  ],
   realtime: [
     "ConnectionState",
     "RealtimeOptions",
@@ -158,13 +167,27 @@ function validated(options: SdkOptions): { name: string; stem: string } {
 }
 
 /**
- * The class: the runtime's `SDKClient` over the service map, merged with the operations' interface.
- * A config without `baseURL` sends to `server`, the document's first one, when it declares any; its auth header
- * pair defaults to the API's scheme (`auth`), as every sibling SDK's does.
+ * Why the class casts a config whose `onInvalidate` event is narrowed (sdk-types.ts) to the runtime's, as the
+ * constructor's comment lines.
  */
-function clientText(name: string, stem: string, server: string | undefined, auth: IRAuth): string {
+const NARROWED_CAST = [
+  "onInvalidate's hooks take only this API's operationIds, all the runtime sends them, but a hook's parameter",
+  "is contravariant, so the narrowed config is the runtime's only through a cast",
+];
+
+/**
+ * The class: the runtime's `SDKClient` over the service map, merged with the operations' interface.
+ * A config without `baseURL` sends to the document's first server, when it declares any; its auth header
+ * pair defaults to the API's scheme, as every sibling SDK's does.
+ */
+function clientText(name: string, stem: string, ir: IR): string {
+  const server = ir.servers[0];
   const based = server === undefined ? "config" : `{ ...config, baseURL: config.baseURL ?? ${tsString(server)} }`;
-  const config = `schemeAuth(${based}, ${tsString(auth.headerName)}, ${tsString(auth.prefix)})`;
+  const isNarrowed = invalidateReads(ir).reads.size > 0;
+
+  const cast = isNarrowed ? `${based} as ConstructorParameters<typeof SDKClient>[1]` : based;
+  const config = `schemeAuth(${cast}, ${tsString(ir.auth.headerName)}, ${tsString(ir.auth.prefix)})`;
+  const reason = isNarrowed ? NARROWED_CAST.map((line) => `\t\t// ${line}\n`).join("") : "";
 
   return `import { SDKClient, schemeAuth } from "./${stem}.runtime.gen.js"
 import { serviceMap } from "./${stem}.map.gen.js"
@@ -172,7 +195,7 @@ import type { ${name}Config, ${name}Operations, ${name}Safe } from "./${stem}.ty
 
 export class ${name} extends SDKClient {
 	constructor(config: ${name}Config) {
-		super(serviceMap, ${config})
+${reason}		super(serviceMap, ${config})
 	}
 }
 
@@ -203,10 +226,14 @@ export function generateSdk(document: Record<string, unknown>, options: SdkOptio
   // memberTree emits the root groups in code-unit order, each renamed in place
   const emitted = [...memberTree(ir.tree).entries.keys()];
   const groups = [...ir.tree.entries.keys()].sort(compareCodeUnits);
-  const notices = groups.flatMap((group, i) => mirrorNotice("ts", MIRROR, group, emitted[i] as string) ?? []);
+
+  const notices = [
+    ...groups.flatMap((group, i) => mirrorNotice("ts", MIRROR, group, emitted[i] as string) ?? []),
+    ...invalidateReads(ir).warnings.map((warning) => `ts: ${warning}`),
+  ];
 
   const files: Record<string, string> = {
-    [`${stem}.client.gen.ts`]: clientText(name, stem, ir.servers[0], ir.auth),
+    [`${stem}.client.gen.ts`]: clientText(name, stem, ir),
     [`${stem}.index.gen.ts`]: indexText(name, stem, features),
     [`${stem}.map.gen.ts`]: serviceMapText(ir, runtime),
     [`${stem}.runtime.gen.ts`]: runtimeSource(features),

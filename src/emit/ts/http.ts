@@ -44,6 +44,7 @@ export const RUNTIME_MODULES: readonly string[] = [
   "stale",
   "app-types",
   "app",
+  "sdk-invalidate",
   "sdk",
   "sdk-sse",
   "sdk-ws",

@@ -3,6 +3,7 @@
  * header types, the SDK's config, and the interface its class merges with. Types and runtime meet
  * in the member tree, so a renamed member (`state` → `state_`) is renamed in both.
  */
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
 import type { IR, IRBody, IRNamespace, IRParam, IRSchema } from "../../ir/model.ts";
 import {
   dispatchKey,
@@ -282,16 +283,54 @@ export function componentNames(ir: IR, reserved: readonly string[]): (schema: st
   return (schema) => table.get(schema, "Schema");
 }
 
-/** The config type: `baseURL` optional when the document declares a server, the first one being its default. */
-function configText(name: string, server: string | undefined, runtimeConfig: string): string {
+/** `ids` as a union of string literals in code-unit order, each once. */
+function literalUnion(ids: Iterable<string>): string {
+  return [...new Set(ids)].toSorted(compareCodeUnits).map(tsString).join(" | ");
+}
+
+/** A field the config type declares in place of the runtime's: its key and its lines. */
+type ConfigField = { key: string; text: string };
+
+/**
+ * `onInvalidate` with its event narrowed to the API's operationIds: `by` to the writes that invalidate a read, each
+ * target to the reads some write invalidates. None for an API whose writes invalidate nothing: no hook is ever called
+ * there, so there is nothing to narrow.
+ */
+function onInvalidateField(ir: IR): ConfigField[] {
+  const { reads } = invalidateReads(ir);
+
+  if (reads.size === 0) return [];
+  const targets = [...reads.values()].flat().map((read) => read.operationId);
+  const event = `InvalidateEvent<${literalUnion(reads.keys())}, ${literalUnion(targets)}>`;
+
+  return [
+    {
+      key: "onInvalidate",
+      text: [
+        "\t/** The `onInvalidate` hooks, their event narrowed to this API's writes and the reads they make stale. */",
+        `\tonInvalidate?: Array<(event: ${event}) => Promise<void> | void>`,
+      ].join("\n"),
+    },
+  ];
+}
+
+/**
+ * The config type: `baseURL` optional when the document declares a server, the first one being its default, and
+ * `onInvalidate`'s event narrowed to the API's operationIds when any write invalidates a read.
+ */
+function configText(ir: IR, name: string, runtimeConfig: string): string {
+  const server = ir.servers[0];
+
+  const doc = server === undefined ? "" : `\t/** Default: the document's first server, ${blockCommentText(server)} */`;
+  const baseURL: ConfigField[] = server === undefined ? [] : [{ key: "baseURL", text: `${doc}\n\tbaseURL?: string` }];
+
+  const fields = [...baseURL, ...onInvalidateField(ir)];
   const head = `export type ${name}Config =`;
 
-  if (server === undefined) return `${head} ${runtimeConfig}`;
+  if (fields.length === 0) return `${head} ${runtimeConfig}`;
+  const omitted = fields.map(({ key }) => tsString(key)).join(" | ");
 
-  return `${head} Omit<${runtimeConfig}, "baseURL"> & {
-	/** Default: the document's first server, ${blockCommentText(server)} */
-	baseURL?: string
-}`;
+  return `${head} Omit<${runtimeConfig}, ${omitted}> & {\n${fields.map(({ text }) => text).join("\n")}\n}`;
 }
 
 /** The `${stem}.types.gen.ts` text of `ir` for the SDK `name`, importing the runtime module `runtime`. */
@@ -318,7 +357,7 @@ export function sdkTypesText(ir: IR, name: string, runtime: string): string {
   );
 
   const body = `${schemas.length === 0 ? "" : `${schemas.join("\n")}\n\n`}${webhookTypesText(ir, types)}${shared(runtimeFeatures(ir))}
-${configText(name, ir.servers[0], runtimeConfig)}
+${configText(ir, name, runtimeConfig)}
 
 /** Every operation of the SDK, by its member path. */
 export interface ${name}Operations {

@@ -43,7 +43,10 @@ function mapEvents(
 	}
 }
 
-/** An SSE op opened: its stale view for the hooks, and its `x-invalidate` targets marked once the answer is ok. */
+/**
+ * An SSE op opened: its stale view for the hooks, and its `x-invalidate` targets marked once the answer is ok, when
+ * the `onInvalidate` hooks are called detached: the open is sync, so nothing waits on them.
+ */
 async function open(core: SdkCore, entry: ServiceEntry, input: RequestOptions): Promise<Answer> {
 	const opts = optionsFor(entry, input)
 	const template = templateOf(entry)
@@ -58,6 +61,7 @@ async function open(core: SdkCore, entry: ServiceEntry, input: RequestOptions): 
 	}
 	const onOpen = () => {
 		if (selector !== undefined) core.mark(entry, input.params, selector)
+		void core.invalidated(entry, input.params)
 	}
 	const { data, response } = await openStream(core.http, { meta, method: entry.method, onOpen, opts, path: template })
 	return { data: eventsOf(data, entry.sse), response }

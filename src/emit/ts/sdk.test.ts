@@ -4,6 +4,7 @@ import { type OpenApiDocument, toIR } from "../../ir/build.ts";
 import { emittedSdk, recordingFetch } from "./__fixtures__/emitted.ts";
 import { runtimeFeatures, runtimeSource } from "./http.ts";
 import { generateSdk, sdkMemberPaths, serviceMapOf } from "./sdk.ts";
+import type { ServiceMapNode } from "./service-map.ts";
 
 type Json = Record<string, unknown>;
 
@@ -138,6 +139,29 @@ describe("serviceMapOf: each operation's method, path, params and invalidation t
       false,
     ]);
   });
+
+  it("resolves a write's x-invalidate targets to the reads it makes stale, each with its own params", () => {
+    const users = serviceMapOf(ir(USERS)).users;
+    const get = { operationId: "users.get", params: ["id"] };
+    const list = { operationId: "users.list", params: [] };
+
+    /** The reads `users.<action>` makes stale; `null` for a node that is not an operation. */
+    function readsOf(action: string) {
+      const node: ServiceMapNode | undefined = users === undefined || "method" in users ? undefined : users[action];
+
+      return node === undefined || !("method" in node) ? null : node.reads;
+    }
+
+    const reads = ["create", "delete", "get", "list", "update"].map((action) => [action, readsOf(action)]);
+
+    expect(Object.fromEntries(reads)).toStrictEqual({
+      create: [list],
+      delete: [get, list],
+      get: undefined,
+      list: undefined,
+      update: [get, list],
+    });
+  });
 });
 
 describe("serviceMapOf: stream kinds and nesting by dotted id", () => {
@@ -159,12 +183,12 @@ describe("serviceMapOf: stream kinds and nesting by dotted id", () => {
     );
 
     expect(plain(map)).toStrictEqual({
-      events: { stream: { method: "GET", path: "/stream", sse: true } },
-      items: { list: { method: "GET", path: "/items" } },
-      rt: { feed: { method: "GET", path: "/rt/feed", realtime: true } },
+      events: { stream: { id: "events.stream", method: "GET", path: "/stream", sse: true } },
+      items: { list: { id: "items.list", method: "GET", path: "/items" } },
+      rt: { feed: { id: "rt.feed", method: "GET", path: "/rt/feed", realtime: true } },
       ws: {
-        chat: { method: "GET", params: ["channelId"], path: "/ws/chat/{channelId}", ws: true },
-        echo: { method: "GET", path: "/ws/echo", ws: true },
+        chat: { id: "ws.chat", method: "GET", params: ["channelId"], path: "/ws/chat/{channelId}", ws: true },
+        echo: { id: "ws.echo", method: "GET", path: "/ws/echo", ws: true },
       },
     });
   });
@@ -181,11 +205,15 @@ describe("serviceMapOf: stream kinds and nesting by dotted id", () => {
     );
 
     expect(plain(map)).toStrictEqual({
-      checkout: { sessions: { create: { method: "POST", path: "/checkout/sessions" } } },
-      getStatus: { method: "GET", path: "/status" },
+      checkout: {
+        sessions: { create: { id: "checkout.sessions.create", method: "POST", path: "/checkout/sessions" } },
+      },
+      getStatus: { id: "getStatus", method: "GET", path: "/status" },
       users: {
-        list: { method: "GET", path: "/users" },
-        profile: { update: { method: "PATCH", params: ["id"], path: "/users/{id}/profile" } },
+        list: { id: "users.list", method: "GET", path: "/users" },
+        profile: {
+          update: { id: "users.profile.update", method: "PATCH", params: ["id"], path: "/users/{id}/profile" },
+        },
       },
     });
   });
@@ -194,7 +222,7 @@ describe("serviceMapOf: stream kinds and nesting by dotted id", () => {
   it("never drops a WebSocket operation without an operationId: it lands under a derived name", async () => {
     const paths = { "/ws/internal": { get: { responses: {}, "x-websocket": true } } };
     expect(plain(serviceMapOf(ir(paths)))).toStrictEqual({
-      getWsInternal: { method: "GET", path: "/ws/internal", ws: true },
+      getWsInternal: { id: "getWsInternal", method: "GET", path: "/ws/internal", ws: true },
     });
     const { TestSDK } = (await emittedSdk(doc(paths))) as unknown as { TestSDK: new (config: Json) => Json };
     const sdk = new TestSDK({ baseURL: "https://api.example.com", fetch: recordingFetch().fetch });
@@ -213,8 +241,8 @@ describe("sdkMemberPaths: where each operation sits on the client", () => {
     const at = (path: string[]) => path.reduce<unknown>((node, key) => (node as Json | undefined)?.[key], map);
     expect(Object.keys(map).sort()).toEqual(["getUsersById", "state_"]);
     expect(Object.fromEntries([...paths].map(([id, path]) => [id, at(path)]))).toEqual({
-      getUsersById: { method: "GET", params: ["id"], path: "/users/{id}" },
-      "state.get": { method: "GET", path: "/state" },
+      getUsersById: { id: "getUsersById", method: "GET", params: ["id"], path: "/users/{id}" },
+      "state.get": { id: "state.get", method: "GET", path: "/state" },
     });
   });
 });
