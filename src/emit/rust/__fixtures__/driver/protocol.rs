@@ -58,6 +58,8 @@ pub struct Setup {
     pub redirect: Option<String>,
     pub timeout_ms: Option<u64>,
     pub max_response_bytes: Option<usize>,
+    /// plan 8's invalidate-once row: record what the on_invalidate hooks see (invalidated.rs)
+    pub record_invalidate: Option<crate::invalidated::RecordInvalidate>,
 }
 
 /// The grid's Auth: a bearer token, or a credential under a header name.

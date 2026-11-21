@@ -7,6 +7,7 @@
  * Every `.rs` file carries the generated-code marker.
  */
 import { type OpenApiDocument, toIR } from "../../ir/build.ts";
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
 import type { IR, IRInfo, IRSchema } from "../../ir/model.ts";
 import { sdkModel } from "../../ir/sdk-model.ts";
 import { lineComment } from "../shared/escape.ts";
@@ -108,7 +109,9 @@ function emitRust(document: Record<string, unknown>, options: RustSdkOptions, sh
     }),
   );
 
-  const client = clientDecls(ir, { at, notices, ops: model.opsById });
+  const { reads, warnings } = invalidateReads(ir);
+  const client = clientDecls(ir, { at, notices, ops: model.opsById, reads });
+  notices.push(...warnings.map((warning) => `rust: ${warning}`));
   // before the hoisted are read: each key's <Key>Data lands among them; an API without operations answers no error
   const errorKeys = model.ops.length > 0 ? [rustErrorKeys(model, at)] : [];
   const hoisted = [...at.decls].sort(([a], [b]) => compareCodeUnits(a, b)).map(([, decl]) => decl);

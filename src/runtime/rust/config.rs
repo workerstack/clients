@@ -12,7 +12,7 @@ use reqwest::header::HeaderName;
 
 use crate::auth::AuthState;
 use crate::errors::Error;
-use crate::hooks::{HookState, OnAuthExpiredHook, OnRequestHook, OnResponseHook};
+use crate::hooks::{HookState, OnAuthExpiredHook, OnInvalidateHook, OnRequestHook, OnResponseHook};
 use crate::invalidation::InvalidationConfig;
 use crate::log::OnLogHook;
 use crate::redirect::RedirectPolicy;
@@ -56,6 +56,8 @@ pub struct ClientConfig {
     pub on_request: Vec<OnRequestHook>,
     pub on_response: Vec<OnResponseHook>,
     pub on_auth_expired: Option<OnAuthExpiredHook>,
+    /// Called with the reads each successful write made stale (`OnInvalidateHook`).
+    pub on_invalidate: Vec<OnInvalidateHook>,
     pub on_log: Option<OnLogHook>,
     pub state: Option<HookState>,
 }
@@ -78,6 +80,7 @@ impl Default for ClientConfig {
             on_request: Vec::new(),
             on_response: Vec::new(),
             on_auth_expired: None,
+            on_invalidate: Vec::new(),
             on_log: None,
             state: None,
         }
@@ -160,6 +163,7 @@ pub(crate) struct Inner {
     pub(crate) on_request: Vec<OnRequestHook>,
     pub(crate) on_response: Vec<OnResponseHook>,
     pub(crate) on_auth_expired: Option<OnAuthExpiredHook>,
+    pub(crate) on_invalidate: Vec<OnInvalidateHook>,
     pub(crate) on_log: Option<OnLogHook>,
     pub(crate) state: HookState,
     pub(crate) stale: StaleTracker,
@@ -242,6 +246,7 @@ impl Client {
             on_request: config.on_request,
             on_response: config.on_response,
             on_auth_expired: config.on_auth_expired,
+            on_invalidate: config.on_invalidate,
             on_log: config.on_log,
             state,
             stale: StaleTracker::new(config.invalidation.as_ref()),

@@ -23,6 +23,13 @@ pub struct LogEntry {
 /// Receives each `LogEntry`; a panic in it is caught, so a faulty logger cannot break a call.
 pub type OnLogHook = Arc<dyn Fn(LogEntry) + Send + Sync>;
 
+/// Hands `entry` to `hook`, if any; a panic in it is caught.
+pub(crate) fn emit(hook: Option<&OnLogHook>, entry: LogEntry) {
+    let Some(hook) = hook else { return };
+    let hook = Arc::clone(hook);
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || hook(entry)));
+}
+
 /// One call's log: its operation, when it started, and whether it is in flight. A call dropped in
 /// flight (`cancel_on`, a caller's own timeout, a dropped future) logs its `error` entry as it goes.
 pub(crate) struct CallLog<'a> {
@@ -49,7 +56,9 @@ impl<'a> CallLog<'a> {
         status: Option<u16>,
         error: Option<String>,
     ) {
-        let Some(hook) = self.hook else { return };
+        if self.hook.is_none() {
+            return;
+        }
         let entry = LogEntry {
             level,
             event,
@@ -58,8 +67,7 @@ impl<'a> CallLog<'a> {
             status,
             error,
         };
-        let hook = Arc::clone(hook);
-        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || hook(entry)));
+        emit(self.hook, entry);
     }
 
     pub(crate) fn started(&mut self) {

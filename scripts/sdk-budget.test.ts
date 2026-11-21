@@ -657,7 +657,14 @@ describe("the Go runtime within its byte budget (bit 12, G14)", () => {
 //   cursor before it decodes, the run split into `connect` and `typed`), transport_ws.rs +63, transport_sse.rs -8.
 // Backend plan 18, +102 B to 144,911 B: sse.rs, `SseEvent` derives `Serialize`, as each `<Op>Event` does, so one
 //   reader takes any stream's events as `{data, event, id, retry}`.
-const RUST_RUNTIME_BYTES = 144_911;
+// Plan 8 (on-invalidate-rust), +6,929 B to 151,840 B: ClientConfig.on_invalidate, called once per successful write
+//   with the reads it made stale. hooks.rs +4,744 (InvalidateEvent, InvalidateTarget, OnInvalidateHook and
+//   `on_invalidate`; `event_of`, the targets the write's params fill; `invalidated`, the hooks in order, an `Err` or a
+//   caught panic sent to on_log and never to the call; `detached`, an open's hooks spawned), request.rs +683
+//   (`spec.reads`, `invalidate_event`), exchange.rs +543 (the hooks after settle and the timeout, a stream's
+//   detached), ws.rs +462 (an open marks its targets and calls the hooks detached), config.rs +290 (the field),
+//   log.rs +207 (`emit`, one guarded on_log call for the call log and the hooks).
+const RUST_RUNTIME_BYTES = 151_840;
 
 describe("the Rust runtime within its byte budget (bit 13, G14)", () => {
   it(

@@ -20,6 +20,7 @@ import { merged } from "../../shared/__fixtures__/merge.ts"
 import type { RustSdkOptions } from "../sdk.ts"
 import { errors, http, httpExtraPaths } from "../../shared/__fixtures__/documents-http.ts"
 import { typedStreams } from "../../shared/__fixtures__/documents-typed.ts"
+import { invalidating } from "./documents-invalidate.ts"
 import { relative, surface, types } from "./documents-specs.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
 
@@ -50,7 +51,7 @@ function lenient(): Readonly<Record<string, unknown>> {
 	}
 }
 
-/** a4673b6e42's nine v0 fixtures as one document. */
+/** a4673b6e42's nine v0 fixtures as one document, with plan 8's on_invalidate writes (documents-invalidate.ts) beside them. */
 function fixtures(): Readonly<Record<string, unknown>> {
 	return merged({
 		crud,
@@ -62,6 +63,7 @@ function fixtures(): Readonly<Record<string, unknown>> {
 		realtime,
 		"realtime-sse": realtimeSse,
 		"realtime-longpoll": realtimeLongpoll,
+		writes: invalidating(),
 	})
 }
 

@@ -32,6 +32,7 @@
 
 mod apply;
 mod dispatch;
+mod invalidated;
 mod observe;
 mod protocol;
 mod script;
@@ -43,6 +44,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
+use invalidated::Invalidations;
 use observe::Outcome;
 use protocol::{Auth, Call, Input, Setup, stream_refusal};
 use script::{Directives, Script};
@@ -71,7 +73,7 @@ async fn drive() -> Result<String, String> {
         }
     };
     let recorder = Recorder::default();
-    let mut config = config_of(&input)?;
+    let (mut config, invalidations) = config_of(&input)?;
     config.on_response.push(observe::answered_status());
     if let Some(s) = &script {
         s.apply(&mut config, &recorder)
@@ -97,7 +99,10 @@ async fn drive() -> Result<String, String> {
             .run(i, &call, d)
             .await
             .map_err(|e| format!("call {i} ({}): {e}", call.operation))?;
-        observed.push(seen);
+        observed.push(match &invalidations {
+            Some(recorded) => recorded.observe(seen),
+            None => seen,
+        });
     }
     let out = match script {
         None => json!(observed),
@@ -190,8 +195,9 @@ async fn perform(
         .map_err(|_| format!("stream stalled: no end within {}s", bound.as_secs()))?
 }
 
-/// The client config a cell's setup asks for, aimed at `base`.
-fn config_of(input: &Input) -> Result<sdk::ClientConfig, String> {
+/// The client config a cell's setup asks for, aimed at `base`, and the recorder its
+/// `recordInvalidate` asks for.
+fn config_of(input: &Input) -> Result<(sdk::ClientConfig, Option<Invalidations>), String> {
     let setup: Setup = match &input.cell.setup {
         None => Setup::default(),
         Some(raw) => serde_json::from_value(raw.clone()).map_err(|e| format!("setup: {e}"))?,
@@ -225,5 +231,10 @@ fn config_of(input: &Input) -> Result<sdk::ClientConfig, String> {
     if let Some(cap) = setup.max_response_bytes {
         config.max_response_bytes = cap;
     }
-    Ok(config)
+    let invalidations = setup.record_invalidate.map(|ask| {
+        let recorded = Invalidations::default();
+        recorded.install(&mut config, &ask);
+        recorded
+    });
+    Ok((config, invalidations))
 }

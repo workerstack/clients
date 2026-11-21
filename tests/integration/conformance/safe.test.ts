@@ -21,8 +21,8 @@ import {
 
 const keysOf = (cells: readonly Cell[]) => cells.map((cell) => cell.key);
 
-/** The SDKs that run the invalidate-once row: TS and Go (plan 6) and Python (plan 7) until plans 8-9 add theirs. */
-const INVALIDATING: readonly Sdk[] = ["ts", "go", "python"];
+/** The SDKs that run the invalidate-once row: TS and Go (plan 6), Rust (plan 8), Python (plan 7); plan 9 adds two. */
+const INVALIDATING: readonly Sdk[] = ["ts", "go", "rust", "python"];
 
 /** `sdk`'s cells on the rows every SDK runs: a row the others join in a later slice (invalidate-once) is left out. */
 function sharedCellsFor(sdk: Sdk): readonly Cell[] {
@@ -58,7 +58,7 @@ describe("response kinds, derived from features.ts", () => {
     ]);
   });
 
-  it("are the same for every SDK on the rows the six run, the invalidated kind only TS's, Go's and Python's", () => {
+  it("are the same for every SDK on the rows the six run, the invalidated kind only the invalidating SDKs'", () => {
     const kinds = (sdk: Sdk) => [...responseKinds(sharedCellsFor(sdk)).keys()];
 
     for (const sdk of SDKS) expect(kinds(sdk), sdk).toEqual(kinds("ts"));

@@ -25,6 +25,7 @@ use crate::call::{Overrides, RawResponse, Run, Signal};
 use crate::config::Inner;
 use crate::errors::{ApiError, Error};
 use crate::exchange::{headers_of, token_of, url_of};
+use crate::hooks::detached;
 use crate::request::RequestSpec;
 
 /// The largest message either side may send.
@@ -387,7 +388,14 @@ fn opened<In: Send + 'static, Out: 'static>(
                 if let Some(e) = spec.take_failure() {
                     return Err(e.into());
                 }
-                Ok(connect(&inner, &spec, &ov, &protocols, read).await?)
+                let meta = inner.stale.begin(spec.method.as_str(), &spec.path);
+                let dialed = connect(&inner, &spec, &ov, &protocols, read).await?;
+                /* an open marks its targets stale and calls the hooks without waiting on them */
+                inner.stale.settle(&meta, spec.invalidates, &spec.params);
+                if let Some(event) = spec.invalidate_event() {
+                    detached(&inner, spec.operation(), event);
+                }
+                Ok(dialed)
             })
         },
     )

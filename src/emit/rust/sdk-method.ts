@@ -7,6 +7,7 @@
  * realtime.ts say, an SSE stream in its style, a WebSocket or realtime connection the same on both clients.
  * Spec text reaches the source only through the shared escape layer.
  */
+import type { InvalidatedRead } from "../../ir/invalidate-reads.ts";
 import type { IRParam } from "../../ir/model.ts";
 import { mediaEssence, type SdkOp } from "../../ir/sdk-model.ts";
 import { lineComment, rustString } from "../shared/escape.ts";
@@ -35,8 +36,11 @@ export type RustMethod = {
   readonly lines: readonly string[];
 };
 
-/** What every method of one SDK shares: the type context it hoists into. */
-export type MethodEnv = { readonly at: RustTypeContext };
+/** The type context it hoists into, and each write's reads by operationId (`invalidateReads`): its event's targets. */
+export type MethodEnv = {
+  readonly at: RustTypeContext;
+  readonly reads: ReadonlyMap<string, readonly InvalidatedRead[]>;
+};
 
 /** How a method answers: a stream's answer, else the `Call`'s answer type and the run it is sent with. */
 type Answer = StreamAnswer | { readonly type: string; readonly run: string; readonly stream: null };
@@ -109,8 +113,18 @@ function specLines(op: SdkOp, fields: readonly OptsField[], answer: Answer, body
   ];
 }
 
+/** The `spec.reads` statement of a write whose success stales `reads`: its operationId and each read's own params. */
+function readsLines(op: SdkOp, reads: readonly InvalidatedRead[] | undefined): string[] {
+  if (reads === undefined || reads.length === 0) return [];
+
+  const each = reads.map((read) => `(${rustString(read.operationId)}, &[${read.params.map(rustString).join(", ")}])`);
+
+  return [`spec.reads(${rustString(op.id)}, &[${each.join(", ")}]);`];
+}
+
 /** A method's parts once its names are claimed: its Opts type and fields, its path locals, its response headers. */
 type Parts = {
+  readonly reads: readonly string[];
   readonly op: SdkOp;
   readonly name: string;
   readonly opts: string;
@@ -132,7 +146,7 @@ function methodLines(parts: Parts, client: string, answer: Answer, body: RustBod
   ];
 
   const bound = path.map(([param, local]) => `(${rustString(param.name)}, ${local})`).join(", ");
-  const statements = specLines(op, fields, answer, body?.lines ?? []);
+  const statements = [...specLines(op, fields, answer, body?.lines ?? []), ...parts.reads];
   const returns = callType(op, answer, headers);
 
   return [
@@ -175,7 +189,8 @@ export function rustMethod(op: SdkOp, name: string, client: string, env: MethodE
   const body = op.body && rustBody(op, op.body, env.at);
   const answer = answerOf(op, env);
   const fields = optsFields(op, opts, env.at, answer.stream);
-  const parts = { fields, headers: responseHeaders(op, env.at), name, op, opts, path };
+  const reads = readsLines(op, env.reads.get(op.id));
+  const parts = { fields, headers: responseHeaders(op, env.at), name, op, opts, path, reads };
   const decls: [string, string][] = [[opts, optsDecl(op, opts, fields, answer.stream)]];
 
   if (parts.headers) decls.push([parts.headers.plan.type, parts.headers.decl]);

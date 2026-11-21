@@ -8,6 +8,7 @@ use bytes::Bytes;
 use crate::auth::new_v4;
 use crate::body::{Body, Content};
 use crate::errors::Error;
+use crate::hooks::{InvalidateEvent, Reads, event_of};
 use crate::path::expand_path;
 use crate::query::{form_encode, object_pairs, texts, to_value};
 
@@ -22,6 +23,9 @@ pub(crate) struct RequestSpec {
     pub(crate) body: Option<Body>,
     pub(crate) content_type: Option<String>,
     pub(crate) invalidates: &'static [&'static str],
+    /// the operationId an `InvalidateEvent` names, and the reads a success makes stale
+    pub(crate) by: &'static str,
+    pub(crate) reads: Reads,
     /// what made the request unsendable (a path param, a body that would not encode)
     pub(crate) failed: Option<Error>,
 }
@@ -55,6 +59,8 @@ impl RequestSpec {
             body: None,
             content_type: None,
             invalidates: &[],
+            by: "",
+            reads: &[],
             failed,
         }
     }
@@ -111,6 +117,17 @@ impl RequestSpec {
     /// The `METHOD /path` targets a 2xx answer stales.
     pub(crate) fn invalidates(&mut self, targets: &'static [&'static str]) {
         self.invalidates = targets;
+    }
+
+    /// The operationId `by` and the reads a success makes stale, for `on_invalidate`.
+    pub(crate) fn reads(&mut self, by: &'static str, reads: Reads) {
+        self.by = by;
+        self.reads = reads;
+    }
+
+    /// The `on_invalidate` event of this request's success; `None` when it stales no read.
+    pub(crate) fn invalidate_event(&self) -> Option<InvalidateEvent> {
+        event_of(self.by, self.reads, &self.params)
     }
 
     fn bytes(&mut self, body: impl Into<Bytes>, content_type: impl Into<String>) {
