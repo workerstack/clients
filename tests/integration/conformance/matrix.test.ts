@@ -108,8 +108,11 @@ function reds(target: Cell, runs: readonly (readonly Observed[])[], wire: readon
 /** The ts cell keyed `key`. */
 const tsCell = (key: string) => cellsFor("ts").find((c) => c.key === key);
 
-/** A row's own targets: all eight, the six SDKs (bit 21 i0), or a CLI or MCP row's own. */
-const OWN_TARGETS = [TARGETS, SDKS, ["cli"], ["mcp"]].map(String);
+/**
+ * A row's own targets: all eight, the six SDKs (bit 21 i0), TS and Go (the invalidate-once row, plan 6, until each
+ * other SDK joins it), or a CLI or MCP row's own.
+ */
+const OWN_TARGETS = [TARGETS, SDKS, ["ts", "go"], ["cli"], ["mcp"]].map(String);
 
 /** The cells `target` should get: each scenario of every row that lists it, keyed feature/scenario. */
 const cellsOfRows = (target: (typeof TARGETS)[number]) =>

@@ -21,8 +21,20 @@ import {
 
 const keysOf = (cells: readonly Cell[]) => cells.map((cell) => cell.key);
 
+/** The SDKs that run the invalidate-once row: TS and Go (plan 6) until plans 7-9 add theirs. */
+const INVALIDATING: readonly Sdk[] = ["ts", "go"];
+
+/** `sdk`'s cells on the rows every SDK runs: a row the others join in a later slice (invalidate-once) is left out. */
+function sharedCellsFor(sdk: Sdk): readonly Cell[] {
+  const everywhere = new Set(
+    FEATURES.filter((feature) => SDKS.every((target) => feature.targets.includes(target))).map((feature) => feature.id),
+  );
+
+  return cellsFor(sdk).filter((cell) => everywhere.has(cell.feature));
+}
+
 describe("response kinds, derived from features.ts", () => {
-  it("are the grid's 18 distinct answers, in grid order", () => {
+  it("are the grid's 19 distinct answers, in grid order", () => {
     expect([...responseKinds(cellsFor("ts")).keys()]).toEqual([
       "json",
       "empty",
@@ -42,13 +54,16 @@ describe("response kinds, derived from features.ts", () => {
       "text",
       "decode over cap",
       "realtime send decode over cap",
+      "invalidated",
     ]);
   });
 
-  it("are the same for every SDK: the six run one grid", () => {
-    const kinds = (sdk: Sdk) => [...responseKinds(cellsFor(sdk)).keys()];
+  it("are the same for every SDK on the rows the six run, the invalidated kind only TS's and Go's", () => {
+    const kinds = (sdk: Sdk) => [...responseKinds(sharedCellsFor(sdk)).keys()];
 
     for (const sdk of SDKS) expect(kinds(sdk), sdk).toEqual(kinds("ts"));
+    const answering = SDKS.filter((sdk) => responseKinds(cellsFor(sdk)).has("invalidated"));
+    expect([kinds("ts").includes("invalidated"), answering]).toStrictEqual([false, INVALIDATING]);
   });
 
   it("follow the cells, with no list to edit: the text row is the text kind, and without it there is none", () => {
@@ -110,7 +125,8 @@ describe("every enabled language's safe variant covers every kind", () => {
       expect(safeCoverageProblems(SAFE_ENABLED)).toEqual([]);
       const { cells, uncovered } = safeCellsFor(sdk);
       const kinds = new Set(cells.flatMap((cell) => cell.calls.map((_, i) => responseKindOf(cell, i))));
-      expect([SAFE_ENABLED.has(sdk), uncovered, kinds.size, cells.length]).toEqual([true, [], 18, 18]);
+      const own = INVALIDATING.includes(sdk) ? 19 : 18;
+      expect([SAFE_ENABLED.has(sdk), uncovered, kinds.size, cells.length]).toEqual([true, [], own, own]);
     },
   );
 

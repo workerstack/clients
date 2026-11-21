@@ -26,6 +26,7 @@ import {
   type Cell,
   cellsFor,
   compareCell,
+  type InvalidateObserved,
   type Json,
   type NoAnswer,
   type Observed,
@@ -89,6 +90,40 @@ function configOf(app: ReferenceApp, setup: Setup = {}): Input {
     redirect: setup.redirect,
     timeout: setup.timeoutMs,
   };
+}
+
+/** Plan 6's `Setup.recordInvalidate`: its onInvalidate hooks, and a call's observation as they recorded it. */
+type InvalidateRecorder = {
+  readonly hooks: readonly ((event: InvalidateObserved) => void)[];
+  readonly observe: (observed: Observed) => Observed;
+};
+
+/** The hook `failFirst` puts before the recording one: its error goes to onLog, never to the write. */
+function failingHook(): never {
+  throw new Error("conformance: a failing onInvalidate hook");
+}
+
+/**
+ * The recorder `setup` asks for: none without `recordInvalidate`; else a hook recording each event, after a failing
+ * one when `failFirst`, and each data answer observed as `invalidated` with the events recorded since the last call.
+ */
+function invalidateRecorder(setup: Setup = {}): InvalidateRecorder {
+  const { recordInvalidate } = setup;
+  const events: InvalidateObserved[] = [];
+
+  function record(event: InvalidateObserved): void {
+    events.push(event);
+  }
+
+  function observe(observed: Observed): Observed {
+    if (recordInvalidate === undefined || observed.kind !== "data") return observed;
+
+    return { data: observed.data, events: events.splice(0), kind: "invalidated", status: observed.status };
+  }
+
+  if (recordInvalidate === undefined) return { hooks: [], observe };
+
+  return { hooks: recordInvalidate.failFirst ? [failingHook, record] : [record], observe };
 }
 
 /** The client input for `call`: params, search, headers, body, per-call overrides and resume cursors. */
@@ -433,14 +468,16 @@ function tsRunner(safe = false) {
         return;
       };
 
-      const client = new built.ConformanceSDK({ ...configOf(app, cell.setup), onResponse: [seen] });
+      const recorder = invalidateRecorder(cell.setup);
+      const config = { ...configOf(app, cell.setup), onInvalidate: recorder.hooks, onResponse: [seen] };
+      const client = new built.ConformanceSDK(config);
       const observed: Observed[] = [];
 
       try {
         const sdk = (safe ? client.safe : client) as Sdk;
         const clients = { errors: built.errors, last: () => last, map: built.map, safe, sdk };
 
-        for (const call of cell.calls) observed.push(await callOf(clients, call, app));
+        for (const call of cell.calls) observed.push(recorder.observe(await callOf(clients, call, app)));
       } finally {
         client.dispose();
       }

@@ -14,7 +14,8 @@ import (
 )
 
 // openStream sends a streaming request through every call's exchange (run), the call's timeout
-// bounding it up to the headers, never the body. A non-2xx is a typed error. The caller owns the body.
+// bounding it up to the headers, never the body. A non-2xx is a typed error; a 2xx settles the call
+// (opened). The caller owns the body.
 func openStream(ctx context.Context, cfg Config, c *call, opts []RequestOption) (*http.Response, error) {
 	if c.headers == nil {
 		c.headers = map[string]string{}
@@ -28,6 +29,7 @@ func openStream(ctx context.Context, cfg Config, c *call, opts []RequestOption) 
 		if err != nil {
 			return nil, err
 		}
+		opened(ctx, cfg, c)
 		return result.resp, nil
 	}
 	open, cancel := context.WithCancelCause(ctx)
@@ -38,6 +40,7 @@ func openStream(ctx context.Context, cfg Config, c *call, opts []RequestOption) 
 		cancel(nil)
 		return nil, err
 	}
+	opened(ctx, cfg, c)
 	result.resp.Body = releasing{result.resp.Body, cancel}
 	return result.resp, nil
 }

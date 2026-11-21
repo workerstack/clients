@@ -90,7 +90,8 @@ func dialWebSocket[In, Out any](ctx context.Context, cfg Config, c *call, read f
 	return &TypedWebSocket[In, Out]{conn: conn, stop: keepAlive(conn, cfg.WSKeepalive), read: read, write: write}, nil
 }
 
-// dialSocket opens the call's WebSocket as the client calls; an error status is its *APIError.
+// dialSocket opens the call's WebSocket as the client calls, settling it once open (opened); an
+// error status is its *APIError.
 func dialSocket(ctx context.Context, cfg Config, c *call, opts []RequestOption) (*websocket.Conn, error) {
 	rc := newRequestConfig(cfg, opts)
 	u, err := buildURL(rc.baseURL, c.path, c.query)
@@ -115,6 +116,7 @@ func dialSocket(ctx context.Context, cfg Config, c *call, opts []RequestOption) 
 	}
 	rc.deliver(resp, nil)
 	conn.SetReadLimit(defaultWSReadLimit)
+	opened(ctx, cfg, c)
 	return conn, nil
 }
 

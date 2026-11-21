@@ -26,6 +26,8 @@ type call struct {
 	invalidates []string          // declared invalidation targets, `METHOD /template`
 	params      map[string]string // path params, to expand templated targets
 	meta        *RequestMeta
+	by          string      // the operationId an InvalidateEvent names
+	reads       []staleRead // the reads a success makes stale, for OnInvalidate
 }
 
 // requestResult is a buffered answer: its body after the OnResponse hooks, the response, and
@@ -50,8 +52,8 @@ type exchange struct {
 var ErrResponseTooLarge = errors.New("httpsdk: response body exceeds MaxResponseBytes")
 
 // doRequest sends c and buffers its answer (run), honoring the call's timeout and the stale
-// tracker. A ctx already done sends nothing: OnLog sees only its error. A 2xx past the cap is a
-// *DecodeError.
+// tracker, then runs the OnInvalidate hooks with the caller's ctx. A ctx already done sends
+// nothing: OnLog sees only its error. A 2xx past the cap is a *DecodeError.
 func doRequest(ctx context.Context, cfg Config, c *call, opts []RequestOption) (*requestResult, error) {
 	x := &exchange{cfg: cfg, rc: newRequestConfig(cfg, opts), c: c}
 	if ctx.Err() != nil {
@@ -59,6 +61,7 @@ func doRequest(ctx context.Context, cfg Config, c *call, opts []RequestOption) (
 		emitLog(cfg, errorEntry(c.operation, time.Now(), err))
 		return nil, err
 	}
+	caller := ctx
 	if x.rc.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, x.rc.timeout)
@@ -70,6 +73,7 @@ func doRequest(ctx context.Context, cfg Config, c *call, opts []RequestOption) (
 		return nil, err
 	}
 	c.stale.settle(c)
+	invalidated(caller, cfg, c)
 	if result.over {
 		return nil, &DecodeError{result.resp, ErrResponseTooLarge}
 	}

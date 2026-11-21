@@ -24,6 +24,10 @@ import (
 //
 // WSKeepalive is a WebSocket's ping interval and pong wait: zero means 20s, negative none.
 //
+// OnInvalidate's hooks run in order once per successful write that makes reads stale, before the
+// call returns and with its context: a stream or socket calls them detached once it opens. A
+// hook's error goes to OnLog and never fails the call.
+//
 // AuthHeaderName and AuthHeaderPrefix are a pair: leave both empty for the API's scheme; set the
 // name and the prefix is yours (empty means none); set only the prefix to keep the scheme's header.
 type Config struct {
@@ -40,6 +44,7 @@ type Config struct {
 	OnRequest        []func(*RequestContext) error
 	OnResponse       []func(*ResponseContext) error
 	OnLog            func(LogEntry)
+	OnInvalidate     []func(context.Context, InvalidateEvent) error
 	MaxResponseBytes int64
 	WSKeepalive      time.Duration
 

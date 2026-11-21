@@ -29,7 +29,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -73,6 +75,9 @@ type setup struct {
 	TimeoutMs *int64            `json:"timeoutMs"`
 
 	MaxResponseBytes *int64 `json:"maxResponseBytes"`
+	RecordInvalidate *struct {
+		FailFirst bool `json:"failFirst"`
+	} `json:"recordInvalidate"`
 }
 
 // plan is one method's call plan, in the emitter's names (emit/go/sdk-method.ts GoMethodCall).
@@ -117,7 +122,7 @@ func drive(r io.Reader, w io.Writer) error {
 	if err := json.NewDecoder(r).Decode(&in); err != nil {
 		return fmt.Errorf("read input: %w", err)
 	}
-	cfg, err := configOf(in)
+	cfg, inv, err := configOf(in)
 	if err != nil {
 		return err
 	}
@@ -138,7 +143,7 @@ func drive(r io.Reader, w io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("call %d (%s): %w", i, c.Operation, err)
 		}
-		observed = append(observed, seen)
+		observed = append(observed, inv.observe(seen))
 	}
 	if s == nil {
 		return json.NewEncoder(w).Encode(observed)
@@ -154,14 +159,59 @@ func strict(raw json.RawMessage, v any) error {
 	return dec.Decode(v)
 }
 
-// configOf is the client config a cell's setup asks for, aimed at base.
-func configOf(in input) (sdk.Config, error) {
+// invalidations records each event a cell's OnInvalidate hooks see under setup.recordInvalidate
+// (plan 6), in the grid's shape; nil when the setup does not ask for it.
+type invalidations struct{ events []any }
+
+// errHook is the error of the hook failFirst puts before the recording one: OnLog's, never the call's.
+var errHook = errors.New("driver: a failing OnInvalidate hook")
+
+func failingHook(context.Context, sdk.InvalidateEvent) error { return errHook }
+
+func (r *invalidations) record(_ context.Context, e sdk.InvalidateEvent) error {
+	targets := make([]any, len(e.Targets))
+	for i, t := range e.Targets {
+		targets[i] = map[string]any{"operationId": t.OperationID, "params": t.Params}
+	}
+	r.events = append(r.events, map[string]any{"by": e.By, "targets": targets})
+	return nil
+}
+
+// observe is a call's observation under the recorder: a data answer is invalidated, with the
+// events recorded since the last call; any other, and every one without a recorder, as is.
+func (r *invalidations) observe(seen any) any {
+	data, ok := seen.(map[string]any)
+	if r == nil || !ok || data["kind"] != "data" {
+		return seen
+	}
+	data["kind"], data["events"] = "invalidated", r.events
+	r.events = []any{}
+	return data
+}
+
+// configOf is the client config a cell's setup asks for, aimed at base, and the recorder its
+// recordInvalidate asks for.
+func configOf(in input) (sdk.Config, *invalidations, error) {
 	var s setup
 	if len(in.Cell.Setup) > 0 {
 		if err := strict(in.Cell.Setup, &s); err != nil {
-			return sdk.Config{}, fmt.Errorf("setup: %w", err)
+			return sdk.Config{}, nil, fmt.Errorf("setup: %w", err)
 		}
 	}
+	cfg, err := settingsOf(in, s)
+	if err != nil || s.RecordInvalidate == nil {
+		return cfg, nil, err
+	}
+	inv := &invalidations{events: []any{}}
+	if s.RecordInvalidate.FailFirst {
+		cfg.OnInvalidate = append(cfg.OnInvalidate, failingHook)
+	}
+	cfg.OnInvalidate = append(cfg.OnInvalidate, inv.record)
+	return cfg, inv, nil
+}
+
+// settingsOf is the client config of setup s, aimed at base.
+func settingsOf(in input, s setup) (sdk.Config, error) {
 	cfg := sdk.Config{BaseURL: in.Base, Headers: map[string]string{}}
 	for name, value := range s.Headers {
 		cfg.Headers[name] = value

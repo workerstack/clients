@@ -58,6 +58,9 @@ const KINDS: Readonly<Record<string, (expected: Expectation, scenario: Scenario,
   error: errorKind,
   events: (expected) => (expected.failed === undefined ? "events" : `events failed ${String(expected.failed)}`),
   frames: () => "frames",
+  // a write's data with its OnInvalidate events: only the invalidate-once row's targets answer it, and plans 7-9 add
+  // their SDKs to the row
+  invalidated: () => "invalidated",
   raw: () => "raw",
   timeout: () => "timeout",
   transport: () => "transport",

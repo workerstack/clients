@@ -611,7 +611,13 @@ describe("runtimeBytes", () => {
 //   plain `resumable` loop, deliver, SendText, the dial split from the typed connection), stream.go +355
 //   (streamEvents, sseData), sse.go +340 (`SSEEvent.Untyped`), result.go +102 (the DecodeError doc), transport.go +99
 //   (`Recv` returns bytes, payloadCursor), realtime_loop.go +72, transport_longpoll.go -17, transport_sse.go -14.
-const GO_RUNTIME_BYTES = 107_434;
+// Plan 6 (sdk-on-invalidate-go), +3,214 B to 110,648 B: Config.OnInvalidate, called once per successful write with
+//   the reads it made stale. hooks.go +2,516 (InvalidateEvent, InvalidateTarget, staleRead; invalidated: the targets
+//   the write's params fill, the hooks run in order, a hook's error or recovered panic sent to OnLog and never to the
+//   call; opened: a stream's or socket's open marks its targets and calls the hooks detached), config.go +316 (the
+//   field and its doc), request.go +247 (call.by and call.reads, the hooks after settle with the caller's ctx),
+//   stream.go +79 and ws.go +56 (opened on a 2xx open).
+const GO_RUNTIME_BYTES = 110_648;
 
 describe("the Go runtime within its byte budget (bit 12, G14)", () => {
   it(`ships every runtime file it holds, their bytes exactly ${GO_RUNTIME_BYTES}`, { timeout: SPAWN_TIMEOUT }, () => {

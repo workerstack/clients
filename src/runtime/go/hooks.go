@@ -3,8 +3,10 @@
 package sdk
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // RequestContext is what each OnRequest hook sees, in declaration order. A hook may change
@@ -50,4 +52,72 @@ func (m *RequestMeta) stale() (string, bool, []string) {
 		return "", false, nil
 	}
 	return m.Selector, m.IsStale, m.InvalidatedBy
+}
+
+// InvalidateTarget is one read a write made stale: its operationId, and the write's values for the
+// read's own path params. A param the write lacks, or holds as "", "." or "..", is left out.
+type InvalidateTarget struct {
+	OperationID string
+	Params      map[string]string
+}
+
+// InvalidateEvent is what each OnInvalidate hook sees after a successful write: the write's
+// operationId and every read it made stale.
+type InvalidateEvent struct {
+	By      string
+	Targets []InvalidateTarget
+}
+
+// staleRead is one read a write makes stale, as the emitter resolved it: its operationId and its
+// own path params.
+type staleRead struct {
+	op     string
+	params []string
+}
+
+// invalidated calls each OnInvalidate hook in order, each after the last returned, with what c
+// made stale; none when c makes nothing stale. A hook's error or panic goes to OnLog as an error
+// entry, never to the call, and is dropped without OnLog; the next hook still runs.
+func invalidated(ctx context.Context, cfg Config, c *call) {
+	if len(c.reads) == 0 || len(cfg.OnInvalidate) == 0 {
+		return
+	}
+	event := InvalidateEvent{By: c.by, Targets: make([]InvalidateTarget, len(c.reads))}
+	for i, read := range c.reads {
+		known := map[string]string{}
+		for _, name := range read.params {
+			if v := c.params[name]; v != "" && v != "." && v != ".." {
+				known[name] = v
+			}
+		}
+		event.Targets[i] = InvalidateTarget{OperationID: read.op, Params: known}
+	}
+	for _, hook := range cfg.OnInvalidate {
+		start := time.Now()
+		if err := runInvalidateHook(ctx, hook, event); err != nil {
+			emitLog(cfg, errorEntry(c.operation, start, err))
+		}
+	}
+}
+
+// runInvalidateHook calls hook, its panic recovered as its error (wrapping a panicked error), so
+// a faulty hook neither crashes a detached open nor changes the write's result.
+func runInvalidateHook(ctx context.Context, hook func(context.Context, InvalidateEvent) error, event InvalidateEvent) (err error) {
+	defer func() {
+		switch r := recover().(type) {
+		case nil:
+		case error:
+			err = fmt.Errorf("httpsdk: OnInvalidate hook panicked: %w", r)
+		default:
+			err = fmt.Errorf("httpsdk: OnInvalidate hook panicked: %v", r)
+		}
+	}()
+	return hook(ctx, event)
+}
+
+// opened settles a stream or socket once it opened: its targets marked stale, and the
+// OnInvalidate hooks called detached, so the open never waits on them nor ends their context.
+func opened(ctx context.Context, cfg Config, c *call) {
+	c.stale.settle(c)
+	go invalidated(context.WithoutCancel(ctx), cfg, c)
 }

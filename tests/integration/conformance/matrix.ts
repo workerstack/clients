@@ -36,6 +36,11 @@ export type Setup = {
   readonly timeoutMs?: number;
   /** the client's response cap in bytes (bit 21 i2's over-cap row) */
   readonly maxResponseBytes?: number;
+  /**
+   * plan 6's invalidate-once row: the target records each event its OnInvalidate hooks see, after a hook that fails
+   * when `failFirst`, and answers a call's data as `invalidated`
+   */
+  readonly recordInvalidate?: { readonly failFirst: boolean };
 };
 
 type Body =
@@ -98,6 +103,13 @@ export type Observed =
       readonly kind: "events";
     }
   | { readonly frames: readonly Json[]; readonly kind: "frames" }
+  /** a data answer under `Setup.recordInvalidate`, with each event the client's OnInvalidate hooks saw (plan 6) */
+  | {
+      readonly data: Json;
+      readonly events: readonly InvalidateObserved[];
+      readonly kind: "invalidated";
+      readonly status: number;
+    }
   | { readonly kind: "timeout" }
   /** a 2xx answer whose body did not decode: the target's decode error, the answer's status kept (bit 21 i0) */
   | { readonly kind: "decode"; readonly status: number }
@@ -113,6 +125,12 @@ export type Observed =
       readonly stderr: readonly Json[];
       readonly stdout: readonly string[];
     };
+
+/** one event an OnInvalidate hook saw: the write's operationId and each read it made stale, by its params */
+export type InvalidateObserved = {
+  readonly by: string;
+  readonly targets: readonly { readonly operationId: string; readonly params: Readonly<Record<string, string>> }[];
+};
 
 /** what a call or a stream fails with when no answer arrives, as the grid observes it (bit 19 f2) */
 export type NoAnswer = "timeout" | "transport";

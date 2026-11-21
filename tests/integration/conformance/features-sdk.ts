@@ -3,9 +3,10 @@
  * of the six SDKs, and a text answer no shared row had (F2); a 2xx past the response cap (i2, on every SDK since i6); and a realtime
  * send's 2xx past it (i7). An undecodable 2xx is the target's decode error: TS's and Python's DecodeError, Go's *DecodeError
  * (i3), Rust's Error::Decode (its DecodeError since i4), C#'s and Java's DecodeException: each driver reads its target's. Every expectation is what the reference app (core `conformance/app.ts`) answers.
+ * A write's OnInvalidate hooks called once (plan 6) run on TS and Go so far.
  */
 import { call, data, error, events, hop } from "./cells.ts";
-import type { Feature, Scenario, Target } from "./matrix.ts";
+import type { Expected, Feature, Scenario, Target } from "./matrix.ts";
 
 /** The SDK targets: the six generated clients, each with its normal (throwing) and safe styles (bit 21 i). */
 export const SDKS = ["ts", "go", "rust", "python", "csharp", "java"] as const satisfies readonly Target[];
@@ -76,6 +77,31 @@ const text: Scenario[] = [
   { calls: [call("health", "GET", "/v1/health")], expect: [data("ok")], id: "plain", wire: [hop("GET", "/v1/health")] },
 ];
 
+/**
+ * A users.update of `id` (plan 6's invalidate-once row) under the recording setup: the target records each event the
+ * client's OnInvalidate hooks see, after a hook that fails when `recordInvalidate.failFirst`, as the call's
+ * `invalidated` result: the write's data and the events. One event, the reads the write names with its id as a string.
+ */
+function invalidateOnce(id: string, recordInvalidate: { readonly failFirst: boolean }): Scenario {
+  const targets: Expected[] = [
+    { operationId: "users.list", params: {} },
+    { operationId: "users.get", params: { id } },
+  ];
+
+  return {
+    calls: [
+      call("users.update", "PUT", "/v1/secure/users/:id", {
+        body: { kind: "json", value: { name: "N" } },
+        params: { id },
+      }),
+    ],
+    expect: [{ ...data({ email: "", id, name: "N" }), events: [{ by: "users.update", targets }], kind: "invalidated" }],
+    id: recordInvalidate.failFirst ? "failing-hook" : "write",
+    setup: { auth: { kind: "bearer", token: "valid-token" }, recordInvalidate },
+    wire: [hop("PUT", `/v1/secure/users/${id}`)],
+  };
+}
+
 /** Rows the six SDKs run. */
 const sdks = (id: string, asserted: string, scenarios: Scenario[]): Feature => ({
   asserted,
@@ -100,4 +126,11 @@ export const SDK_ROWS: readonly Feature[] = [
     "a realtime send's 2xx past the response cap is the target's decode error, never no answer",
     realtime,
   ),
+  // TS and Go record the hooks (plan 6); each other SDK joins the row in its own slice
+  {
+    asserted: "a 2xx write calls its OnInvalidate hooks once with the reads it made stale; a failing hook leaves it ok",
+    id: "invalidate-once",
+    scenarios: [invalidateOnce("inv-1", { failFirst: false }), invalidateOnce("inv-2", { failFirst: true })],
+    targets: ["ts", "go"],
+  },
 ];

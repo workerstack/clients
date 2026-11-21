@@ -7,6 +7,7 @@
  * generated-code marker.
  */
 import { type OpenApiDocument, toIR } from "../../ir/build.ts";
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
 import type { IR, IRInfo, IRSchema } from "../../ir/model.ts";
 import { sdkModel } from "../../ir/sdk-model.ts";
 import { lineComment } from "../shared/escape.ts";
@@ -105,9 +106,9 @@ function emitGo(document: Record<string, unknown>, options: GoSdkOptions): Gener
   const at = goTypeContext(ir);
   // components first: the client's hoisted types then land beside them
   const components = componentDecls(ir, at);
-  const ops = model.opsById;
+  const { reads, warnings } = invalidateReads(ir);
   const notices: string[] = [];
-  const client = clientDecls(ir, { at, notices, ops });
+  const client = clientDecls(ir, { at, notices, ops: model.opsById, reads });
   const errorKeys = goErrorKeys(model, at);
   const hoisted = [...at.decls].sort(([a], [b]) => compareCodeUnits(a, b)).map(([, decl]) => decl);
 
@@ -128,7 +129,7 @@ function emitGo(document: Record<string, unknown>, options: GoSdkOptions): Gener
         ["json", "encoding/json"],
       ]),
     },
-    notices,
+    notices: [...notices, ...warnings.map((warning) => `go: ${warning}`)],
     packages: [packageOn("go", modulePath, options.version)],
     plans: client.plans,
   };

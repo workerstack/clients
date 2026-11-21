@@ -4,6 +4,7 @@
  * stream's runtime call (`sse.ts`, `ws.ts`). The query and header params ride on `<Op>Opts`, sent
  * only when set. Spec text reaches the source only through the shared escape layer.
  */
+import type { InvalidatedRead } from "../../ir/invalidate-reads.ts";
 import type { IRParam } from "../../ir/model.ts";
 import { mediaEssence, type SdkBody, type SdkOp, type SdkResponseKind, type SdkStream } from "../../ir/sdk-model.ts";
 import { goString, lineComment } from "../shared/escape.ts";
@@ -68,7 +69,8 @@ export type GoMethod = {
 };
 
 /** What every method of one SDK shares: the type context it hoists into. */
-export type MethodEnv = { readonly at: GoTypeContext };
+/** The type context, and each write's reads by operationId (`invalidateReads`): what its `OnInvalidate` event names. */
+export type MethodEnv = { readonly at: GoTypeContext; readonly reads: ReadonlyMap<string, readonly InvalidatedRead[]> };
 
 /** Where a method lives: its receiver's type, and the expression reaching the `*Client` from it. */
 export type Receiver = { readonly type: string; readonly client: string };
@@ -106,6 +108,7 @@ const METHOD_LOCALS = [
   "setIdempotencyKey",
   "sseData",
   "sseFail",
+  "staleRead",
   "streamEvents",
   "streamText",
   "textField",
@@ -208,6 +211,17 @@ function callMembers(op: SdkOp, path: PathLines, body: GoBody | undefined, clien
   ];
 }
 
+/** The `call` literal's `OnInvalidate` members: its operationId and the reads a success makes stale, for a write. */
+function invalidatingMembers(op: SdkOp, reads: readonly InvalidatedRead[] | undefined): string[] {
+  if (reads === undefined || reads.length === 0) return [];
+
+  const each = reads.map(
+    (read) => `{${goString(read.operationId)}, []string{${read.params.map(goString).join(", ")}}}`,
+  );
+
+  return [`by: ${goString(op.id)}`, `reads: []staleRead{${each.join(", ")}}`];
+}
+
 /**
  * How a method's `Client.Safe()` twin answers, as the field of its name on the twin struct: `call` a `Result` of the
  * answer, `none` one of `struct{}` (no body), `stream` one of the event stream opened on the call, `conn` the very
@@ -256,12 +270,14 @@ export function goMethod(op: SdkOp, name: string, receiver: Receiver, env: Metho
     "reqOpts ...RequestOption",
   ];
 
+  const members = [...callMembers(op, path, body, receiver.client), ...invalidatingMembers(op, env.reads.get(op.id))];
+
   const lines = [
     ...methodDoc(op, name, stream),
     `func (r *${receiver.type}) ${name}(${params.join(", ")}) ${shape.returns} {`,
     ...path.lines,
     ...(body ? body.lines(shape.fail) : []),
-    `\tc := &call{${callMembers(op, path, body, receiver.client).join(", ")}}`,
+    `\tc := &call{${members.join(", ")}}`,
     ...optsLines(op, fields, streamOpts),
     ...shape.tail(receiver.client),
     "}",
