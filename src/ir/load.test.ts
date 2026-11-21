@@ -172,6 +172,12 @@ describe("an --app module on Node, through Vite's module runner", () => {
     const [http, openapi] = await Promise.all([load("lib/http"), load("lib/http/openapi")]);
     expect([http.which, openapi.which]).toStrictEqual(["http", "openapi"]);
   });
+
+  it("fails naming an import of the app's that nothing resolves", async () => {
+    const dir = project({ "src/app.ts": `import { admin } from "not-installed"\nexport const app = admin\n` });
+    const missing = `Cannot find module 'not-installed' imported from '${join(dir, "src/app.ts")}'`;
+    expect(await loaded(["src/app.ts"], dir)).toStrictEqual([missing]);
+  });
 });
 
 describe("an --app module on Bun, by Bun's own import (bit 20)", () => {

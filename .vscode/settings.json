@@ -43,6 +43,7 @@
     }
   },
   "files.readonlyInclude": {
+    "**/_gen/**": true,
     ".agents/agents/implementer-deep.md": true,
     ".agents/agents/implementer-fast.md": true,
     ".agents/agents/orchestrator.md": true,

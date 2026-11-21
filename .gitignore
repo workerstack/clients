@@ -1,7 +1,7 @@
 dist/
 **/.cache/
 
-# repo:ignore 7d468bac
+# repo:ignore 3294036a
 .tmp/
 .worktrees/
 coverage/
@@ -20,6 +20,7 @@ node_modules/
 /knip.jsonc
 knip.unignored-*.jsonc
 /.oxfmtrc.jsonc
+.oxlintrc.fix-*.jsonc
 /.oxlintrc.jsonc
 .oxlintrc.unskipped-*.jsonc
 /.agents/

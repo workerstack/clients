@@ -4,7 +4,8 @@
 // The build reads the checkout's `clients-source` condition, but the tarball ships no src/, so the manifest npm packs
 // drops every `clients-source` key: a process that sets the condition would otherwise resolve an install to a missing
 // file. It drops devDependencies too, which no consumer installs and whose vendored `file:` pins name a tarball no
-// install can reach, and refuses a `file:`, `link:` or git spec in a field a consumer does install. release.yml's
+// install can reach, and the scripts, each a dev tool of this repo (the postinstall one, `repo sync`, fails every
+// consumer's install), and refuses a `file:`, `link:` or git spec in a field a consumer does install. release.yml's
 // pack job packs here (bit 19 i).
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -14,9 +15,13 @@ import { join, resolve } from "node:path";
 const INSTALLED = ["dependencies", "optionalDependencies", "peerDependencies"] as const;
 const NON_REGISTRY = /^(?:file|link|git(?:\+[a-z]+)?|github):/;
 
-type Manifest = { name: string; version: string; exports?: unknown; imports?: unknown } & Partial<
-  Record<(typeof INSTALLED)[number] | "devDependencies", Record<string, string>>
->;
+type Manifest = {
+  name: string;
+  version: string;
+  exports?: unknown;
+  imports?: unknown;
+  scripts?: Record<string, string>;
+} & Partial<Record<(typeof INSTALLED)[number] | "devDependencies", Record<string, string>>>;
 
 const UNSTAGED = new Set(["coverage", "dist", "node_modules", "tests"]);
 
@@ -27,9 +32,12 @@ function published(dir: string): Manifest {
   return read(dir);
 }
 
-/** `manifest` as npm publishes it: no devDependencies, and every installed spec a registry version, or it throws. */
+/**
+ * `manifest` as npm publishes it: no devDependencies nor scripts, and every installed spec a registry version, or it
+ * throws.
+ */
 function shippedManifest(manifest: Manifest): Manifest {
-  const { devDependencies: _dev, ...shipped } = manifest;
+  const { devDependencies: _dev, scripts: _scripts, ...shipped } = manifest;
 
   for (const field of INSTALLED) {
     for (const [name, spec] of Object.entries(manifest[field] ?? {})) {

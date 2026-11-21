@@ -1,7 +1,8 @@
 /**
  * scripts/pack.ts packs the tarball release.yml publishes. Its manifest drops devDependencies, which no consumer
  * installs and whose vendored `file:` pin named a tarball no install could reach (rc.27 shipped one), and a `file:`,
- * `link:` or git spec in a field a consumer installs fails the pack before it builds.
+ * `link:` or git spec in a field a consumer installs fails the pack before it builds. It drops the scripts too: each
+ * runs the repo's own dev tools, and the postinstall one (`repo sync`) failed every install of rc.30, npx's included.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -55,6 +56,20 @@ describe("scripts/pack.ts", () => {
       expect([published.dependencies, published.devDependencies]).toEqual([{ zod: "4.3.6" }, undefined]);
     },
   );
+
+  it("publishes no scripts, so an install runs none of the repo's dev tools", { timeout: PACK_TIMEOUT }, () => {
+    // a postinstall that fails wherever it runs, as `repo sync` does where no @workerstack/repo is installed
+    const dir = fixture("scripts", { scripts: { postinstall: "exit 3", test: "vitest run" } });
+    const tarball = pack(dir, scratch);
+    const read = spawnSync("tar", ["-xOzf", tarball, "package/package.json"], { encoding: "utf8" });
+    const consumer = mkdtempSync(join(scratch, "consumer-"));
+    writeFileSync(join(consumer, "package.json"), "{}\n");
+
+    const installed = spawnSync("npm", ["install", "--no-audit", "--no-fund", tarball], { cwd: consumer });
+
+    const { scripts } = JSON.parse(read.stdout) /* npm packs a manifest object */ as { scripts?: object };
+    expect([scripts, installed.status]).toStrictEqual([undefined, 0]);
+  });
 
   it(
     "refuses a file:, link: or git spec a consumer would install, naming the field and the spec",
