@@ -715,7 +715,14 @@ describe("the Rust runtime within its byte budget (bit 13, G14)", () => {
 // names); events.py +590 (`SseEventOf[N, T]`, the `SseEvent` alias, a named-event stream's per-name decode);
 // operation.py +163 (events, encode, decode, dispatch, kind); send_async.py +34, transport_sse.py +20 and
 // transport_ws.py +21 (the events passed on, the generic spellings).
-const PYTHON_RUNTIME_BYTES = 95_210;
+// Plan 7 (sdk-on-invalidate-python), +4,474 B to 99,684 B: on_invalidate and on_invalidate_sync, called once per
+//   successful write with the reads it made stale. hooks.py +3,058 (InvalidateEvent, InvalidateTarget; invalidation:
+//   the targets the write's params fill; the sync and async runners, a raising hook logged by `Logged` and the next
+//   still run; detach: a stream's or socket's open runs them as a held task; refuse_hooks covers both lists),
+//   config.py +624 (the fields and their doc), send_async.py +255 (awaited after done, detached for a stream), ws.py
+//   +201 (a socket's open marks stale and detaches), exchange.py +153 (the event at settle), send_sync.py +110,
+//   operation.py +73 (by, reads).
+const PYTHON_RUNTIME_BYTES = 99_684;
 
 describe("the Python runtime within its byte budget (bit 14, G14)", () => {
   it(

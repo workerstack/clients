@@ -27,12 +27,17 @@ class HeaderAuth(TypedDict):
     value: str
 
 
+class RecordInvalidate(TypedDict):
+    failFirst: bool
+
+
 class Setup(TypedDict, total=False):
     auth: BearerAuth | HeaderAuth
     headers: dict[str, str]
     redirect: Literal["follow", "same-origin"]
     timeoutMs: int
     maxResponseBytes: int
+    recordInvalidate: RecordInvalidate
 
 
 class Route(TypedDict):

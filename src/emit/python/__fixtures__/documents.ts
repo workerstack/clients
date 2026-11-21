@@ -30,6 +30,7 @@ import { merged } from "../../shared/__fixtures__/merge.ts"
 import type { PythonSdkOptions } from "../sdk.ts"
 import { pythonHttp } from "./documents-http.ts"
 import { relative, surface, types } from "./documents-specs.ts"
+import { invalidateDocument } from "./on-invalidate.ts"
 
 /**
  * One package a run gates: an OpenAPI document the emitter writes a package for (made on use: a module runs no
@@ -127,6 +128,8 @@ export const FIXTURES = {
 	fixtures: { document: fixtures },
 	/** the HTTP runtime's document (contract 29 §4.3): bit 13's `http` and three Python-only paths, both modes */
 	http: { document: pythonHttp },
+	/** plan 7's on_invalidate cases: plan 2's document in Python's terms (http.on-invalidate*.test.ts) */
+	invalidate: { document: invalidateDocument },
 	/** every name spelled at lengths 20..110, across ruff's width of 88 (bit 21 i7a) */
 	long: { document: longNames },
 	/** the resumable connections (contract 34 Fd6): bit 13's `realtime` document, shared */

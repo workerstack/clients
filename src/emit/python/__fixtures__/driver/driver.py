@@ -43,6 +43,7 @@ from typing import Any, TypeVar
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from invalidations import Invalidations, recording
 from invoke import Target, prepare
 from observe import Lens, Outcome, raised, returned
 from protocol import (
@@ -95,6 +96,13 @@ class Runner:
     target: Target
     recorder: Recorder
     script: Script | None
+    invalidations: Invalidations | None = None
+
+    def observed(self, outcome: Outcome) -> Observed | None:
+        """``outcome``'s observation, an invalidated one under ``Setup.recordInvalidate``."""
+        if self.invalidations is None:
+            return outcome.observed
+        return self.invalidations.observe(outcome.observed)
 
     def directives(self, i: int) -> CallScript:
         """Call ``i``'s script entry; an empty one without it."""
@@ -196,7 +204,7 @@ def run_sync(runner: Runner, config: Any) -> list[Observed | None]:
                 raise located(i, call, error) from error
             recorded = (outcome.error, outcome.result, outcome.stream)
             runner.recorder.called(elapsed_ms(start), *recorded)
-            out.append(outcome.observed)
+            out.append(runner.observed(outcome))
     if config.http_client is not None:
         config.http_client.close()
     return out
@@ -218,7 +226,7 @@ async def run_async(runner: Runner, config: Any) -> list[Observed | None]:
                 raise located(i, call, error) from error
             recorded = (outcome.error, outcome.result, outcome.stream)
             runner.recorder.called(elapsed_ms(start), *recorded)
-            out.append(outcome.observed)
+            out.append(runner.observed(outcome))
     if config.async_http_client is not None:
         await config.async_http_client.aclose()
     return out
@@ -243,10 +251,11 @@ def drive(envelope: Envelope) -> list[Observed | None] | Printed:
     module = importlib.import_module(envelope["sdk"]["package"])
     recorder = Recorder()
     fields = config_fields(envelope)
+    invalidations = recording(envelope["cell"].get("setup", {}), fields, client)
     if script is not None:
         apply(script, fields, (module, client), recorder)
     config = module.ClientConfig(**fields)
-    runner = Runner(Target(module, envelope), recorder, script)
+    runner = Runner(Target(module, envelope), recorder, script, invalidations)
     if client == "sync":
         observed = run_sync(runner, config)
     else:

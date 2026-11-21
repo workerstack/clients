@@ -15,7 +15,7 @@ import httpx2
 from .errors import ConfigError
 
 if TYPE_CHECKING:
-    from .hooks import RequestContext, ResponseContext
+    from .hooks import InvalidateEvent, RequestContext, ResponseContext
     from .log import LogEntry
 
 __all__ = ["ClientConfig", "InvalidationConfig", "RawResponse", "RequestOptions"]
@@ -41,7 +41,11 @@ class ClientConfig:
     WebSocket's ping interval and pong wait. A redirect to another origin is followed only under ``"follow"``, and
     never carries credentials, a body, or what an ``http_client`` adds. ``SDK`` runs the ``*_sync``
     hooks and a plain ``on_auth_expired``; ``AsyncSDK`` runs the others, and coroutine functions too.
-    Either refuses, at construction, a hook it would not run.
+    Either refuses, at construction, a hook it would not run. ``on_invalidate`` (``on_invalidate_sync``)
+    runs once per call, after the final answer (an auth refresh included), for a 2xx write, its body
+    decoded or not, with the reads it made stale; the call returns after the last hook, so a hung one
+    holds it past ``timeout``. A stream's or socket's open runs them detached, waiting on none. A hook
+    that raises is an ``on_log`` error entry (dropped without ``on_log``), never the call's error.
     """
 
     base_url: str = ""
@@ -60,6 +64,8 @@ class ClientConfig:
     on_response: Sequence[Callable[[ResponseContext], Awaitable[None] | None]] = ()
     on_request_sync: Sequence[Callable[[RequestContext], None]] = ()
     on_response_sync: Sequence[Callable[[ResponseContext], None]] = ()
+    on_invalidate: Sequence[Callable[[InvalidateEvent], Awaitable[None] | None]] = ()
+    on_invalidate_sync: Sequence[Callable[[InvalidateEvent], None]] = ()
     on_log: Callable[[LogEntry], None] | None = None
     on_auth_expired: Callable[[], Awaitable[str | None] | str | None] | None = None
     invalidation: InvalidationConfig | None = None

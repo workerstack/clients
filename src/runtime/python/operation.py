@@ -21,6 +21,8 @@ class Operation(Generic[T]):
     shape: Literal["array", "boolean", "number", "object", "string"] | None = None
     idempotent: bool = False
     invalidates: tuple[str, ...] = ()
+    by: str = ""
+    reads: tuple[tuple[str, tuple[str, ...]], ...] = ()
     stream: Literal["realtime", "sse", "ws"] | None = None
     headers: tuple[tuple[str, str, HeaderKind, bool], ...] = ()
     events: tuple[str, ...] | None = None

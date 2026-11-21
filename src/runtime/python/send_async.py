@@ -12,7 +12,13 @@ from .config import ClientConfig, Defaults
 from .errors import APIConnectionError, APITimeoutError, HttpError
 from .events import EventStream, raced
 from .exchange import CallArgs, ClientCore, Exchange, HttpAnswer, failure
-from .hooks import RequestContext, refuse_hooks, run_async
+from .hooks import (
+    RequestContext,
+    detach,
+    invalidate_async,
+    refuse_hooks,
+    run_async,
+)
 from .operation import Operation
 from .redirect import Hop, cross
 from .result import ANSWERS, Err, Ok, Result
@@ -108,7 +114,13 @@ class AsyncTransport(ClientCore):
         except asyncio.CancelledError:
             x.log.emit("error", "error", error="the call was canceled")
             raise
-        return x.done(answer), live
+        x.done(answer)
+        hooks = self.config.on_invalidate
+        if x.stream:
+            detach(hooks, x.invalidated, x.log)
+        else:
+            await invalidate_async(hooks, x.invalidated, x.log)
+        return answer, live
 
     async def prepared(
         self, x: Exchange, token: str | None, is_retry: bool = False

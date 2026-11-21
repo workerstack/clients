@@ -37,6 +37,7 @@ from .errors import (
 )
 from .events import Cancel, raced
 from .exchange import CallArgs, Exchange
+from .hooks import detach, invalidation
 from .operation import Operation
 from .send_async import AsyncTransport
 
@@ -324,7 +325,10 @@ class AsyncWsTransport(AsyncTransport):
         resume = {"reconnect_token": reconnect_token or None}
         query = {**(args.get("query") or {}), **resume}
         x = Exchange(self, op, {**args, "query": query}, stream=True)
-        return cast("T", await self.socket(x, protocols, op))
+        socket = await self.socket(x, protocols, op)
+        self.stale.settle(x.meta, op.invalidates, x.params)
+        detach(self.config.on_invalidate, invalidation(op, x.params), x.log)
+        return cast("T", socket)
 
     async def socket(
         self,

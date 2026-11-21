@@ -29,7 +29,7 @@ from .errors import (
     loads,
     status_error,
 )
-from .hooks import RequestContext, ResponseContext
+from .hooks import InvalidateEvent, RequestContext, ResponseContext, invalidation
 from .log import CallLog
 from .operation import Operation
 from .path import expand
@@ -112,6 +112,7 @@ class Exchange:
         self.hops = 0
         self.raw = options.get("raw") or RawResponse()
         self.failure: APIStatusError | None = None
+        self.invalidated: InvalidateEvent | None = None
 
     def check(self) -> float | None:
         cancel = self.options.get("cancel")
@@ -226,6 +227,7 @@ class Exchange:
         self.log.answered(answer.status)
         if 200 <= answer.status < 300:
             self.core.stale.settle(self.meta, self.op.invalidates, self.params)
+            self.invalidated = invalidation(self.op, self.params)
         else:
             self.failure = failure(answer, self.core)
             self.log.failed(self.failure)

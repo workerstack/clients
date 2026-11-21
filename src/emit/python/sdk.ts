@@ -8,6 +8,7 @@
  * is no error-mode option.
  */
 import { type OpenApiDocument, toIR } from "../../ir/build.ts";
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
 import type { IR, IRSchema } from "../../ir/model.ts";
 import { sdkModel } from "../../ir/sdk-model.ts";
 import { pyDocLines } from "../shared/escape.ts";
@@ -192,6 +193,8 @@ function emitPython(document: Record<string, unknown>, options: PythonSdkOptions
 
   const transport = features.realtime ? "AsyncRealtimeTransport" : features.ws ? "AsyncWsTransport" : "AsyncTransport";
 
+  const { reads, warnings } = invalidateReads(ir);
+
   const env: ClientEnv = {
     at: { ...at, declTyping: at.typing, typing: new Set() },
     constants: new NameScope(),
@@ -199,6 +202,7 @@ function emitPython(document: Record<string, unknown>, options: PythonSdkOptions
     keyed: errorKey !== null,
     notices: [],
     ops: model.opsById,
+    reads,
     transport,
     typesImports: new Set(),
   };
@@ -237,7 +241,9 @@ function emitPython(document: Record<string, unknown>, options: PythonSdkOptions
 
   const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => compareCodeUnits(a, b)));
 
-  return { files: sorted, notices: env.notices, pkg, plans: client.plans };
+  const notices = [...env.notices, ...warnings.map((warning) => `python: ${warning}`)];
+
+  return { files: sorted, notices, pkg, plans: client.plans };
 }
 
 /** The package's files for `document`, by path, and its notices; `metadata` fills pyproject.toml's description fields. */

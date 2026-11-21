@@ -457,12 +457,15 @@ describe.skipIf(!PY)("the hooks a client never runs: refused at construction (Fc
   // v0: 31aba57f46
   it("refuses an async on_auth_expired on SDK inside a running loop, and a hook in the other client's list, nothing sent", async () => {
     const { auth, run } = await program("refusals", [{ status: 401 }, USER], REFUSALS);
-    const sync = "ConfigError: SDK runs on_request_sync, on_response_sync and a plain on_auth_expired";
+
+    const sync =
+      "ConfigError: SDK runs on_request_sync, on_response_sync, on_invalidate_sync and a plain on_auth_expired";
+
     expect(
       { async: seen(run, "async"), hops: auth.length, loop: seen(run, "loop"), sync: seen(run, "sync") },
       run.stderr,
     ).toEqual({
-      async: { out: ["ConfigError: AsyncSDK runs on_request and on_response"], ran: true },
+      async: { out: ["ConfigError: AsyncSDK runs on_request, on_response and on_invalidate"], ran: true },
       hops: 0,
       loop: { out: [sync], ran: true },
       sync: { out: [sync], ran: true },

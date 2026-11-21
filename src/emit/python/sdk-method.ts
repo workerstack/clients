@@ -6,6 +6,7 @@
  * call into the transport, evaluating only `self` and module globals named `_<UPPER>`: no parameter can
  * shadow one (S3). Spec text reaches the source only through the shared escape layer.
  */
+import type { InvalidatedRead } from "../../ir/invalidate-reads.ts";
 import type { IRParam } from "../../ir/model.ts";
 import {
   dispatchKey,
@@ -33,6 +34,8 @@ export type MethodEnv = {
   readonly imports: Set<string>;
   /** the runtime names types.py imports (a multipart body's `FilePart`, a named event's `SseEventOf`) */
   readonly typesImports: Set<string>;
+  /** each write's reads by operationId (`invalidateReads`): what its `on_invalidate` event names */
+  readonly reads: ReadonlyMap<string, readonly InvalidatedRead[]>;
 };
 
 /**
@@ -169,6 +172,22 @@ function framing(op: SdkOp, env: MethodEnv): [string, string | null][] {
   ];
 }
 
+/**
+ * The `Operation(…)` keywords an `on_invalidate` event comes from: the write's operationId and each read a success
+ * makes stale with its own path params; none for a write with no reads, nor a realtime connection, which reconnects.
+ */
+function invalidating(op: SdkOp, env: MethodEnv): [string, string][] {
+  const reads = op.stream === "realtime" ? undefined : env.reads.get(op.id);
+
+  if (reads === undefined || reads.length === 0) return [];
+  const each = reads.map((read) => `(${pyString(read.operationId)}, ${tuple(read.params.map(pyString))})`);
+
+  return [
+    ["by", pyString(op.id)],
+    ["reads", tuple(each)],
+  ];
+}
+
 /** The `Operation(…)` keywords that differ from its defaults, in its field order. */
 function namedArgs(parts: Parts, env: MethodEnv): string[] {
   const { answer, headers, op } = parts;
@@ -184,6 +203,7 @@ function namedArgs(parts: Parts, env: MethodEnv): string[] {
     ["shape", shape === null ? null : pyString(shape)],
     ["idempotent", op.idempotent && op.stream === null ? "True" : null],
     ["invalidates", op.invalidates.length > 0 ? tuple(op.invalidates.map(pyString)) : null],
+    ...invalidating(op, env),
     ["stream", op.stream === null ? null : pyString(op.stream)],
     ["headers", headers === null ? null : tuple(headers.read)],
     ["events", jsonEvents(op, env)],

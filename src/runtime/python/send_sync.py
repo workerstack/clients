@@ -9,7 +9,7 @@ from .auth import refresh_sync
 from .config import ClientConfig, Defaults
 from .errors import APIConnectionError, APITimeoutError, HttpError
 from .exchange import CallArgs, ClientCore, Exchange, HttpAnswer
-from .hooks import refuse_hooks, run_sync
+from .hooks import invalidate_sync, refuse_hooks, run_sync
 from .operation import Operation
 from .redirect import Hop, cross
 from .result import ANSWERS, Err, Ok, Result
@@ -47,7 +47,9 @@ class SyncTransport(ClientCore):
         except HttpError as error:
             x.log.failed(error)
             raise
-        return x.done(answer)
+        x.done(answer)
+        invalidate_sync(self.config.on_invalidate_sync, x.invalidated, x.log)
+        return answer
 
     def attempt(self, x: Exchange, token: str | None, is_retry: bool) -> HttpAnswer:
         ctx = x.request(token, is_retry)

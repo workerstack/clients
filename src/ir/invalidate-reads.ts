@@ -76,7 +76,8 @@ function selectorKeys(path: string): RouteKey[] {
   return keys.map((key) => key.join("/"));
 }
 
-/** The reads `selector` names, in document order, or why it names none. */
+/** The reads `selector` names, in the order of its keys (a `:name?` left out, then kept), so a document's path order
+ * moves none, or why it names none. */
 function resolve(
   selector: string,
   reads: readonly { key: RouteKey; op: IROperation }[],
@@ -87,8 +88,8 @@ function resolve(
   const method = selector.slice(0, space).toUpperCase();
 
   if (method !== READ_METHOD) return { why: `names a ${method} route; only ${READ_METHOD} reads are cached` };
-  const keys = new Set(selectorKeys(selector.slice(space + 1)));
-  const matched = reads.filter(({ key }) => keys.has(key)).map(({ op }) => op);
+  const keys = selectorKeys(selector.slice(space + 1));
+  const matched = keys.flatMap((key) => reads.filter((read) => read.key === key).map(({ op }) => op));
 
   return matched.length > 0 ? { ops: matched } : { why: `matches no ${READ_METHOD} read` };
 }
