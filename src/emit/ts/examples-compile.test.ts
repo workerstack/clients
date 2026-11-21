@@ -145,8 +145,8 @@ describe("the docs' TypeScript SDK code", () => {
     { timeout: SPAWN_TIMEOUT },
     () => {
       const sources = sourcesOf(allBlocks(), TANSTACK_INFOS);
-      // the setup, the call shapes and the route preload of references/sdks.md
-      expect(Object.keys(sources)).toHaveLength(3);
+      // the setup, the call shapes, the route preload and the single-flight client of references/sdks.md
+      expect(Object.keys(sources)).toHaveLength(4);
       expect(sdkTypeErrors(sources, mkdtempSync(join(scratch, "tanstack-")))).toStrictEqual([]);
     },
   );

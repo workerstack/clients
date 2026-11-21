@@ -1,4 +1,4 @@
-import type { ClientConfig, InvalidateEvent, InvalidateTarget } from "./config.ts"
+import type { ClientConfig, FreshReads, InvalidateEvent, InvalidateTarget } from "./config.ts"
 
 /** One read a write makes stale, as the service map holds it: its operationId and its own path params. */
 export type ServiceRead = { operationId: string; params: readonly string[] }
@@ -9,9 +9,14 @@ type ParamValue = InvalidateTarget["params"][string]
 /** The path params a call was made with, as a generated call passes them: a param may be left undefined. */
 type CallParams = Readonly<Record<string, ParamValue | undefined>>
 
-/** A successful call that may make reads stale: its operationId, `METHOD path` for the log, its reads and params. */
+/**
+ * A successful call that may make reads stale: its operationId, `METHOD path` for the log, its reads and params, and
+ * the reads a single-flight batch brought back with it.
+ */
 export type InvalidatingCall = {
 	by: string
+	/** the reads a single-flight batch brought back */
+	fresh?: FreshReads | undefined
 	operation: string
 	params: CallParams | undefined
 	reads: readonly ServiceRead[] | undefined
@@ -45,6 +50,7 @@ export function runInvalidateHooks(config: ClientConfig, call: InvalidatingCall)
 	const reads = call.reads ?? []
 	if (reads.length === 0 || hooks.length === 0) return Promise.resolve()
 	const event: InvalidateEvent = { by: call.by, targets: targetsOf(reads, call.params) }
+	if (call.fresh !== undefined) event.fresh = call.fresh
 	function failed(cause: unknown, durationMs: number): void {
 		try {
 			config.onLog?.({

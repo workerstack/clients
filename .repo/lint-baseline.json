@@ -6886,7 +6886,7 @@
     "typescript(strict-boolean-expressions)": 1
   },
   "src/runtime/ts/http.ts": {
-    "eslint(func-style)": 2,
+    "eslint(func-style)": 1,
     "eslint(max-lines-per-function)": 1,
     "eslint(max-params)": 2,
     "repo(as-needs-reason)": 1,
@@ -7033,7 +7033,7 @@
     "repo(no-unknown-returns)": 1,
     "repo(no-unsafe-dictionary-type)": 2,
     "typescript(no-unsafe-return)": 2,
-    "typescript(strict-boolean-expressions)": 9,
+    "typescript(strict-boolean-expressions)": 8,
     "unicorn(no-await-expression-member)": 1
   },
   "src/runtime/ts/sse.ts": {

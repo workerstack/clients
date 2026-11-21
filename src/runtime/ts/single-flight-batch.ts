@@ -1,5 +1,6 @@
 import type { CallInput, ServiceEntry, ServiceMap, ServiceMapNode } from "./sdk.ts"
-import { BATCH_VERSION, READ_METHOD, WRITE_METHODS } from "./single-flight.constants.ts"
+import { BATCH_VERSION, WRITE_METHODS } from "./sdk-single-flight.constants.ts"
+import { READ_METHOD } from "./single-flight.constants.ts"
 
 /** A JSON value, as a parsed body holds it. */
 export type Json = null | boolean | number | string | readonly Json[] | JsonObject

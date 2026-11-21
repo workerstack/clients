@@ -19,6 +19,8 @@ export type RequestOptions = {
 	raw?: boolean | undefined
 	search?: Record<string, unknown> | undefined
 	signal?: AbortSignal | undefined
+	/** `false` sends this write direct, never in a single-flight batch */
+	singleFlight?: boolean | undefined
 	/** Per-call timeout in milliseconds; overrides `config.timeout`, `0` disables it. */
 	timeout?: number | undefined
 }

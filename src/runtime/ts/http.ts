@@ -14,7 +14,7 @@ import {
 	requestInit,
 	requestSignal,
 } from "./request.ts"
-import { type Answer, finishRequest, type Reading, type Sent } from "./response.ts"
+import { type Answer, discard, finishRequest, type Reading, type Sent } from "./response.ts"
 
 /** One request, ready to send: where, with what, and the hooks' view of it. */
 type Prepared = { body: BodyInit | undefined; headers: Headers; url: URL }
@@ -29,18 +29,15 @@ export const REFRESH_AUTH: unique symbol = /* @__PURE__ */ Symbol("http.refreshA
 export const SEND: unique symbol = /* @__PURE__ */ Symbol("http.send")
 export const CONFIG: unique symbol = /* @__PURE__ */ Symbol("http.config")
 
+/** The token in place, for a caller that refreshes on a 401 it reads itself (a single-flight write's). */
+export const AUTH_TOKEN: unique symbol = /* @__PURE__ */ Symbol("http.authToken")
+
 /** One operation of a generated SDK: the call, how it is read, and its stale view for the hooks. */
 export type Operation = Call & {
 	/** the non-JSON media type the operation declares, read as that type; null when it declares no body */
 	declared?: string | null | undefined
 	meta?: RequestMeta | undefined
 }
-
-/** Ignore a failed cancel: the body is being discarded either way. */
-const discard = (response: Response) =>
-	response.body?.cancel().catch(() => {
-		/* discarded */
-	})
 
 export class HTTPClient {
 	readonly #config: ClientConfig
@@ -56,6 +53,11 @@ export class HTTPClient {
 		this.#config = config
 		this.#fetch = connectionErrors(bindDefaultFetch(config.fetch))
 		this.#disposal = disposal
+	}
+
+	/** @internal The token in place, null before any refresh. */
+	get [AUTH_TOKEN](): string | null {
+		return this.#token
 	}
 
 	/** The base URL, parsed once; a per-call base (C2) is parsed for that call. */
@@ -131,9 +133,9 @@ export class HTTPClient {
 		return this.#send(call, kind, meta)
 	}
 
-	/** @internal The client's one shared refresh; whether a new token is in place. */
-	async [REFRESH_AUTH](): Promise<boolean> {
-		return (await this.#refresh(this.#token)) !== null
+	/** @internal The client's one shared refresh of `rejected` (the token in place); whether a new token is in place. */
+	async [REFRESH_AUTH](rejected: string | null = this.#token): Promise<boolean> {
+		return (await this.#refresh(rejected)) !== null
 	}
 
 	/** Build the request and let the `onRequest` hooks see and change it. */

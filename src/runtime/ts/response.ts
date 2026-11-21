@@ -10,6 +10,13 @@ export type Sent = {
 	response: Response
 }
 
+/** Ignore a failed cancel: the body is being discarded either way. */
+export function discard(response: Response): Promise<void> | undefined {
+	return response.body?.cancel().catch(() => {
+		/* discarded */
+	})
+}
+
 /** A REST call's answer: its value (the response itself when raw) and the response. */
 export type Answer = { data: unknown; response: Response }
 

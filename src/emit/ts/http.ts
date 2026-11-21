@@ -47,6 +47,8 @@ export const RUNTIME_MODULES: readonly string[] = [
   "app-types",
   "app",
   "sdk-invalidate",
+  "sdk-single-flight.constants",
+  "sdk-single-flight",
   "sdk",
   "sdk-sse",
   "sdk-ws",

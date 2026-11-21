@@ -20,6 +20,7 @@ import type {
 	DefaultError,
 	InfiniteData,
 	InfiniteQueryObserverOptions,
+	MutationFunctionContext,
 	QueryFunction,
 	QueryKey,
 } from "@tanstack/query-core"
@@ -30,7 +31,7 @@ import { childOf, INFINITE, isEntry, isStream, READ, readKey } from "./invalidat
 type AnyMethod = (...args: any[]) => any
 
 /** The per-call options a generated method's input carries beside the request; none of them is in a key. */
-type CallOption = "baseURL" | "cookies" | "headers" | "idempotencyKey" | "raw" | "signal" | "timeout"
+type CallOption = "baseURL" | "cookies" | "headers" | "idempotencyKey" | "raw" | "signal" | "singleFlight" | "timeout"
 
 /** A method's one input, as its value overload (the last, which `infer` reads) takes it. */
 type Input<M> = M extends AnyMethod ? Parameters<M>[0] : never
@@ -48,9 +49,12 @@ export type QueryFactory<M> = (...args: [...ReqArgs<M>, init?: Init<M>]) => {
 	queryKey: ReadKey<Data<M>>
 }
 
-/** A write's key and function; `mutate` takes the SDK method's own input, so a call site reads like the call. */
+/**
+ * A write's key and function; `mutate` takes the SDK method's own input, so a call site reads like the call. A
+ * mutation whose `meta.singleFlight` is false sends its write direct, never in a single-flight batch.
+ */
 export type MutationFactory<M> = () => {
-	mutationFn: (variables: Input<M>) => Promise<Data<M>>
+	mutationFn: (variables: Input<M>, context?: MutationFunctionContext) => Promise<Data<M>>
 	mutationKey: QueryKey
 }
 
@@ -157,7 +161,12 @@ function queryOptionsAt(ctx: Context, member: string[]) {
 
 function mutationOptionsAt(ctx: Context, member: string[]) {
 	return () => ({
-		mutationFn: (variables: unknown) => methodAt(ctx, member)(variables),
+		mutationFn: (variables: unknown, context?: MutationFunctionContext) => {
+			/* a mutation's `meta.singleFlight: false` sends its write direct, never in a single-flight batch */
+			const isDirect = context?.meta?.["singleFlight"] === false
+			const direct = { ...(variables /* the SDK method's input, or none */ as object), singleFlight: false }
+			return methodAt(ctx, member)(isDirect ? direct : variables)
+		},
 		mutationKey: [ctx.sdkName, ...member],
 	})
 }

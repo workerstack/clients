@@ -940,7 +940,19 @@ describe("the C# runtime within its byte budget (bit 15, G14)", () => {
 // single-flight-run.ts +7,536 (the write once, raw, then the reads in parallel under one signal and byte budget),
 // single-flight-body.ts +2,021 (a body read whole, cut where its taker refuses a chunk) and single-flight.constants.ts
 // +1,572. Nothing else moved: an SDK without the switch ships byte-identical runtime text.
-const TS_RUNTIME_BYTES = 170_471;
+// Plan 5 (single-flight caller), +14,507 B to 184,978 B, in the client every SDK ships, since `singleFlight` is a
+// runtime config: sdk-single-flight.ts +9,578 (new: the eligibility rule, `select` capped at maxReads, the batch
+// through the client's POST or the caller's `send`, the envelope checked, the write's answer rebuilt as the Response a
+// direct call reads, a refusal resent direct, an inner 401 refreshed once), sdk-single-flight.constants.ts +1,089
+// (new: the batch version, write methods and refusal type the handler shares, the default path and maxReads),
+// config.ts +2,246 (SingleFlightConfig, SingleFlightBatch, SingleFlightReadRequest and FreshReads with their docs,
+// InvalidateEvent.fresh), sdk.ts +922 (the idempotent key made before the batch, `fly` first and the direct request
+// after, pathOf), http.ts +220 (AUTH_TOKEN, the token a refresh is measured against; `discard` moved out),
+// response.ts +215 (`discard`, moved in), sdk-invalidate.ts +218 (`fresh` on the event), request.ts +108
+// (RequestOptions.singleFlight); the handler's modules +141 net (single-flight.constants.ts -230, the shared
+// constants moved to the client's; single-flight-batch.ts +50, single-flight-run.ts +44 and single-flight.ts +47
+// importing them).
+const TS_RUNTIME_BYTES = 184_978;
 
 describe("the TS runtime within its byte budget (bit 11, G14)", () => {
   it(
@@ -982,7 +994,11 @@ describe("the TS runtime within its byte budget (bit 11, G14)", () => {
 // `invalidatedBy` gone; `invalidationHook` maps a target's operationId to its key through the emitted table)
 // and query.ts +259 (the listener merge of TanStack's signal with the caller's, and the factories' new types;
 // the `initialData` seed, `getQueryClient` and the nested `reqOptions` gone).
-const TS_TANSTACK_QUERY_RUNTIME_BYTES = 14_892;
+// Plan 5 (single-flight caller), +3,711 B to 18,603 B: invalidate.ts +3,181 (activeReadsOf, the active plain reads a
+// write's targets name, by hash, skipping disabled, infinite and opted-out queries; `seed`, a fresh read's data set
+// after its refetch in flight is cancelled; the invalidation that follows leaving the seeded queries alone) and
+// query.ts +530 (`singleFlight` a call option, a mutation's `meta.singleFlight: false` sending its write direct).
+const TS_TANSTACK_QUERY_RUNTIME_BYTES = 18_603;
 
 describe("the TanStack Query adapter within its byte budget (bit 22, G14)", () => {
   it(

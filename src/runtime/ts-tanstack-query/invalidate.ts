@@ -5,7 +5,7 @@
  * the surfaces that use it.
  */
 import type { QueryClient, QueryKey } from "@tanstack/query-core"
-import type { InvalidateEvent, InvalidateTarget } from "../ts/config.ts"
+import type { FreshReads, InvalidateEvent, InvalidateTarget, SingleFlightReadRequest } from "../ts/config.ts"
 import type { ServiceEntry, ServiceMap } from "../ts/sdk.ts"
 
 /** The one method a cache reads from; every other method is a write. */
@@ -66,13 +66,77 @@ function targetKey(sdkName: string, member: readonly string[], params: Invalidat
 	return Object.keys(params).length === 0 ? prefix : [...prefix, { params }]
 }
 
+/** The request keys a single-flight read takes: a plain read's key holds no other. */
+const FLIGHT_KEYS: readonly string[] = ["params", "search"]
+
+/** Whether `value` is a request a single-flight read can carry: an object of params and search only. */
+function isFlightRequest(value: unknown): value is SingleFlightReadRequest["input"] {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+	return Object.keys(value).every((name) => FLIGHT_KEYS.includes(name))
+}
+
+/** The request a plain read's key at `member` holds, or undefined for any other key (a paged one, say). */
+function requestOf(key: QueryKey, at: number): SingleFlightReadRequest["input"] | undefined {
+	if (key.length === at) return {}
+	const req = key[at]
+	return key.length === at + 1 && isFlightRequest(req) ? req : undefined
+}
+
+/**
+ * The single-flight `select` that brings back the active plain reads a write's targets match in `client`, each by
+ * its query hash, so `invalidationHook` can seed it. A paged read, a disabled or unobserved one, and one whose
+ * `meta.singleFlight` is false are left to refetch as before.
+ */
+export function activeReadsOf<Read extends string>(
+	client: QueryClient,
+	sdkName: string,
+	members: ReadonlyMap<string, readonly string[]>,
+): (targets: InvalidateTarget<Read>[]) => SingleFlightReadRequest<Read>[] {
+	return (targets) => {
+		const reads = new Map<string, SingleFlightReadRequest<Read>>()
+		for (const { operationId, params } of targets) {
+			const member = members.get(operationId)
+			if (member === undefined) continue
+			const filters = { queryKey: targetKey(sdkName, member, params), type: "active" as const }
+			for (const query of client.getQueryCache().findAll(filters)) {
+				const input = requestOf(query.queryKey, member.length + 1)
+				if (input === undefined || query.meta?.["singleFlight"] === false) continue
+				if (!reads.has(query.queryHash)) reads.set(query.queryHash, { id: query.queryHash, input, operationId })
+			}
+		}
+		return [...reads.values()]
+	}
+}
+
+/** Put each fresh read in `client` by its hash, a refetch in flight cancelled first; the hashes it put. */
+async function seed(client: QueryClient, fresh: FreshReads | undefined): Promise<Set<string>> {
+	const seeded = new Set<string>()
+	const cache = client.getQueryCache()
+	const each = [...(fresh?.data ?? [])].map(async ([hash, data]) => {
+		const query = cache.get(hash)
+		if (query === undefined) return
+		await client.cancelQueries({ exact: true, queryKey: query.queryKey })
+		client.setQueryData(query.queryKey, data)
+		seeded.add(hash)
+	})
+	await Promise.all(each)
+	return seeded
+}
+
+/** The filters a target's `queryKey` invalidates by: every match but a query `seeded` just put fresh data in. */
+function filtersOf(queryKey: QueryKey, seeded: ReadonlySet<string>) {
+	if (seeded.size === 0) return { queryKey }
+	return { predicate: (query: { queryHash: string }) => !seeded.has(query.queryHash), queryKey }
+}
+
 /**
  * The SDK `onInvalidate` hook that makes a write's targets stale in `client`: each target's key by its
  * member path (`members`, operationId to path, which the emitted file builds from the document), an
  * operationId it does not hold skipped. `cancelRefetch` restarts a refetch already running, so the read
  * sees the write. The SDK awaits the hook, so a write resolves once its active reads have refetched: a
  * failing refetch holds it through its retries but never rejects it (TanStack's `invalidateQueries`
- * swallows a refetch error), and an infinite query refetches every page it holds.
+ * swallows a refetch error), and an infinite query refetches every page it holds. A single-flight write's
+ * fresh reads are put in the cache first and not refetched; a failed one, and every other match, are.
  */
 export function invalidationHook(
 	client: QueryClient,
@@ -80,11 +144,13 @@ export function invalidationHook(
 	members: ReadonlyMap<string, readonly string[]>,
 ): (event: InvalidateEvent) => Promise<void> {
 	return async (event) => {
+		const seeded = await seed(client, event.fresh)
 		const keys: QueryKey[] = []
 		for (const target of event.targets) {
 			const member = members.get(target.operationId)
 			if (member !== undefined) keys.push(targetKey(sdkName, member, target.params))
 		}
-		await Promise.all(keys.map((queryKey) => client.invalidateQueries({ queryKey }, { cancelRefetch: true })))
+		const each = keys.map((key) => client.invalidateQueries(filtersOf(key, seeded), { cancelRefetch: true }))
+		await Promise.all(each)
 	}
 }

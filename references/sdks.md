@@ -204,6 +204,55 @@ cookie only sticks when the API shares the handler's site.
 The index never re-exports the file, so no browser bundle carries the handler; the package exports it at
 `./single-flight`.
 
+The client sends its writes there once you give it `singleFlight`. A write goes in a batch only when it can: a
+REST write with a JSON answer whose `x-invalidate` names reads, called with nothing a batch cannot carry
+(`headers`, `cookies`, `body`, `form`, `baseURL`, `raw`), its operationId not in `exclude`, and `select` picking at
+least one read. `select` gets the write's targets and returns the reads to bring back, at most `maxReads` (10).
+Every other call goes direct, as does one called with `singleFlight: false`. The batch is a POST to `path`
+(`_mutate`) under the base URL, so the client's hooks, timeout and signal apply to it. An idempotent write's key
+is made before the batch, so a resend carries the same one. With TanStack Query, `activeReads(queryClient)` picks
+the active reads, and `invalidateQueries` puts each one in the cache before it marks the rest stale:
+
+```sdk ts tanstack
+import { QueryClient } from "@tanstack/query-core"
+import { Kitchen } from "./kitchen"
+import { activeReads, invalidateQueries } from "./kitchen.tanstack-query.gen"
+
+const queryClient = new QueryClient()
+const sdk = new Kitchen({
+	baseURL: "https://app.example.com/api",
+	onInvalidate: [invalidateQueries(queryClient)],
+	singleFlight: { select: activeReads(queryClient) },
+})
+```
+
+The write resolves with the answer a direct call would have, and throws the same error. Its reads reach the
+`onInvalidate` hooks first, as `event.fresh`: each answered read's data by the id `select` gave it, and in
+`failed` the ids that did not come back. A query opts out with `meta: { singleFlight: false }`, and a mutation with
+the same meta sends its write direct. A 401 on the write refreshes the token once through `onAuthExpired` and sends
+the batch again. When the handler refuses the batch, the client sends the write direct; any other failure throws
+and the write is never sent twice. A batch answer that is no envelope throws `DecodeError`, the hooks still
+called, since the write may have run.
+
+`send` replaces the POST, for an app that calls its server another way, such as a server function that returns
+`runSingleFlight(sdk, batch)`. It gets the batch and resolves the envelope. The client cannot tell a refusal
+through `send` from a failure, so it throws one and never resends the write:
+
+```sdk ts
+import { Kitchen, type SingleFlightBatch } from "./kitchen"
+
+declare function mutate(batch: SingleFlightBatch): Promise<object>
+
+export const sdk = new Kitchen({
+	baseURL: "https://app.example.com/api",
+	singleFlight: {
+		select: (targets) =>
+			targets.map((target, at) => ({ id: `r${at}`, input: { params: target.params }, operationId: target.operationId })),
+		send: mutate,
+	},
+})
+```
+
 ## The Go SDK
 
 Idiomatic Go: a `Config`, `context.Context` on every call, errors read with `errors.As`, and an event stream as a

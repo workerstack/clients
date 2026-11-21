@@ -3,13 +3,8 @@ import { type Answer, parseBody } from "./response.ts"
 import type { CallInput, SDKClient, ServiceEntry } from "./sdk.ts"
 import type { FlightBatch, FlightOp, FlightRead } from "./single-flight-batch.ts"
 import { bodyOf } from "./single-flight-body.ts"
-import {
-	BATCH_VERSION,
-	FIRST_SUCCESS,
-	LAST_SUCCESS,
-	NO_ANSWER_STATUS,
-	TIMED_OUT_STATUS,
-} from "./single-flight.constants.ts"
+import { BATCH_VERSION } from "./sdk-single-flight.constants.ts"
+import { FIRST_SUCCESS, LAST_SUCCESS, NO_ANSWER_STATUS, TIMED_OUT_STATUS } from "./single-flight.constants.ts"
 
 /** How far the reads of one batch may go: their count, their time and their bytes in all. */
 export type FlightLimits = { maxReadBytes: number; maxReads: number; readBudgetMs: number }

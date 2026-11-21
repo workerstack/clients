@@ -301,14 +301,22 @@ function onInvalidateField(ir: IR): ConfigField[] {
 
   if (reads.size === 0) return [];
   const targets = [...reads.values()].flat().map((read) => read.operationId);
-  const event = `InvalidateEvent<${literalUnion(reads.keys())}, ${literalUnion(targets)}>`;
+  const ids = `${literalUnion(reads.keys())}, ${literalUnion(targets)}`;
 
   return [
     {
       key: "onInvalidate",
       text: [
         "\t/** The `onInvalidate` hooks, their event narrowed to this API's writes and the reads they make stale. */",
-        `\tonInvalidate?: Array<(event: ${event}) => Promise<void> | void>`,
+        `\tonInvalidate?: Array<(event: InvalidateEvent<${ids}>) => Promise<void> | void>`,
+      ].join("\n"),
+    },
+    {
+      key: "singleFlight",
+      text: [
+        "\t/** Single flight, its `exclude` and `select` narrowed to this API's writes and the reads they make " +
+          "stale. */",
+        `\tsingleFlight?: SingleFlightConfig<${ids}>`,
       ].join("\n"),
     },
   ];

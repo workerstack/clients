@@ -1,10 +1,11 @@
-import type { ClientConfig, RequestMeta } from "./config.ts"
+import type { ClientConfig, FreshReads, RequestMeta, SingleFlightConfig } from "./config.ts"
 import { ClientError, DecodeError } from "./error.ts"
 import { HTTPClient } from "./http.ts"
 import { interpolatePath, PathParamError } from "./path.ts"
 import { newClientRequestId, type RequestOptions } from "./request.ts"
-import { type Answer, resultOf } from "./response.ts"
+import { type Answer, finishRequest, resultOf } from "./response.ts"
 import { runInvalidateHooks, type ServiceRead } from "./sdk-invalidate.ts"
+import { fly } from "./sdk-single-flight.ts"
 import { resolveInvalidationTargets, StaleIndex } from "./stale.ts"
 
 /** One operation as the service map holds it: where it goes and how its answer is read. */
@@ -55,7 +56,11 @@ export type InvalidationConfig = {
 	staleTime: number
 }
 
-export type SDKConfig = ClientConfig & { invalidation?: InvalidationConfig }
+export type SDKConfig = ClientConfig & {
+	invalidation?: InvalidationConfig
+	/** send eligible writes to a single-flight handler with the reads they make stale; see `SingleFlightConfig` */
+	singleFlight?: SingleFlightConfig
+}
 
 /** What a REST call takes; a stream, WebSocket or realtime operation's own call types its input further. */
 export type CallInput = RequestOptions
@@ -80,14 +85,15 @@ export function templateOf(entry: ServiceEntry): string {
 	return entry.wildcard === undefined ? entry.path : entry.path.replace(`{${entry.wildcard}}`, `*${entry.wildcard}`)
 }
 
-/** A call whose path params cannot form a path, as a status-0 ClientError: no request was sent. */
-function pathError(e: PathParamError, entry: ServiceEntry): ClientError {
-	return new ClientError({
-		body: null,
-		message: `${e.message} for ${entry.method} ${entry.path}`,
-		response: Response.error(),
-		status: 0,
-	})
+/** `template` filled with `params`; params that cannot form a path throw a status-0 ClientError, no request sent. */
+function pathOf(entry: ServiceEntry, template: string, params: CallInput["params"]): string {
+	try {
+		return interpolatePath(template, params)
+	} catch (e) {
+		if (!(e instanceof PathParamError)) throw e
+		const message = `${e.message} for ${entry.method} ${entry.path}`
+		throw new ClientError({ body: null, message, response: Response.error(), status: 0 })
+	}
 }
 
 /** The per-call options an entry adds: its `Accept` and an `Idempotency-Key`. */
@@ -135,42 +141,44 @@ export class SdkCore {
 	}
 
 	/** Tell the `onInvalidate` hooks what the successful call `entry` with `params` made stale; it never rejects. */
-	invalidated(entry: ServiceEntry, params: RequestOptions["params"]): Promise<void> {
+	invalidated(entry: ServiceEntry, params: RequestOptions["params"], fresh?: FreshReads): Promise<void> {
 		const operation = `${entry.method} ${entry.path}`
-		return runInvalidateHooks(this.#config, { by: entry.id, operation, params, reads: entry.reads })
+		return runInvalidateHooks(this.#config, { by: entry.id, fresh, operation, params, reads: entry.reads })
 	}
 
 	/**
 	 * A REST op's answer, its `x-invalidate` targets marked and its stale mark cleared once it is a 2xx; it resolves
-	 * after the `onInvalidate` hooks settle.
+	 * after the `onInvalidate` hooks settle. An eligible write goes in a single-flight batch, its key made first so a
+	 * refused batch's direct resend carries the same one.
 	 */
-	async request(entry: ServiceEntry, input: CallInput): Promise<Answer> {
+	async request(entry: ServiceEntry, call: CallInput): Promise<Answer> {
+		const key = entry.idempotent === true ? { idempotencyKey: call.idempotencyKey ?? newClientRequestId() } : {}
+		const input = { ...call, ...key }
 		const template = templateOf(entry)
-		let path: string
-		try {
-			path = interpolatePath(template, input.params)
-		} catch (e) {
-			throw e instanceof PathParamError ? pathError(e, entry) : e
-		}
+		const path = pathOf(entry, template, input.params)
 		const selector = `${entry.method} ${path}`
 		const meta = this.meta(selector, path, entry.method)
-		const opts = optionsFor(entry, input)
-		const declared = entry.empty ? null : entry.accept
+		const reading = { declared: entry.empty === true ? null : entry.accept, limits: this.#config, method: entry.method }
+		let fresh: FreshReads | undefined
 		const settle = () => {
 			this.mark(entry, input.params, selector)
 			if (meta?.isStale) this.#stale?.clear(selector, path, entry.method, meta.seqSnapshot)
-			return this.invalidated(entry, input.params)
+			return this.invalidated(entry, input.params, fresh)
 		}
-		let answer: Answer
 		try {
-			answer = await this.http.requestOperation({ declared, meta, method: entry.method, opts, path: template })
+			const client = { config: this.#config.singleFlight, disposal: this.#disposal.signal, http: this.http }
+			const flown = await fly(client, entry, input)
+			fresh = flown?.fresh
+			const op = { ...reading, meta, opts: optionsFor(entry, input), path: template }
+			const answer =
+				flown === undefined ? await this.http.requestOperation(op) : await finishRequest(flown.sent, reading)
+			await settle()
+			return answer
 		} catch (e) {
 			/* a 2xx whose body does not decode still changed what it invalidates */
 			if (e instanceof DecodeError) await settle()
 			throw e
 		}
-		await settle()
-		return answer
 	}
 
 	#newIndex(): StaleIndex | null {

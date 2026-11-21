@@ -1,3 +1,5 @@
+import type { RequestOptions } from "./request.ts"
+
 export type HeadersContext = {
 	method: string
 	path: string
@@ -86,7 +88,47 @@ export type InvalidateTarget<Read extends string = string> = {
  */
 export type InvalidateEvent<Write extends string = string, Read extends string = string> = {
 	by: Write
+	/** the reads a single-flight batch brought back with the write, by the id `select` gave each; unset otherwise */
+	fresh?: FreshReads
 	targets: InvalidateTarget<Read>[]
+}
+
+/** The reads a single-flight batch brought back: each answered read's data by its id, and the ids that failed. */
+export type FreshReads = { data: Map<string, unknown>; failed: Set<string> }
+
+/** One read a single-flight batch asks for: an id of the caller's, the read's operationId and its input. */
+export type SingleFlightReadRequest<Read extends string = string> = {
+	id: string
+	input: { params?: InvalidateTarget["params"]; search?: RequestOptions["search"] }
+	operationId: Read
+}
+
+/** The batch a single-flight write sends: the write's operationId and input, and the reads to bring back. */
+export type SingleFlightBatch = {
+	input: Pick<RequestOptions, "idempotencyKey" | "json" | "params" | "search">
+	op: string
+	reads: SingleFlightReadRequest[]
+	v: 1
+}
+
+/**
+ * Send each eligible write to a single-flight handler with the reads it makes stale, in one request, and hand the
+ * reads it brings back to the `onInvalidate` hooks as `fresh`. A write is eligible when it is a REST JSON write with
+ * `x-invalidate` reads, called with no headers, cookies, baseURL, body, form or raw, not in `exclude`, not
+ * `singleFlight: false`, and `select` picks a read for it; every other call goes direct. A refusal resends the write
+ * direct, with the same Idempotency-Key; any other failure of the batch throws, and nothing is resent.
+ */
+export type SingleFlightConfig<Write extends string = string, Read extends string = string> = {
+	/** the writes that always go direct */
+	exclude?: readonly Write[]
+	/** the most reads one batch brings back; past it the rest are cut. Default 10, the handler's own default. */
+	maxReads?: number
+	/** the handler's path under `baseURL`. Default `"_mutate"`. */
+	path?: string
+	/** the reads to bring back of those the write made stale; none sends the write direct */
+	select: (targets: InvalidateTarget<Read>[]) => SingleFlightReadRequest<Read>[]
+	/** send the batch some other way (a server function): it resolves the handler's envelope, and throws on a refusal */
+	send?: (batch: SingleFlightBatch) => Promise<object>
 }
 
 export type AuthExpiredContext = {

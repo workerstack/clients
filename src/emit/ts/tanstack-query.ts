@@ -200,5 +200,15 @@ ${table.join("\n")}
 export function invalidateQueries(queryClient: QueryClient): (event: InvalidateEvent) => Promise<void> {
 	return invalidationHook(queryClient, ${JSON.stringify(name)}, READ_MEMBERS)
 }
+
+/**
+ * The \`select\` for \`new ${name}({ singleFlight: { select: activeReads(queryClient) } })\`: a write brings back
+ * the active reads it made stale in its single-flight batch, and \`invalidateQueries\` puts them in the cache.
+ */
+export function activeReads<Read extends string>(
+	queryClient: QueryClient,
+): (targets: InvalidateTarget<Read>[]) => SingleFlightReadRequest<Read>[] {
+	return activeReadsOf(queryClient, ${JSON.stringify(name)}, READ_MEMBERS)
+}
 `;
 }

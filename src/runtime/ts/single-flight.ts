@@ -1,5 +1,6 @@
 import { parseMediaType } from "./media-type.ts"
 import type { SDKClient, ServiceMap } from "./sdk.ts"
+import { DEFAULT_MAX_READS, REFUSED, REFUSED_STATUS } from "./sdk-single-flight.constants.ts"
 import { type FlightOp, type Json, operationsOf, parseBatch } from "./single-flight-batch.ts"
 import { bodyOf } from "./single-flight-body.ts"
 import { type FlightLimits, fly, type Flown, type SingleFlightEnvelope } from "./single-flight-run.ts"
@@ -9,10 +10,7 @@ import {
 	BATCH_METHOD,
 	DEFAULT_MAX_BODY_BYTES,
 	DEFAULT_MAX_READ_BYTES,
-	DEFAULT_MAX_READS,
 	DEFAULT_READ_BUDGET_MS,
-	REFUSED,
-	REFUSED_STATUS,
 	SAME_ORIGIN,
 	UNANSWERED,
 	UNANSWERED_STATUS,

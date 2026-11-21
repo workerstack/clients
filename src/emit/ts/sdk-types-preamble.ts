@@ -33,6 +33,7 @@ export const RESERVED: readonly string[] = [
   "SDKConfig",
   "SSEEvent",
   "SSEEventOf",
+  "SingleFlightConfig",
   "SseOptions",
   "TypedWebSocket",
   "Uint8Array",
@@ -50,6 +51,7 @@ const RUNTIME_TYPES = [
   "SDKConfig",
   "SSEEvent",
   "SSEEventOf",
+  "SingleFlightConfig",
   "TypedWebSocket",
   "WsFrame",
 ] as const;
@@ -61,9 +63,10 @@ const OPTIONS = `export type HttpOptions = {
 	headers?: Record<string, string>
 	idempotencyKey?: string
 	signal?: AbortSignal
+	singleFlight?: boolean
 	timeout?: number
 }
-export type SseOptions = Omit<HttpOptions, "idempotencyKey"> & { lastEventId?: string }
+export type SseOptions = Omit<HttpOptions, "idempotencyKey" | "singleFlight"> & { lastEventId?: string }
 export type WsOptions = { protocols?: string | string[]; reconnectToken?: string }
 `;
 
@@ -123,7 +126,8 @@ export function shared(features: TsRuntimeFeatures): string {
   ];
 
   const realtime = features.realtime
-    ? `export type RealtimeCallOptions = Omit<HttpOptions, "idempotencyKey" | "timeout"> & RealtimeOptions\n`
+    ? 'export type RealtimeCallOptions = Omit<HttpOptions, "idempotencyKey" | "singleFlight" | "timeout"> & ' +
+      "RealtimeOptions\n"
     : "";
 
   const rest = "T[K] extends HttpCall<infer I, infer D, infer E, infer H>";

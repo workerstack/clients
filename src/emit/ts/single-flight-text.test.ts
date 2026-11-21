@@ -92,7 +92,8 @@ describe("a browser bundle of the index carries no single-flight code (plan 4, V
       expect([
         indexed.includes("TestSDK"),
         indexed.includes("singleFlightHandler"),
-        indexed.includes("single-flight"),
+        // the client carries the refusal's `urn:workerstack:single-flight:refused` (plan 5), so the probe is the runner
+        indexed.includes("runSingleFlight"),
         flight.includes("singleFlightHandler"),
       ]).toStrictEqual([true, false, false, true]);
     },

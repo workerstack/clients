@@ -82,12 +82,16 @@ const RUNTIME_EXPORTS = {
 const RUNTIME_TYPES = {
   core: [
     "ClientConfig",
+    "FreshReads",
     "InvalidateEvent",
     "InvalidateTarget",
     "InvalidationConfig",
     "LogEntry",
     "RequestOptions",
     "Result",
+    "SingleFlightBatch",
+    "SingleFlightConfig",
+    "SingleFlightReadRequest",
   ],
   realtime: [
     "ConnectionState",
@@ -174,8 +178,8 @@ function validated(options: SdkOptions): { name: string; stem: string } {
  * constructor's comment lines.
  */
 const NARROWED_CAST = [
-  "onInvalidate's hooks take only this API's operationIds, all the runtime sends them, but a hook's parameter",
-  "is contravariant, so the narrowed config is the runtime's only through a cast",
+  "onInvalidate's hooks and singleFlight's select take only this API's operationIds, all the runtime sends them,",
+  "but a callback's parameter is contravariant, so the narrowed config is the runtime's only through a cast",
 ];
 
 /**
