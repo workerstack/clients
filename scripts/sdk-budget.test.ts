@@ -971,7 +971,12 @@ describe("the TS runtime within its byte budget (bit 11, G14)", () => {
 // The standards pack, -111 B to 16,496 B: query.ts's two `oxlint-disable-next-line typescript/no-explicit-any`
 // comments cut; the `any` they covered is a `lint.skip` entry in repo.config.ts, with its reason, and the code is
 // unchanged.
-const TS_TANSTACK_QUERY_RUNTIME_BYTES = 16_496;
+// Plan 3's adapter reshape, -1,604 B to 14,892 B: invalidation moved to the SDK's `onInvalidate`, so
+// invalidate.ts -1,863 (the selector normalizers, the runtime read index, `paramsOf`, `keyOf` and
+// `invalidatedBy` gone; `invalidationHook` maps a target's operationId to its key through the emitted table)
+// and query.ts +259 (the listener merge of TanStack's signal with the caller's, and the factories' new types;
+// the `initialData` seed, `getQueryClient` and the nested `reqOptions` gone).
+const TS_TANSTACK_QUERY_RUNTIME_BYTES = 14_892;
 
 describe("the TanStack Query adapter within its byte budget (bit 22, G14)", () => {
   it(

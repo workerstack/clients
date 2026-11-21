@@ -5,6 +5,8 @@
  * operation, since an SDK ships the realtime helpers only then (plan 32). A webhook receiver block imports from
  * `./shop.webhook.gen` of the Shop SDK, whose document declares the Standard Webhooks event the webhooks page sends (plan 36).
  * A typed stream block imports from `./streams`, an SDK of named SSE events and keyed WebSocket and realtime messages.
+ * A `sdk ts tanstack` block also imports `./kitchen.tanstack-query.gen`, the adapter `--ts-tanstack-query`
+ * writes beside the Kitchen SDK, and `@tanstack/query-core` from the workspace (plan 3).
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,6 +14,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts";
 import { allBlocks, type Block, docsDocument, exampleOf, REPO } from "../shared/__fixtures__/docs-blocks.ts";
 import { generateSdk } from "./sdk.ts";
 
@@ -90,7 +93,9 @@ const STREAMS = ["sse-item-schema", "ws-keyed", "realtime-keyed"]
 
 /** tsc's errors for `sources` (name → code, each a module beside the generated SDK), by source and line. */
 export function sdkTypeErrors(sources: Readonly<Record<string, string>>, dir: string): string[] {
-  for (const [path, text] of Object.entries(generateSdk(docsDocument(), { name: "Kitchen" }).files))
+  for (const [path, text] of Object.entries(
+    generateSdk(docsDocument(), { name: "Kitchen", tanstackQuery: true }).files,
+  ))
     writeFileSync(join(dir, path), text);
   writeFileSync(join(dir, "kitchen.ts"), 'export * from "./kitchen.index.gen"\n');
 
@@ -116,12 +121,15 @@ export function sdkTypeErrors(sources: Readonly<Record<string, string>>, dir: st
  * Each `ts sdk` block as a source named after its page and line; a reference page spells it `sdk ts`, because
  * `repo docs` type-checks every block whose first word is `ts` on its own, and these import a generated SDK.
  */
-const SDK_INFOS = new Set(["ts sdk", "sdk ts"]);
+const SDK_INFOS: ReadonlySet<string> = new Set(["ts sdk", "sdk ts"]);
 
-const sourcesOf = (blocks: readonly Block[]) =>
+/** A TanStack Query block: `repo docs` skips it as it skips `sdk ts`, and this compiles it beside the adapter. */
+const TANSTACK_INFOS: ReadonlySet<string> = new Set(["sdk ts tanstack"]);
+
+const sourcesOf = (blocks: readonly Block[], infos: ReadonlySet<string> = SDK_INFOS) =>
   Object.fromEntries(
     blocks
-      .filter((block) => SDK_INFOS.has(block.info))
+      .filter((block) => infos.has(block.info))
       .map((block) => [`${block.at.replaceAll(/[/:.]/g, "_")}.ts`, block.code]),
   );
 
@@ -131,6 +139,17 @@ describe("the docs' TypeScript SDK code", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(10);
     expect(sdkTypeErrors(sources, mkdtempSync(join(scratch, "docs-")))).toEqual([]);
   }, 120_000);
+
+  it(
+    "type-checks every sdk ts tanstack block against the Kitchen SDK's TanStack Query adapter",
+    { timeout: SPAWN_TIMEOUT },
+    () => {
+      const sources = sourcesOf(allBlocks(), TANSTACK_INFOS);
+      // the setup, the call shapes and the route preload of references/sdks.md
+      expect(Object.keys(sources)).toHaveLength(3);
+      expect(sdkTypeErrors(sources, mkdtempSync(join(scratch, "tanstack-")))).toStrictEqual([]);
+    },
+  );
 
   it("reports a block that calls an operation the SDK does not have", () => {
     const code = 'import { Kitchen } from "./kitchen"\nnew Kitchen({ baseURL: "https://x.test" }).getNothing()\n';

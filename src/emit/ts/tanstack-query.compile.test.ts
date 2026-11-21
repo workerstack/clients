@@ -73,32 +73,59 @@ const document = {
   },
 } as unknown as OpenApiDocument;
 
-// a consumer's own module: the shapes a consumer's ~40 call sites use, so this fails if one of them breaks
-const consumer = `import { Shop } from "./shop.client.gen"
-import { createQueryHelpers } from "./shop.tanstack-query.gen"
+// a consumer's own module: the call shapes an app uses, each spread into query-core's own observer as solid-query's
+// hooks spread it, so the options a spread infers are the options TanStack sees; the Equal lines pin what it infers
+const consumer = `import {
+	type InfiniteData,
+	InfiniteQueryObserver,
+	MutationObserver,
+	QueryClient,
+	QueryObserver,
+} from "@tanstack/query-core"
+import { Shop } from "./shop.client.gen"
+import { createQueryHelpers, invalidateQueries } from "./shop.tanstack-query.gen"
 
-const sdk = new Shop({ baseURL: "https://example.test" })
-const helpers = createQueryHelpers(() => sdk)
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+type Org = Awaited<ReturnType<Shop["org"]["get"]>>
+type Members = Awaited<ReturnType<Shop["org"]["member"]["list"]>>
+type Update = Parameters<Shop["org"]["update"]>[0]
 
-export const listOptions = helpers.query.org.list()
-export const oneOptions = helpers.query.org.get({ reqOptions: { req: { params: { org_id: "o1" } } } })
-export const nested = helpers.query.org.member.list({ reqOptions: { req: { params: { org_id: "o1" } } } })
-export const fresh = helpers.query.org.list({ queryProps: { staleTime: 0 } })
-export const create = helpers.mutation.org.create()
-export const update = helpers.mutation.org.update()
-export const listKey = helpers.queryKey.org.list()
-export const oneKey = helpers.queryKey.org.get({ params: { org_id: "o1" } })
+const queryClient = new QueryClient()
+const sdk = new Shop({ baseURL: "https://example.test", onInvalidate: [invalidateQueries(queryClient)] })
+const { infiniteQuery, mutation, query, queryKey } = createQueryHelpers(() => sdk)
 
-/* search belongs in the key, so the typed request has to accept it on both the read and its key builder */
-export const page = helpers.query.org.member.list({
-	reqOptions: { req: { params: { org_id: "o1" }, search: { limit: 20 } } },
+export const list = new QueryObserver(queryClient, query.org.list())
+export const one = new QueryObserver(queryClient, { ...query.org.get({ params: { org_id: "o1" } }), staleTime: 0 })
+export const oneData: Equal<ReturnType<typeof one.getCurrentResult>["data"], Org | undefined> = true
+export const timed = query.org.get({ params: { org_id: "o1" } }, { timeout: 5_000 })
+export const page = query.org.member.list({ params: { org_id: "o1" }, search: { limit: 20 } })
+export const prefetched = queryClient.prefetchQuery(query.org.get({ params: { org_id: "o1" } }))
+const cached = queryClient.getQueryData(queryKey.org.get({ params: { org_id: "o1" } }))
+export const cachedData: Equal<typeof cached, Org | undefined> = true
+export const pageKey = queryKey.org.member.list({ params: { org_id: "o1" }, search: { limit: 20 } })
+
+export const update = new MutationObserver(queryClient, {
+	...mutation.org.update(),
+	onMutate: (variables) => {
+		const exact: Equal<typeof variables, Update> = true
+		return exact
+	},
 })
-export const pageKey = helpers.queryKey.org.member.list({ params: { org_id: "o1" }, search: { limit: 20 } })
-export const paged = helpers.infiniteQuery.org.member.list({
-	buildReqOptions: (limit: number) => ({ req: { params: { org_id: "o1" }, search: { limit } } }),
-	getNextPageParam: () => null,
-	initialPageParam: 20,
+export const updated = update.mutate({ params: { org_id: "o1" } })
+export const create = mutation.org.create()
+
+export const members = new InfiniteQueryObserver(queryClient, {
+	...infiniteQuery.org.member.list((limit: number | undefined) => ({ params: { org_id: "o1" }, search: { limit } })),
+	getNextPageParam: (_last, _all, lastPageParam) => {
+		const exact: Equal<typeof lastPageParam, number | undefined> = true
+		return exact ? (lastPageParam ?? 0) + 20 : undefined
+	},
+	initialPageParam: undefined,
 })
+export const membersData: Equal<
+	ReturnType<typeof members.getCurrentResult>["data"],
+	InfiniteData<Members, number | undefined> | undefined
+> = true
 `;
 
 /** The project written out, and what `tsc` says about it: `""` when it is clean. */
@@ -135,21 +162,39 @@ describe("the emitted adapter compiles in a consumer's project (bit 22, G-strict
     expect(resolved).toContain("@tanstack/query-core");
     expect(diagnostics).toBe("");
   });
+});
 
+/** What `tsc` says once the consumer also exports `statement`. */
+function refused(statement: string): string {
+  return checked(`\nexport const bad = ${statement}\n`).diagnostics;
+}
+
+const NESTED = 'query.org.get({ reqOptions: { req: { params: { org_id: "o1" } } } })';
+
+const OFF_ANNOTATION =
+  "new InfiniteQueryObserver(queryClient, { " +
+  '...infiniteQuery.org.member.list((n: number) => ({ params: { org_id: "o1" }, search: { limit: n } })), ' +
+  'getNextPageParam: () => 1, initialPageParam: "a" })';
+
+describe("the emitted adapter's types refuse what the service map and the SDK do not take", () => {
+  // a clean run proves nothing unless a wrong call is refused, so each mutant must red
   it(
     "is not a hollow check: the surfaces refuse what the service map says they are not",
     { timeout: SPAWN_TIMEOUT },
     () => {
-      // a clean run proves nothing unless a wrong call is refused, so each mutant must red
-      expect(checked("\nexport const bad = helpers.query.org.create()\n").diagnostics).toContain(
-        "Property 'create' does not exist",
-      );
-      expect(checked("\nexport const bad = helpers.mutation.org.list()\n").diagnostics).toContain(
-        "Property 'list' does not exist",
-      );
-      expect(checked("\nexport const bad = helpers.query.org.get()\n").diagnostics).toContain(
-        "Expected 1 arguments, but got 0",
-      );
+      expect(refused("query.org.create()")).toContain("Property 'create' does not exist");
+      expect(refused("mutation.org.list()")).toContain("Property 'list' does not exist");
+      expect(refused("query.org.get()")).toContain("but got 0");
+    },
+  );
+
+  it(
+    "refuses the old nested input, a wrong mutate and a page param off its annotation",
+    { timeout: SPAWN_TIMEOUT },
+    () => {
+      expect(refused(NESTED)).toContain("'reqOptions' does not exist in type");
+      expect(refused("update.mutate({ params: {} })")).toContain("Property 'org_id' is missing");
+      expect(refused(OFF_ANNOTATION)).toContain("Type 'string' is not assignable to type 'number'");
     },
   );
 });

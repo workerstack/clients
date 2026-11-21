@@ -52,7 +52,7 @@ describe("tanstackQuerySource: the vendored adapter, pointed at the emitted runt
 
   it("drops the imports its own modules make of each other, since they are now one file", () => {
     expect(source).not.toContain('from "./invalidate.ts"');
-    expect(source).toContain("export function invalidatedBy");
+    expect(source).toContain("export function invalidationHook");
     expect(source).toContain("export function queryHelpers");
   });
 
@@ -113,5 +113,12 @@ describe("tanstackQueryText: the key trees come from the service map, not from m
     expect(text).toContain("export function createQueryHelpers");
     // the name heads every key, so it is baked in rather than passed
     expect(text).toContain('"Shop"');
+  });
+
+  it("binds the onInvalidate hook to the name and each read's member path, and no write's", () => {
+    expect(text).toContain("export function invalidateQueries(queryClient: QueryClient)");
+    expect(text).toContain('["org.member.list", ["org","member","list"]],');
+    expect(text).not.toContain('["org.create",');
+    expect(text).toContain('invalidationHook(queryClient, "Shop", READ_MEMBERS)');
   });
 });

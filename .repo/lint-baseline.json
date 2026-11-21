@@ -5607,27 +5607,9 @@
     "repo(no-unknown-returns)": 1,
     "vitest(prefer-strict-equal)": 2
   },
-  "src/emit/ts/tanstack-query.behavior.test.ts": {
-    "eslint(func-style)": 3,
-    "eslint(max-lines)": 1,
-    "eslint(max-lines-per-function)": 5,
-    "eslint(require-await)": 1,
-    "repo(as-needs-reason)": 5,
-    "repo(duplicate-code)": 1,
-    "repo(no-chained-type-assertions)": 1,
-    "repo(no-known-value-widening)": 1,
-    "repo(no-unknown-parameters)": 1,
-    "typescript(no-unsafe-argument)": 9,
-    "typescript(no-unsafe-assignment)": 13,
-    "typescript(no-unsafe-call)": 11,
-    "typescript(no-unsafe-member-access)": 32,
-    "typescript(strict-boolean-expressions)": 1,
-    "vitest(prefer-strict-equal)": 19
-  },
   "src/emit/ts/tanstack-query.compile.test.ts": {
     "eslint(func-style)": 2,
     "repo(as-needs-reason)": 2,
-    "repo(duplicate-code)": 1,
     "repo(naming-convention)": 1,
     "repo(no-chained-type-assertions)": 1,
     "repo(no-known-value-widening)": 2
@@ -6842,28 +6824,16 @@
     "typescript(strict-boolean-expressions)": 1
   },
   "src/runtime/ts-tanstack-query/invalidate.ts": {
-    "eslint(func-style)": 1,
-    "eslint(max-params)": 1,
-    "repo(as-needs-reason)": 5,
     "repo(guard-rejects)": 1,
-    "repo(magic-regex)": 1,
     "repo(magic-string)": 1,
-    "repo(no-known-value-widening)": 2,
-    "repo(no-runtime-typeof)": 3,
-    "repo(no-unknown-parameters)": 3
+    "repo(no-unknown-parameters)": 1
   },
   "src/runtime/ts-tanstack-query/query.ts": {
-    "eslint(func-style)": 1,
-    "eslint(max-params)": 5,
-    "repo(as-needs-reason)": 6,
     "repo(naming-convention)": 1,
-    "repo(no-known-value-widening)": 2,
-    "repo(no-runtime-typeof)": 3,
+    "repo(no-runtime-typeof)": 2,
     "repo(no-unknown-parameters)": 4,
-    "repo(no-unknown-returns)": 4,
-    "repo(no-unsafe-dictionary-type)": 1,
-    "typescript(no-unsafe-assignment)": 1,
-    "typescript(no-unsafe-return)": 3
+    "repo(no-unknown-returns)": 3,
+    "typescript(no-unsafe-return)": 2
   },
   "src/runtime/ts/app-types.ts": {
     "repo(no-unsafe-dictionary-type)": 2

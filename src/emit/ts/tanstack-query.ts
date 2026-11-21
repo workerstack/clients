@@ -1,7 +1,8 @@
 /**
  * The TanStack Query adapter the `ts` target writes under `--ts-tanstack-query` (bit 22):
  * `<stem>.tanstack-query.gen.ts`, the vendored modules under `runtime/ts-tanstack-query` joined into one
- * file beside the SDK, plus the types that make its surfaces exact for this document.
+ * file beside the SDK, plus the types that make its surfaces exact for this document and the
+ * `onInvalidate` hook bound to its reads.
  *
  * The vendoring mirrors `http.ts`'s `runtimeSource`, with one difference it cannot share: those modules
  * import only each other, so dropping every sibling import is enough. These import clients' runtime too
@@ -121,15 +122,30 @@ function readable(ir: IR): Map<string, boolean> {
   return out;
 }
 
+/** Each cacheable read's operationId and its member path, as the client nests it. */
+function readMembers(
+  ns: IRNamespace,
+  ops: Map<string, boolean>,
+  at: readonly string[] = [],
+): Array<[string, string[]]> {
+  return [...ns.entries].flatMap(([name, entry]): Array<[string, string[]]> => {
+    if (entry.kind === "namespace") return readMembers(entry.ns, ops, [...at, name]);
+
+    return ops.get(entry.op.id) === true ? [[entry.op.id, [...at, name]]] : [];
+  });
+}
+
 /**
- * `<stem>.tanstack-query.gen.ts`: the vendored adapter, the two key trees read off this document, and the
- * mapped types that turn them into exact surfaces over the client's own operations.
+ * `<stem>.tanstack-query.gen.ts`: the vendored adapter, the two key trees read off this document, the
+ * mapped types that turn them into exact surfaces over the client's own operations, and the
+ * `onInvalidate` hook bound to this API's reads.
  */
 export function tanstackQueryText(ir: IR, name: string, stem: string): string {
   const ops = readable(ir);
   const tree = memberTree(ir.tree);
   const queries = treeOf(tree, (op) => ops.get(op.id) === true, ops);
   const mutations = treeOf(tree, (op) => ops.get(op.id) === false, ops);
+  const table = readMembers(tree, ops).map(([id, member]) => `\t[${JSON.stringify(id)}, ${JSON.stringify(member)}],`);
 
   return `${tanstackQuerySource(`${stem}.runtime.gen`)}
 import { serviceMap } from "./${stem}.map.gen.js"
@@ -143,42 +159,46 @@ type TanstackMutationTree = ${treeText(mutations)}
 
 type TreeShape = { readonly [key: string]: TreeShape | 1 }
 
-type Surfaced<TOps, TTree extends TreeShape, TLeaf> = {
+/** A leaf's factory, by surface: query, mutation, infiniteQuery, queryKey, mutationKey. */
+type Leaf<M> = [QueryFactory<M>, MutationFactory<M>, InfiniteFactory<M>, QueryKeyFactory<M>, MutationKeyFactory]
+
+type Surfaced<TOps, TTree extends TreeShape, TLeaf extends number> = {
 	[K in Extract<keyof TTree, keyof TOps>]: TTree[K] extends 1
-		? TLeaf extends 0
-			? QueryFactory<TOps[K]>
-			: TLeaf extends 1
-				? MutationFactory<TOps[K]>
-				: TLeaf extends 2
-					? InfiniteFactory<TOps[K]>
-					: KeyFactory<TOps[K]>
+		? Leaf<TOps[K]>[TLeaf]
 		: TTree[K] extends TreeShape
 			? Surfaced<TOps[K], TTree[K], TLeaf>
 			: never
 }
 
-/**
- * The TanStack Query factories for this SDK. \`sdk\` may be a client or a thunk for one, which an
- * isomorphic app needs; \`getQueryClient\` is what a successful write invalidates against.
- */
-export function createQueryHelpers(
-	sdk: SdkSource<${name}>,
-	options: QueryHelperOptions = {},
-): {
+type Surfaces = {
 	infiniteQuery: Surfaced<${name}, TanstackQueryTree, 2>
 	mutation: Surfaced<${name}, TanstackMutationTree, 1>
-	mutationKey: Surfaced<${name}, TanstackMutationTree, 3>
+	mutationKey: Surfaced<${name}, TanstackMutationTree, 4>
 	query: Surfaced<${name}, TanstackQueryTree, 0>
 	queryKey: Surfaced<${name}, TanstackQueryTree, 3>
-} {
-	const helpers = queryHelpers(sdk, serviceMap as ServiceMap, ${JSON.stringify(name)}, options)
-	return helpers as unknown as {
-		infiniteQuery: Surfaced<${name}, TanstackQueryTree, 2>
-		mutation: Surfaced<${name}, TanstackMutationTree, 1>
-		mutationKey: Surfaced<${name}, TanstackMutationTree, 3>
-		query: Surfaced<${name}, TanstackQueryTree, 0>
-		queryKey: Surfaced<${name}, TanstackQueryTree, 3>
-	}
+}
+
+/**
+ * The TanStack Query factories for this SDK, over the client \`getSdk\` returns, read on every call so an
+ * isomorphic app can hand each request its own. Spread a factory's result into TanStack's options.
+ */
+export function createQueryHelpers(getSdk: () => ${name}): Surfaces {
+	const helpers = queryHelpers(getSdk, serviceMap as ServiceMap, ${JSON.stringify(name)})
+	/* the runtime's surfaces are untyped proxies over this map; these types are the map's own */
+	return helpers as unknown as Surfaces
+}
+
+/** Each read's operationId and the member path its keys start with. */
+const READ_MEMBERS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
+${table.join("\n")}
+])
+
+/**
+ * The hook for \`new ${name}({ onInvalidate: [invalidateQueries(queryClient)] })\`: a write, raw or through
+ * \`mutation\`, resolves once the reads it made stale have refetched, and a failing refetch never rejects it.
+ */
+export function invalidateQueries(queryClient: QueryClient): (event: InvalidateEvent) => Promise<void> {
+	return invalidationHook(queryClient, ${JSON.stringify(name)}, READ_MEMBERS)
 }
 `;
 }

@@ -69,32 +69,110 @@ clients generate --spec openapi.json --target ts --out generated --ts-name Kitch
 clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen --ts-tanstack-query
 ```
 
-Its `createQueryHelpers(sdk, { getQueryClient })` gives five surfaces — `query`, `mutation`, `infiniteQuery`,
-`queryKey` and `mutationKey` — each nested exactly as the client is, so `query.org.member.list(…)` sits where
-`client.org.member.list(…)` does. `sdk` may be a client or a thunk for one, which an isomorphic app needs.
+Build the QueryClient first, then the SDK with the file's `invalidateQueries` hook, then the helpers. The
+`QueryClient` is the one your framework's adapter exports (`@tanstack/solid-query`, `@tanstack/react-query`), or
+query-core's own, as here:
+
+```sdk ts tanstack
+import { QueryClient } from "@tanstack/query-core"
+import { Kitchen } from "./kitchen"
+import { createQueryHelpers, invalidateQueries } from "./kitchen.tanstack-query.gen"
+
+export const queryClient = new QueryClient()
+const sdk = new Kitchen({ baseURL: "https://api.example.com", onInvalidate: [invalidateQueries(queryClient)] })
+export const { query, mutation, infiniteQuery, queryKey, mutationKey } = createQueryHelpers(() => sdk)
+```
+
+The five surfaces are nested exactly as the client is, so `query.organizations.retrieve(…)` sits where
+`client.organizations.retrieve(…)` does. `createQueryHelpers` takes a function that returns the client, and it calls it
+on every request, so an isomorphic app can return a different client for each request.
 
 The document decides what goes where. A `GET` is on `query`, every other method is on `mutation`, and an event
 stream, a WebSocket or an `x-realtime` operation is on neither, because a stream is not a cache entry. Nothing
 is keyed off a method's name.
 
-**Keys.** A read's key is `[<SDK name>, ...the member path, the request]` — the request object whole, so
-`params`, `search` and anything else the SDK sends are all in it. That is what TanStack requires: every input
+**Call shapes.** Each factory returns only its key and its function. Spread the result into TanStack's own
+options and put everything else after it, so every other option is typed by TanStack. These use query-core's
+observers; `useQuery(() => ({ ... }))` in solid-query, or `useQuery({ ... })` in react-query, takes the same
+object:
+
+```sdk ts tanstack
+import { InfiniteQueryObserver, MutationObserver, QueryClient, QueryObserver } from "@tanstack/query-core"
+import { Kitchen } from "./kitchen"
+import { createQueryHelpers, invalidateQueries } from "./kitchen.tanstack-query.gen"
+
+const queryClient = new QueryClient()
+const sdk = new Kitchen({ baseURL: "https://api.example.com", onInvalidate: [invalidateQueries(queryClient)] })
+const { query, mutation, infiniteQuery, queryKey } = createQueryHelpers(() => sdk)
+
+export function organization(orgId: string) {
+	return new QueryObserver(queryClient, { ...query.organizations.retrieve({ params: { orgId } }), staleTime: 0 })
+}
+
+// the second argument is the SDK's own call options; they reach the call, not the key
+export const timed = query.organizations.retrieve({ params: { orgId: "org_1" } }, { timeout: 5_000 })
+
+export const greet = new MutationObserver(queryClient, {
+	...mutation.hello.create(),
+	onMutate: (input) => console.log(`greeting ${input.json.name}`),
+})
+
+export const greetings = new InfiniteQueryObserver(queryClient, {
+	...infiniteQuery.hello.list((q: string | undefined) => ({ search: { q: q ?? "" } })),
+	initialPageParam: undefined,
+	getNextPageParam: () => undefined, // read the next page param off the last page, when your API pages
+})
+
+export const cached = queryClient.getQueryData(queryKey.hello.list({ search: { q: "Ada" } }))
+```
+
+A read takes the SDK method's request, then optionally its call options (`timeout`, `headers`, `signal`, and
+the other per-call options). `mutate` takes exactly what the SDK method takes. A paged read takes a function
+from the page param to the request. The adapter calls that function once with `undefined` to build the key, so
+it must accept `undefined`. Annotate its parameter and TanStack infers the page param type from it. Every call
+gets TanStack's abort signal merged with yours, so a cancel, or the last observer unmounting, aborts the
+request.
+
+**Keys.** A read's key is `[<SDK name>, ...the member path, the request]`. The request object goes in whole,
+so `params`, `search` and anything else the SDK sends are all in it. That is what TanStack requires: every input
 the `queryFn` depends on belongs in the key, so two reads of one route that differ only by `search` are two
-cache entries. `init` is not in the key, since a signal and a timeout say nothing about the answer. A read with
-no request keys as `[<SDK name>, ...the member path]`. `queryKey.<…>(req)` returns exactly the key
-`query.<…>({ reqOptions: { req } })` writes. A paged read carries a trailing `"infinite"` marker, because its
-cached shape is `InfiniteData` and it must not share the plain read's entry.
+cache entries. The call options are not in the key, since a signal and a timeout say nothing about the answer.
+A read with no request keys as `[<SDK name>, ...the member path]`. `queryKey.<…>(req)` returns exactly the key
+`query.<…>(req)` uses, typed so `getQueryData` infers the answer. A paged read's key is the key of its request
+for `undefined` plus a trailing `"infinite"` marker, because its cached shape is `InfiniteData` and it must not
+share the plain read's entry.
 
-**Invalidation** works by prefix, which is why the two are not the same shape. A successful write makes stale
-the reads its `x-invalidate` selectors name, with the mutation's own path params filled in:
-`[<SDK name>, ...the member path, { params }]`. TanStack matches objects partially and compares only the
-filter's own positions, so that reaches every search of that read, the paged entry included. When a selector's
-params are not all known the filter stays the bare prefix, which reaches everything under it — made stale
-rather than missed.
+**Invalidation** happens in the SDK, not the helpers. A successful write fires the SDK's `onInvalidate` with the
+reads its `x-invalidate` selectors name, and `invalidateQueries(queryClient)` makes each of them stale as
+`[<SDK name>, ...the member path, { params }]`, or as the bare prefix when the target has no params. TanStack
+matches objects partially and compares only the filter's own positions, so that reaches every search of that
+read, the paged entry included. Because the SDK fires the hook, a plain `sdk.hello.create(…)` refreshes the
+cache just as `mutation.hello.create()` does. The SDK awaits the hook, so a write resolves only after the
+active reads it made stale have refetched. A failing refetch holds the write through its retries but never
+rejects it, and an infinite query refetches every page it holds.
 
-Two notes. `@tanstack/query-core` is your dependency, not backend's — install it yourself; the file imports it for
-types only. And a read's options carry `initialData: undefined`, which is what solid-query needs to keep the
-unseeded overload; it is harmless under react-query.
+**Server rendering.** On the server, build the QueryClient and the SDK per request, in that order. Both are
+dropped when the request ends, and the hook holds no state of its own. If a route preload prefetches, skip the
+browser's hydration run, or it refetches what the server already sent:
+
+```sdk ts tanstack
+import { QueryClient } from "@tanstack/query-core"
+import { Kitchen } from "./kitchen"
+import { createQueryHelpers, invalidateQueries } from "./kitchen.tanstack-query.gen"
+
+const queryClient = new QueryClient()
+const sdk = new Kitchen({ baseURL: "https://api.example.com", onInvalidate: [invalidateQueries(queryClient)] })
+const { query } = createQueryHelpers(() => sdk)
+
+// a route preload: `isServer` from your framework (`@solidjs/web` in Solid), `intent` from the router
+export function preloadOrganization(isServer: boolean, intent: string, orgId: string): void {
+	if (!isServer && intent === "initial") return
+	void queryClient.prefetchQuery(query.organizations.retrieve({ params: { orgId } }))
+}
+```
+
+`@tanstack/query-core` is your dependency, not backend's. Install it yourself; the file imports it for types
+only.
 
 Drop the flag and the next run deletes the file, the way `.clients-generated.json` deletes anything the previous
 run wrote and this one did not. The index file never re-exports the adapter, so an SDK generated without the
