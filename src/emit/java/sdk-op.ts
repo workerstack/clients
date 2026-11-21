@@ -6,6 +6,7 @@
  * JSON as the mapper writes it, a form urlencoded, text as its raw bytes, binary as sized bytes or a one-shot stream,
  * multipart as hand-built parts under a `clients-<uuid>` boundary.
  */
+import type { InvalidatedRead } from "../../ir/invalidate-reads.ts";
 import type { IRSchema } from "../../ir/model.ts";
 import type { SdkOp } from "../../ir/sdk-model.ts";
 import { javaString } from "../shared/escape.ts";
@@ -35,10 +36,14 @@ import { multipartHelper, multipartRecordLines, paramsRecord } from "./sdk-recor
 import { CURSOR, sseMethodLines } from "./sse.ts";
 import { PROTOCOLS, TOKEN, wsMethodLines } from "./ws.ts";
 
-/** What an operation's text needs: the type context its types hoist into, and the array test. */
+/**
+ * What an operation's text needs: the type context its types hoist into, the array test, and each write's reads by
+ * operationId (`invalidateReads`): what its `onInvalidate` event names.
+ */
 export type OpEnv = {
   readonly ctx: JavaTypeContext;
   readonly isArray: (schema: IRSchema) => boolean;
+  readonly reads: ReadonlyMap<string, readonly InvalidatedRead[]>;
 };
 
 /** One operation's text and plan, before its accessors are known. */
@@ -223,8 +228,26 @@ function methodLines(op: SdkOp, site: MethodSite, env: OpEnv): string[] {
   ];
 }
 
-/** The `Operation` constant: the method, the path template, the path params in path order, accept and idempotence. */
-function constantLines(op: SdkOp, constant: string): string[] {
+/** A write's `onInvalidate` members: its operationId and the reads it makes stale; `null` and none without reads. */
+function readItems(op: SdkOp, reads: readonly InvalidatedRead[] | undefined): Expr[] {
+  const each = (reads ?? []).map((read) =>
+    newOf("Operation.Read", [
+      javaString(read.operationId),
+      array(
+        "String[]",
+        read.params.map((name) => javaString(name)),
+      ),
+    ]),
+  );
+
+  return [lit(each.length === 0 ? "null" : javaString(op.id)), array("Operation.Read[]", each)];
+}
+
+/**
+ * The `Operation` constant: the method, the path template, the path params in path order, accept and idempotence,
+ * then a write's targets, operationId and reads.
+ */
+function constantLines(op: SdkOp, constant: string, reads: readonly InvalidatedRead[] | undefined): string[] {
   const names = op.pathSegments.flatMap((segment) => (segment.kind === "param" ? [segment.name] : []));
   const accept = acceptOf(op);
 
@@ -244,6 +267,7 @@ function constantLines(op: SdkOp, constant: string): string[] {
             "String[]",
             op.invalidates.map((target) => javaString(target)),
           ),
+          ...readItems(op, reads),
         ]),
   ];
 
@@ -302,7 +326,7 @@ export function javaOp(op: SdkOp, name: string, env: OpEnv): JavaOp {
         ? null
         : { lines: multipartRecordLines(multipart.name, op.id, multipart.components), name: multipart.name },
     constant,
-    constantLines: constantLines(op, constant),
+    constantLines: constantLines(op, constant, env.reads.get(op.id)),
     headers,
     helper: multipartHelper(op, env),
     lines: methodLines(op, { fields, headers, name }, env),

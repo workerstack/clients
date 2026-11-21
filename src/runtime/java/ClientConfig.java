@@ -24,6 +24,7 @@ final class ClientConfig {
   private final List<RequestHook> onRequest;
   private final List<ResponseHook> onResponse;
   private final Supplier<String> onAuthExpired;
+  private final List<InvalidateHook> onInvalidate;
   private final Consumer<LogEntry> onLog;
   private final RedirectPolicy redirect;
   private final long maxResponseBytes;
@@ -39,6 +40,7 @@ final class ClientConfig {
     this.onRequest = List.copyOf(builder.onRequest);
     this.onResponse = List.copyOf(builder.onResponse);
     this.onAuthExpired = builder.onAuthExpired;
+    this.onInvalidate = List.copyOf(builder.onInvalidate);
     this.onLog = builder.onLog;
     this.redirect = builder.redirect;
     this.maxResponseBytes = builder.maxResponseBytes;
@@ -100,6 +102,10 @@ final class ClientConfig {
     return onAuthExpired;
   }
 
+  List<InvalidateHook> onInvalidate() {
+    return onInvalidate;
+  }
+
   Consumer<LogEntry> onLog() {
     return onLog;
   }
@@ -135,6 +141,7 @@ final class ClientConfig {
     private final List<RequestHook> onRequest = new ArrayList<>();
     private final List<ResponseHook> onResponse = new ArrayList<>();
     private Supplier<String> onAuthExpired;
+    private final List<InvalidateHook> onInvalidate = new ArrayList<>();
     private Consumer<LogEntry> onLog;
     private String token;
     private String authHeader;
@@ -187,6 +194,10 @@ final class ClientConfig {
 
     void onAuthExpired(Supplier<String> refresh) {
       this.onAuthExpired = refresh;
+    }
+
+    void onInvalidate(InvalidateHook hook) {
+      this.onInvalidate.add(hook);
     }
 
     void onLog(Consumer<LogEntry> log) {

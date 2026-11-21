@@ -35,7 +35,8 @@ internal sealed record Setup(
     Dictionary<string, string>? Headers = null,
     long? MaxResponseBytes = null,
     string? Redirect = null,
-    int? TimeoutMs = null);
+    int? TimeoutMs = null,
+    RecordInvalidate? RecordInvalidate = null);
 
 /// <summary><c>bearer</c> with its token, or <c>header</c> with its name and value.</summary>
 internal sealed record Auth(string Kind, string? Token = null, string? Name = null, string? Value = null);

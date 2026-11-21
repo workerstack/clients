@@ -13,6 +13,7 @@
  * own locals or its stream's fields is `…2`, a keyword `@`-escaped (H52); the twin's lambda takes `_o`, which no
  * param is (a `_` leads a name only before a digit).
  */
+import type { InvalidatedRead } from "../../ir/invalidate-reads.ts";
 import type { IRParam } from "../../ir/model.ts";
 import type { SdkOp, SdkStream } from "../../ir/sdk-model.ts";
 import { csString } from "../shared/escape.ts";
@@ -33,8 +34,8 @@ import { sseStream } from "./sse.ts";
 import { type CsTypeContext, csTypeOf } from "./types.ts";
 import { wsStream } from "./ws.ts";
 
-/** What every method of one SDK shares: the type context. */
-export type MethodEnv = { readonly at: CsTypeContext };
+/** The type context, and each write's reads by operationId (`invalidateReads`): what its `OnInvalidate` event names. */
+export type MethodEnv = { readonly at: CsTypeContext; readonly reads: ReadonlyMap<string, readonly InvalidatedRead[]> };
 
 /** How a rendered method spells a type the context lists: its runtime type, and its `<Context>.Default.<Name>`. */
 export type Spelling = { readonly runtime: (type: string) => string; readonly info: (type: string) => string };
@@ -262,14 +263,27 @@ function acceptOf(op: SdkOp): string | undefined {
   return op.success.kind === "binary" || op.success.kind === "text" ? op.success.contentType : undefined;
 }
 
-/** The `Operation` field: method, path, path params, `Idempotent`, then `Accept` and `Invalidates` when they apply. */
-function operationField({ field, keyed, op, path }: Parts): string {
+/** The `Operation` members a write's `OnInvalidate` event needs: its operationId and the reads it makes stale. */
+function readsOf(op: SdkOp, reads: readonly InvalidatedRead[] | undefined): string[] {
+  if (reads === undefined || reads.length === 0) return [];
+
+  const each = reads.map((read) => `new(${csString(read.operationId)}, [${read.params.map(csString).join(", ")}])`);
+
+  return [`By: ${csString(op.id)}`, `Reads: [${each.join(", ")}]`];
+}
+
+/**
+ * The `Operation` field: method, path, path params, `Idempotent`, then `Accept`, `Invalidates` and the
+ * `OnInvalidate` reads when they apply.
+ */
+function operationField({ field, keyed, op, path }: Parts, reads: readonly InvalidatedRead[] | undefined): string {
   const accept = acceptOf(op);
 
   const named = [
     `Idempotent: ${keyed}`,
     ...(accept === undefined ? [] : [`Accept: ${csString(accept)}`]),
     ...(op.invalidates.length === 0 ? [] : [`Invalidates: [${op.invalidates.map(csString).join(", ")}]`]),
+    ...readsOf(op, reads),
   ];
 
   const params = path.map(({ param }) => csString(param.name)).join(", ");
@@ -290,7 +304,7 @@ export function csMethod(op: SdkOp, name: string, field: string, env: MethodEnv)
   const parts: Parts = { answer, body, field, headers, keyed, name, op, params, path, stream };
 
   return {
-    field: operationField(parts),
+    field: operationField(parts, env.reads.get(op.id)),
     lines: (spell) => methodLines(parts, spell),
     plan: planOf(parts),
     twin: (spell) => twinLines(parts, spell),

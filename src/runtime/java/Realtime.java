@@ -109,7 +109,9 @@ final class Realtime {
             op.names(),
             "text/event-stream",
             op.idempotent(),
-            op.invalidates());
+            op.invalidates(),
+            op.by(),
+            op.reads());
     Call at =
         new Call(
             call.path(),

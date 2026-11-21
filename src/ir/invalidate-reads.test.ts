@@ -69,6 +69,21 @@ describe("invalidateReads: each write's x-invalidate selectors, resolved to the 
   });
 });
 
+/** Two reads at one route key (`/docs/{id}`, `/docs/{slug}`) and a write naming both and `/docs` by `:id?`. */
+const SHARED_KEY = {
+  "/docs": { get: read("docs.list") },
+  "/docs/{id}": { get: read("docs.get", [param("id")]) },
+  "/docs/{id}/touch": { post: write("docs.touch", [param("id")], ["GET /docs/:id?"]) },
+  "/docs/{slug}": { get: read("docs.bySlug", [param("slug")]) },
+};
+
+/** The operationIds `docs.touch` names in a document of `paths`. */
+function touched(paths: OpenApiDocument["paths"]) {
+  return invalidateReads(toIR({ ...DOCUMENT, paths }))
+    .reads.get("docs.touch")
+    ?.map(({ operationId }) => operationId);
+}
+
 describe("invalidateReads: duplicates and selectors that name nothing", () => {
   it("names a read once however many selectors name it; skips a selector with no method, and a bare write", () => {
     const document = {
@@ -93,5 +108,15 @@ describe("invalidateReads: duplicates and selectors that name nothing", () => {
     expect(new Set(invalidateReads(toIR(DOCUMENT)).reads.keys())).toStrictEqual(
       new Set(["docs.archive", "state.save"]),
     );
+  });
+});
+
+describe("invalidateReads: one order for every document", () => {
+  it("orders a selector's reads by its keys, then by operationId, whatever the document's path order", () => {
+    const reversed = Object.fromEntries(Object.entries(SHARED_KEY).toReversed());
+    expect([touched(SHARED_KEY), touched(reversed)]).toStrictEqual([
+      ["docs.list", "docs.bySlug", "docs.get"],
+      ["docs.list", "docs.bySlug", "docs.get"],
+    ]);
   });
 });

@@ -324,7 +324,7 @@ describe("generateCSharpSdk: <Op>Headers (Fc7, §2.2)", () => {
     const { csResponseHeaders } = await import("./sdk-answer.ts");
     const ir = toIR(STREAMED as OpenApiDocument, { deriveOperationIds: true });
     const model = sdkModel(ir);
-    const env = { at: csTypeContext(ir) };
+    const env = { at: csTypeContext(ir), reads: new Map<string, []>() };
     const plan = (id: string) => csResponseHeaders(model.opsById.get(id) as SdkOp, env)?.plan ?? null;
     expect({ plain: plan("plain.get"), realtime: plan("live.connect"), ws: plan("ws.subscribe") }).toEqual({
       plain: { fields: { "X-Trace": "XTrace" }, type: "PlainGetHeaders" },

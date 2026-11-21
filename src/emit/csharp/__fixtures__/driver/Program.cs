@@ -51,6 +51,7 @@ internal static class Program
         var sdk = Sdk.Load(envelope.Sdk);
         var recorder = new Recorder();
         var config = Configured(sdk, envelope);
+        var invalidations = Invalidations.Install(config, envelope.Cell.Setup ?? new Setup());
         if (script is not null)
         {
             Scripts.Apply(script, config, sdk, recorder);
@@ -79,7 +80,7 @@ internal static class Program
                 throw new DriverException($"call {i} ({call.Operation}): {reason}");
             }
             recorder.Called(clock.ElapsedMilliseconds, outcome);
-            observed.Add(outcome.Observed);
+            observed.Add(invalidations is null ? outcome.Observed : invalidations.Observe(outcome.Observed));
         }
         return script is null ? observed.ToJsonString() : new JsonObject { ["observed"] = observed, ["trace"] = recorder.Trace() }.ToJsonString();
     }

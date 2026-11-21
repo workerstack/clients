@@ -39,9 +39,10 @@ const GATED = [
 
 type Gated = (typeof GATED)[number];
 
-// what each gated SDK's ops need of the runtime beyond plain HTTP (contract 50 §2): only these three have a WebSocket
-// or realtime op; SSE is core
+// what each gated SDK's ops need of the runtime beyond plain HTTP (contract 50 §2): only these four have a WebSocket
+// or realtime op (fixtures since plan 9: plan 2's onInvalidate paths ride in it, rooms.live among them); SSE is core
 const MIXES: Partial<Record<Gated, CSharpRuntimeFeatures>> = {
+  fixtures: { realtime: false, ws: true },
   long: { realtime: true, ws: true },
   realtime: { realtime: true, ws: false },
   ws: { realtime: false, ws: true },

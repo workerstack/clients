@@ -800,7 +800,13 @@ describe("the Python runtime within its byte budget (bit 14, G14)", () => {
 //   (`EventStream<TEvent>` over a whole-event decode, `NamedEventsAsync`, `EventData` for the named decode),
 //   TransportSse.cs +24, RealtimeLoop.cs +8, Ws.cs +1 (`Fire` internal, shared with the typed socket and the
 //   connection).
-const CSHARP_RUNTIME_BYTES = 143_395;
+// Plan 9 (sdk-on-invalidate-csharp-java), +3,257 B to 146,652 B: ClientConfig.OnInvalidate, awaited once per
+//   successful write with the reads it made stale. Exchange.cs +1,813 (RunAsync awaits the hooks after Done with the
+//   caller's token; InvalidatedAsync: the targets the write's params fill, each hook in its own try, its error to
+//   OnLog; Opened and Detached: a stream's or socket's open marks its targets and runs the hooks on Task.Run),
+//   Config.cs +542 (the property, its doc, its name in ToString), Hooks.cs +514 (InvalidateEvent, InvalidateTarget),
+//   Operation.cs +331 (By, Reads, StaleRead), WsDial.cs +57 (Opened on a 101).
+const CSHARP_RUNTIME_BYTES = 146_652;
 
 describe("the C# runtime within its byte budget (bit 15, G14)", () => {
   it(

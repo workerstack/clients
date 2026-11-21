@@ -181,6 +181,7 @@ const SETTERS: readonly (readonly [string, string])[] = [
   ["onRequest", "RequestHook"],
   ["onResponse", "ResponseHook"],
   ["onAuthExpired", "Supplier<String>"],
+  ["onInvalidate", "InvalidateHook"],
   ["onLog", "Consumer<LogEntry>"],
   ["redirect", "RedirectPolicy"],
   ["maxResponseBytes", "long"],

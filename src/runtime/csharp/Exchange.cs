@@ -31,8 +31,14 @@ internal sealed class Exchange(Transport client, Operation op, Call call, bool s
     private int _redirects;
     private HttpResponseMessage? _live;
 
-    public async Task<(RawResponse Raw, SdkException? Error)> RunAsync(CancellationToken cancellationToken) =>
-        Done(await BoundedAsync(cancellationToken).ConfigureAwait(false));
+    private bool _settled;
+
+    public async Task<(RawResponse Raw, SdkException? Error)> RunAsync(CancellationToken cancellationToken)
+    {
+        var done = Done(await BoundedAsync(cancellationToken).ConfigureAwait(false));
+        await InvalidatedAsync(cancellationToken).ConfigureAwait(false);
+        return done;
+    }
 
     public async Task<HttpResponseMessage> OpenAsync(CancellationToken cancellationToken)
     {
@@ -44,6 +50,7 @@ internal sealed class Exchange(Transport client, Operation op, Call call, bool s
                 throw error;
             }
             call.Read?.Invoke(raw.Headers);
+            Detached();
             return _live!;
         }
         catch
@@ -231,8 +238,8 @@ internal sealed class Exchange(Transport client, Operation op, Call call, bool s
         SdkException? error = null;
         if (answer.Status is >= 200 and < 300)
         {
-            var values = op.PathParams.Zip(call.Path).ToDictionary(pair => pair.First, pair => pair.Second);
-            client.Stale.Settle(_meta, op.Invalidates ?? [], values);
+            client.Stale.Settle(_meta, op.Invalidates ?? [], Values);
+            _settled = true;
             error = answer.Over ? new DecodeException($"the answer exceeds {Max} bytes") : null;
         }
         else
@@ -243,5 +250,50 @@ internal sealed class Exchange(Transport client, Operation op, Call call, bool s
         var raw = call.Options?.Raw ?? new RawResponse();
         raw.Fill(answer.Status, answer.Headers, answer.Body, answer.Url);
         return (raw, error);
+    }
+
+    private Dictionary<string, string> Values => op.PathParams.Zip(call.Path).ToDictionary(pair => pair.First, pair => pair.Second);
+
+    /* a socket's 101: its targets marked stale, and the hooks run detached */
+    public void Opened()
+    {
+        _meta = client.Stale.Begin(op.Method, UrlPath.Expand(op, call.Path));
+        client.Stale.Settle(_meta, op.Invalidates ?? [], Values);
+        _settled = true;
+        Detached();
+    }
+
+    /* an open never waits on a hook nor ends its token; InvalidatedAsync never throws */
+    private void Detached()
+    {
+        if (op.Reads is { Length: > 0 } && client.Config.OnInvalidate is { Count: > 0 })
+        {
+            _ = Task.Run(() => InvalidatedAsync(CancellationToken.None));
+        }
+    }
+
+    /* each OnInvalidate hook in order after a 2xx, a hook's error logged and never the call's */
+    private async Task InvalidatedAsync(CancellationToken token)
+    {
+        if (!_settled || op.Reads is not { Length: > 0 } reads || client.Config.OnInvalidate is not { Count: > 0 } hooks)
+        {
+            return;
+        }
+        var values = Values;
+        var targets = reads.Select(read => new InvalidateTarget(read.Op, read.Params
+            .Where(name => values.TryGetValue(name, out var value) && value is not ("" or "." or ".."))
+            .ToDictionary(name => name, name => values[name], StringComparer.Ordinal))).ToList();
+        var e = new InvalidateEvent(op.By ?? "", targets);
+        foreach (var hook in hooks)
+        {
+            try
+            {
+                await hook(e, token).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                _log.Failed(error);
+            }
+        }
     }
 }

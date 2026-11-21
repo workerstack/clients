@@ -371,9 +371,9 @@ const staleFiles = (files: Readonly<Record<string, string>>): string[] =>
     .map((path) => path.slice(path.lastIndexOf("/") + 1))
     .sort();
 
-/** The operation constants that carry x-invalidate targets: their sixth argument is the target array. */
+/** The operation constants with x-invalidate targets: their sixth argument, the write's id and reads after it. */
 const targets = (files: Readonly<Record<string, string>>) =>
-  Object.values(files).filter((text) => /(true|false),\s+new String\[\] \{[^}]*\}\);/.test(text)).length;
+  Object.values(files).filter((text) => /(true|false),\s+new String\[\] \{[^}]*\},/.test(text)).length;
 
 describe("stale tracking: the exchange ships its stale tracker; only the op's targets follow x-invalidate", () => {
   // new

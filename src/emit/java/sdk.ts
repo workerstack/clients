@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 
 import { toIR, type OpenApiDocument } from "../../ir/build.ts";
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
 import { type SdkOp, sdkModel } from "../../ir/sdk-model.ts";
 import { compareCodeUnits } from "../shared/lang.ts";
 import { type PackageIdentity, packageOn } from "../shared/metadata.ts";
@@ -155,6 +156,9 @@ const OPERATION_FILES = [
   "HttpException",
   "Hops",
   "Hooks",
+  "InvalidateEvent",
+  "InvalidateHook",
+  "InvalidateTarget",
   "LogEntry",
   "Operation",
   "RawResponse",
@@ -250,6 +254,7 @@ function emitJava(document: Record<string, unknown>, options: JavaSdkOptions) {
   const ctx = javaTypeContext(ir, [pkg.clientName]);
   const isArray = (schema: Parameters<typeof model.resolve>[0]) => model.resolve(schema).kind === "array";
   const operations = model.ops.length > 0;
+  const { reads, warnings } = invalidateReads(ir);
 
   const env: SurfaceEnv = {
     client: pkg.clientName,
@@ -259,6 +264,7 @@ function emitJava(document: Record<string, unknown>, options: JavaSdkOptions) {
     notices: [],
     ops: model.opsById,
     packageName: pkg.packageName,
+    reads,
   };
 
   const surface = operations ? surfaceOf(ir, env) : { files: {}, plans: [] as JavaCallPlan[] };
@@ -300,7 +306,7 @@ function emitJava(document: Record<string, unknown>, options: JavaSdkOptions) {
 
   return {
     files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => compareCodeUnits(a, b))),
-    notices: [...new Set([...env.notices, ...renamed])],
+    notices: [...new Set([...env.notices, ...renamed, ...warnings.map((warning) => `java: ${warning}`)])],
     plans: surface.plans,
   };
 }

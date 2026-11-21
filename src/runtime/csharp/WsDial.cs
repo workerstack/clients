@@ -50,7 +50,9 @@ internal static class WsDial
             x.Raw?.Fill(101, headers, [], SocketUrl(url));
             var stream = Connection(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false));
             var options = new WebSocketCreationOptions { SubProtocol = chosen, KeepAliveInterval = KeepAlive, KeepAliveTimeout = KeepAlive };
-            return new TypedWebSocket(WebSocket.CreateFromStream(stream, options), chosen, response);
+            var socket = new TypedWebSocket(WebSocket.CreateFromStream(stream, options), chosen, response);
+            x.Opened();
+            return socket;
         }
         catch
         {

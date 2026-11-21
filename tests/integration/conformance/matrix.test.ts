@@ -109,10 +109,10 @@ function reds(target: Cell, runs: readonly (readonly Observed[])[], wire: readon
 const tsCell = (key: string) => cellsFor("ts").find((c) => c.key === key);
 
 /**
- * A row's own targets: all eight, the six SDKs (bit 21 i0), TS, Go, Python and Rust (the invalidate-once row, plans
- * 6-8, until each other SDK joins it), or a CLI or MCP row's own.
+ * A row's own targets: all eight, the six SDKs (bit 21 i0, and the invalidate-once row since plans 6-9), or a CLI or
+ * MCP row's own.
  */
-const OWN_TARGETS = [TARGETS, SDKS, ["ts", "go", "python", "rust"], ["cli"], ["mcp"]].map(String);
+const OWN_TARGETS = [TARGETS, SDKS, ["cli"], ["mcp"]].map(String);
 
 /** The cells `target` should get: each scenario of every row that lists it, keyed feature/scenario. */
 const cellsOfRows = (target: (typeof TARGETS)[number]) =>

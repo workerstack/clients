@@ -63,6 +63,13 @@ public sealed record ClientConfig
     /// <summary>Asked once per call for a new token after a 401, with the call's token; null or empty keeps the 401.</summary>
     public Func<CancellationToken, Task<string?>>? OnAuthExpired { get; init; }
 
+    /// <summary>
+    /// Run in order once per successful write, each after the last, with what it made stale and the call's token: the
+    /// call returns after the last. An event stream or WebSocket runs them when it opens, without waiting. A hook's
+    /// error goes to <see cref="OnLog"/> as an error entry and never to the call; the next hook still runs.
+    /// </summary>
+    public IReadOnlyList<Func<InvalidateEvent, CancellationToken, Task>>? OnInvalidate { get; init; }
+
     /// <summary>Told of each call's start, its answer and its error; what it throws is ignored.</summary>
     public Action<LogEntry>? OnLog { get; init; }
 
@@ -83,7 +90,8 @@ public sealed record ClientConfig
         builder.Append(", Redirect = ").Append(Redirect);
         builder.Append(", MaxResponseBytes = ").Append(MaxResponseBytes);
         (string Name, bool Set)[] hooks =
-            [("OnRequest", OnRequest is not null), ("OnResponse", OnResponse is not null), ("OnAuthExpired", OnAuthExpired is not null), ("OnLog", OnLog is not null)];
+            [("OnRequest", OnRequest is not null), ("OnResponse", OnResponse is not null), ("OnAuthExpired", OnAuthExpired is not null), ("OnInvalidate", OnInvalidate is not null),
+             ("OnLog", OnLog is not null)];
         builder.Append(", Hooks = [").Append(string.Join(", ", hooks.Where(hook => hook.Set).Select(hook => hook.Name))).Append(']');
         return true;
     }

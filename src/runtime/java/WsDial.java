@@ -72,6 +72,9 @@ final class WsDial {
     if (options.raw() != null) {
       options.raw().fill(101, Map.of(), new byte[0], url);
     }
+    StaleTracker stale = exchange.stale();
+    stale.settle(stale.begin(op.method(), path), op.invalidates(), op.values(call.path()));
+    Hooks.onInvalidate(config, op, call.path(), true);
     return new TypedWebSocket<>(socket, read);
   }
 

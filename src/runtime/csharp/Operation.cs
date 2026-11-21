@@ -6,7 +6,12 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace Http.Runtime;
 
-internal sealed record Operation(string Method, string Path, string[] PathParams, bool Idempotent, string? Accept = null, string[]? Invalidates = null);
+/* By and Reads: a write's operationId and the reads its success makes stale, for ClientConfig.OnInvalidate */
+internal sealed record Operation(
+    string Method, string Path, string[] PathParams, bool Idempotent, string? Accept = null, string[]? Invalidates = null, string? By = null, StaleRead[]? Reads = null);
+
+/* one read a write makes stale, as the generator resolved it: its operationId and its own path params */
+internal sealed record StaleRead(string Op, string[] Params);
 
 internal sealed record Defaults(string? BaseUrl, string AuthHeader, string AuthPrefix, JsonSerializerOptions Json);
 

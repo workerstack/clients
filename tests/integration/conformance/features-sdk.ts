@@ -3,7 +3,7 @@
  * of the six SDKs, and a text answer no shared row had (F2); a 2xx past the response cap (i2, on every SDK since i6); and a realtime
  * send's 2xx past it (i7). An undecodable 2xx is the target's decode error: TS's and Python's DecodeError, Go's *DecodeError
  * (i3), Rust's Error::Decode (its DecodeError since i4), C#'s and Java's DecodeException: each driver reads its target's. Every expectation is what the reference app (core `conformance/app.ts`) answers.
- * A write's OnInvalidate hooks called once (plan 6) run on TS, Go, Python (plan 7) and Rust (plan 8) so far.
+ * A write's OnInvalidate hooks called once (plan 6) run on all six SDKs (plans 6-9).
  */
 import { call, data, error, events, hop } from "./cells.ts";
 import type { Expected, Feature, Scenario, Target } from "./matrix.ts";
@@ -126,11 +126,11 @@ export const SDK_ROWS: readonly Feature[] = [
     "a realtime send's 2xx past the response cap is the target's decode error, never no answer",
     realtime,
   ),
-  // TS and Go (plan 6), Python (plan 7) and Rust (plan 8) record the hooks; each other SDK joins in its own slice
+  // TS and Go (plan 6), Python (plan 7), Rust (plan 8), C# and Java (plan 9) record the hooks
   {
     asserted: "a 2xx write calls its OnInvalidate hooks once with the reads it made stale; a failing hook leaves it ok",
     id: "invalidate-once",
     scenarios: [invalidateOnce("inv-1", { failFirst: false }), invalidateOnce("inv-2", { failFirst: true })],
-    targets: ["ts", "go", "python", "rust"],
+    targets: ["ts", "go", "rust", "python", "csharp", "java"],
   },
 ];

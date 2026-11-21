@@ -21,8 +21,8 @@ import {
 
 const keysOf = (cells: readonly Cell[]) => cells.map((cell) => cell.key);
 
-/** The SDKs that run the invalidate-once row: TS and Go (plan 6), Rust (plan 8), Python (plan 7); plan 9 adds two. */
-const INVALIDATING: readonly Sdk[] = ["ts", "go", "rust", "python"];
+/** The SDKs that run the invalidate-once row: all six (plans 6-9). */
+const INVALIDATING: readonly Sdk[] = ["ts", "go", "rust", "python", "csharp", "java"];
 
 /** `sdk`'s cells on the rows every SDK runs: a row the others join in a later slice (invalidate-once) is left out. */
 function sharedCellsFor(sdk: Sdk): readonly Cell[] {
@@ -58,12 +58,12 @@ describe("response kinds, derived from features.ts", () => {
     ]);
   });
 
-  it("are the same for every SDK on the rows the six run, the invalidated kind only the invalidating SDKs'", () => {
+  it("are the same for every SDK on the rows the six run, the invalidated kind among them", () => {
     const kinds = (sdk: Sdk) => [...responseKinds(sharedCellsFor(sdk)).keys()];
 
     for (const sdk of SDKS) expect(kinds(sdk), sdk).toEqual(kinds("ts"));
     const answering = SDKS.filter((sdk) => responseKinds(cellsFor(sdk)).has("invalidated"));
-    expect([kinds("ts").includes("invalidated"), answering]).toStrictEqual([false, INVALIDATING]);
+    expect([kinds("ts").includes("invalidated"), answering]).toStrictEqual([true, INVALIDATING]);
   });
 
   it("follow the cells, with no list to edit: the text row is the text kind, and without it there is none", () => {

@@ -59,6 +59,15 @@ function callOf(files: Files, name: string, start: string): string {
   return at < 0 ? `no method ${start.trim()}` : (lines[at + 1] ?? "");
 }
 
+/** A users write's `x-invalidate` targets, and the reads they resolve to: what its `OnInvalidate` event names. */
+const USERS = `["GET /users", "GET /users/{id}"]`;
+const USERS_READS = `Reads: [new("users.list", []), new("users.get", ["id"])]`;
+
+/** The pages write's field: its targets, its operationId and its reads. */
+const TOUCH =
+  `${FIELD} _touch = new("POST", "/touch", [], Idempotent: false, Invalidates: ["GET /a", "GET /b", "GET /c"], ` +
+  `By: "pages.touch", Reads: [new("pages.a", []), new("pages.b", []), new("pages.c", [])]);`;
+
 describe("generateCSharpSdk: the Operation fields (§2)", () => {
   it("adds Accept for a text or binary answer and Invalidates for x-invalidate targets, and keeps a JSON op's phase-b text", () => {
     const files = http();
@@ -79,12 +88,12 @@ describe("generateCSharpSdk: the Operation fields (§2)", () => {
         `${FIELD} _a = new("GET", "/a", [], Idempotent: false);`,
         `${FIELD} _b = new("GET", "/b", [], Idempotent: false);`,
         `${FIELD} _c = new("GET", "/c", [], Idempotent: false);`,
-        `${FIELD} _touch = new("POST", "/touch", [], Idempotent: false, Invalidates: ["GET /a", "GET /b", "GET /c"]);`,
+        TOUCH,
       ],
       TextResource: [`${FIELD} _get = new("GET", "/text", [], Idempotent: false, Accept: "text/plain");`],
       UsersResource: [
-        `${FIELD} _create = new("POST", "/users", [], Idempotent: false, Invalidates: ["GET /users", "GET /users/{id}"]);`,
-        `${FIELD} _delete = new("DELETE", "/users/{id}", ["id"], Idempotent: false, Invalidates: ["GET /users", "GET /users/{id}"]);`,
+        `${FIELD} _create = new("POST", "/users", [], Idempotent: false, Invalidates: ${USERS}, By: "users.create", ${USERS_READS});`,
+        `${FIELD} _delete = new("DELETE", "/users/{id}", ["id"], Idempotent: false, Invalidates: ${USERS}, By: "users.delete", ${USERS_READS});`,
         `${FIELD} _get = new("GET", "/users/{id}", ["id"], Idempotent: false);`,
         `${FIELD} _list = new("GET", "/users", [], Idempotent: false);`,
       ],

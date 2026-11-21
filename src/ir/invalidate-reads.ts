@@ -4,6 +4,7 @@
  * OpenAPI path (`/users/{id}`), so this is the one place the two spellings meet. A runtime then fills each read's
  * params from the write's own and never parses a selector.
  */
+import { compareCodeUnits } from "../emit/shared/lang.ts";
 import type { IR, IROperation } from "./model.ts";
 import { READ_METHOD } from "./read-method.constants.ts";
 import { openApiPathParams } from "./slots.ts";
@@ -76,8 +77,18 @@ function selectorKeys(path: string): RouteKey[] {
   return keys.map((key) => key.join("/"));
 }
 
-/** The reads `selector` names, in the order of its keys (a `:name?` left out, then kept), so a document's path order
- * moves none, or why it names none. */
+/** The reads whose key is `at`, by operationId. */
+function readsAt(reads: readonly { key: RouteKey; op: IROperation }[], at: RouteKey): IROperation[] {
+  return reads
+    .filter(({ key }) => key === at)
+    .map(({ op }) => op)
+    .toSorted((a, b) => compareCodeUnits(a.id, b.id));
+}
+
+/**
+ * The reads `selector` names, in the order its keys spell them (an optional segment left out first) and by
+ * operationId within one key, so a document's path order never reorders them; or why it names none.
+ */
 function resolve(
   selector: string,
   reads: readonly { key: RouteKey; op: IROperation }[],
@@ -88,8 +99,7 @@ function resolve(
   const method = selector.slice(0, space).toUpperCase();
 
   if (method !== READ_METHOD) return { why: `names a ${method} route; only ${READ_METHOD} reads are cached` };
-  const keys = selectorKeys(selector.slice(space + 1));
-  const matched = keys.flatMap((key) => reads.filter((read) => read.key === key).map(({ op }) => op));
+  const matched = selectorKeys(selector.slice(space + 1)).flatMap((at) => readsAt(reads, at));
 
   return matched.length > 0 ? { ops: matched } : { why: `matches no ${READ_METHOD} read` };
 }

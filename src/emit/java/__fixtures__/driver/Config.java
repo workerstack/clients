@@ -7,15 +7,15 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import tools.jackson.databind.JsonNode;
 
-/** The client a cell's setup and script make: the builder's setters by name, then its build. */
+/** The client builder a cell's setup and script make: the builder's setters by name. */
 final class Config {
   private Config() {}
 
   /**
-   * The client for the envelope's cell, configured by its setup and by the script when one is
-   * given.
+   * The client builder for the envelope's cell, configured by its setup and by the script when one
+   * is given; the caller builds it.
    */
-  static Object client(Sdk sdk, JsonNode envelope, JsonNode script, Recorder recorder) {
+  static Object builder(Sdk sdk, JsonNode envelope, JsonNode script, Recorder recorder) {
     JsonNode target = Wire.member(envelope, "sdk");
     Class<?> client = sdk.type(Wire.text(target, "client"));
     Object builder = Reflect.invokeStatic(client, "builder");
@@ -24,7 +24,7 @@ final class Config {
     if (script != null) {
       scripted(sdk, builder, script, recorder);
     }
-    return Reflect.call(builder, "build");
+    return builder;
   }
 
   private static void setup(Sdk sdk, Object builder, JsonNode setup) {

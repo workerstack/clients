@@ -59,12 +59,16 @@ public final class Driver {
     Protocol.check(envelope, script);
     Sdk sdk = Sdk.load(Wire.text(Wire.member(envelope, "sdk"), "package"));
     Recorder recorder = new Recorder(script);
-    Object client = Config.client(sdk, envelope, script, recorder);
+    Object builder = Config.builder(sdk, envelope, script, recorder);
+    JsonNode setup = Wire.member(Wire.member(envelope, "cell"), "setup");
+    Invalidations invalidations = Invalidations.install(sdk, builder, setup);
+    Object client = Reflect.call(builder, "build");
     Invoke.Run run = new Invoke.Run(sdk, envelope, recorder, client, script != null);
     ArrayNode observed = Wire.array();
     JsonNode calls = Wire.member(Wire.member(envelope, "cell"), "calls");
     for (int i = 0; i < calls.size(); i++) {
-      observed.add(one(run, i, calls.get(i), Protocol.entry(script, i)));
+      JsonNode seen = one(run, i, calls.get(i), Protocol.entry(script, i));
+      observed.add(invalidations == null ? seen : invalidations.observe(seen));
     }
     if (script == null) {
       return Wire.write(observed);

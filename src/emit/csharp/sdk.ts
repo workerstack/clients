@@ -10,6 +10,7 @@
  * reports every name it emits other than the spec's (`notices`, shared/mirror.ts), never silently.
  */
 import { type OpenApiDocument, toIR } from "../../ir/build.ts";
+import { invalidateReads } from "../../ir/invalidate-reads.ts";
 import type { IR, IRSchema } from "../../ir/model.ts";
 import { sdkModel } from "../../ir/sdk-model.ts";
 import { compareCodeUnits, csTypeName } from "../shared/lang.ts";
@@ -126,7 +127,10 @@ function emitCSharp(document: Record<string, unknown>, options: CSharpSdkOptions
     }),
   );
 
-  const env = { at, client: id.client, context: id.context, notices, ops: model.opsById };
+  const { reads, warnings } = invalidateReads(ir);
+  notices.push(...warnings.map((warning) => `csharp: ${warning}`));
+
+  const env = { at, client: id.client, context: id.context, notices, ops: model.opsById, reads };
   const client = clientDecls(ir, env);
   const decls = [...components, ...[...at.decls].sort(([a], [b]) => compareCodeUnits(a, b))];
   const types = [...decls.map(([, text]) => text), ...(errorKey === null ? [] : [errorKey])].join("\n\n");

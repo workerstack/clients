@@ -13,6 +13,7 @@ import reservedWords from "../../../ir/__fixtures__/specs/python/reserved-words.
 import integerEnumStatus from "../../../ir/__fixtures__/specs/go/integer-enum-status.json" with { type: "json" }
 import nullablePrimitive from "../../../ir/__fixtures__/specs/go/nullable-primitive.json" with { type: "json" }
 import { docsStreamsDocument } from "../../shared/__fixtures__/docs-blocks.ts"
+import { invalidatePaths } from "../../shared/__fixtures__/documents-invalidate.ts"
 import { longNames } from "../../shared/__fixtures__/documents-long.ts"
 import { errors } from "../../shared/__fixtures__/documents-http.ts"
 import * as streams from "../../shared/__fixtures__/documents-streams.ts"
@@ -65,10 +66,12 @@ const project = (name: string) => `<Project Sdk="Microsoft.NET.Sdk">
 
 /**
  * The v0 fixtures that hold nothing the phase-b emitter refuses (Fb1: no form, multipart, binary or text body,
- * no binary answer, no stream) as one document: `reserved-words` brings C#'s `in` and `return`.
+ * no binary answer, no stream) as one document: `reserved-words` brings C#'s `in` and `return`. Plan 2's
+ * onInvalidate paths sit beside them at the root (plan 9), unprefixed, so their operationIds and the root group
+ * `safe` stay as the other SDKs' cases spell them; the registry has no room for a 17th document.
  */
 function fixtures(): Readonly<Record<string, unknown>> {
-	return merged({
+	const v0 = merged({
 		crud,
 		discriminated,
 		invalidation,
@@ -78,6 +81,7 @@ function fixtures(): Readonly<Record<string, unknown>> {
 		"integer-enum-status": integerEnumStatus,
 		"nullable-primitive": nullablePrimitive,
 	})
+	return { ...v0, paths: { ...(v0.paths as /* merged() writes every source's paths */ object), ...invalidatePaths() } }
 }
 
 /** A 200 whose JSON body is `schema`. */

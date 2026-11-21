@@ -285,22 +285,12 @@ final class Flight {
       log.failed(error, error.status());
     }
     if (hop.status() >= 200 && hop.status() < 300) {
-      exchange.stale().settle(meta, op.invalidates(), pathValues());
+      exchange.stale().settle(meta, op.invalidates(), op.values(call.path()));
+      Hooks.onInvalidate(config, op, call.path(), stream);
       if (over) {
         throw new DecodeException(Decode.exceeds(config.maxResponseBytes()), null);
       }
     }
     return new Answer(route, raw, error, hop.body());
-  }
-
-  /**
-   * The call's path values by their template names: what a stale target's placeholders fill from.
-   */
-  private Map<String, String> pathValues() {
-    Map<String, String> values = new TreeMap<>();
-    for (int i = 0; i < op.names().length; i++) {
-      values.put(op.names()[i], call.path()[i]);
-    }
-    return values;
   }
 }

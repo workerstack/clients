@@ -146,7 +146,14 @@ import {
 //   named decode, the cursor taken before it decodes), WsDial.java +179 (the frame reader), Socket.java +106
 //   (`report`, `run` shared with the socket and the connection), WsAdapter.java +66, Exchange.java +27,
 //   SseAdapter.java +10, Flight.java -22 (the decode `Function` for the `TypeReference`).
-const JAVA_RUNTIME_BYTES = 161072;
+// Plan 9 (sdk-on-invalidate-csharp-java), +3,484 B to 164,556 B: the builder's onInvalidate, called once per
+//   successful write with the reads it made stale. Hooks.java +1,611 (onInvalidate: the targets the write's params
+//   fill, each hook in its own try, its error to onLog; a stream's or socket's open runs them on the common pool),
+//   InvalidateHook.java +347, InvalidateEvent.java +317 and InvalidateTarget.java +264 (new), Operation.java +636
+//   (by, reads, Read, values shared with the stale settle), ClientConfig.java +340 (the list and its setter),
+//   WsDial.java +190 (a 101 marks its targets and runs the hooks), Realtime.java +45, Flight.java -266 (the hooks
+//   after stale().settle; pathValues moved to Operation.values).
+const JAVA_RUNTIME_BYTES = 164556;
 
 describe("the Java runtime within its byte budget (bit 16, the G14 analog)", () => {
   it(

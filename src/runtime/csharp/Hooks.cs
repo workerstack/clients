@@ -104,6 +104,15 @@ public sealed class ResponseContext
         $"ResponseContext {{ Status = {Status}, IsRetry = {IsRetry}, Selector = {Selector}, IsStale = {IsStale}, InvalidatedBy = [{string.Join(", ", InvalidatedBy)}] }}";
 }
 
+/// <summary>
+/// What each <c>ClientConfig.OnInvalidate</c> hook sees after a successful write: the write's operationId, and every
+/// read its <c>x-invalidate</c> made stale.
+/// </summary>
+public sealed record InvalidateEvent(string By, IReadOnlyList<InvalidateTarget> Targets);
+
+/// <summary>One read a write made stale: its operationId, and the write's values for the read's path params it has.</summary>
+public sealed record InvalidateTarget(string OperationId, IReadOnlyDictionary<string, string> Params);
+
 internal sealed record CallState(bool IsRetry, string Selector, bool IsStale, IReadOnlyList<string> InvalidatedBy, IDictionary<string, object?> State);
 
 internal static class Hooks
