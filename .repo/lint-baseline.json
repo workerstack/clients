@@ -96,8 +96,8 @@
     "typescript(no-unsafe-argument)": 12,
     "typescript(no-unsafe-assignment)": 58,
     "typescript(no-unsafe-call)": 38,
-    "typescript(no-unsafe-member-access)": 130,
-    "typescript(no-unsafe-return)": 15,
+    "typescript(no-unsafe-member-access)": 129,
+    "typescript(no-unsafe-return)": 13,
     "typescript(strict-boolean-expressions)": 10
   },
   "lint/public-surface.test.ts": {
@@ -112,7 +112,6 @@
     "repo(no-module-state)": 1,
     "typescript(consistent-return)": 1,
     "typescript(no-unsafe-argument)": 1,
-    "typescript(no-unsafe-return)": 1,
     "typescript(strict-boolean-expressions)": 1
   },
   "lint/repo-path.test.ts": {
@@ -126,10 +125,6 @@
     "repo(no-module-side-effects)": 3,
     "repo(no-runtime-typeof)": 1,
     "repo(no-unknown-parameters)": 1,
-    "typescript(no-unsafe-argument)": 2,
-    "typescript(no-unsafe-assignment)": 1,
-    "typescript(no-unsafe-call)": 1,
-    "typescript(no-unsafe-member-access)": 3,
     "unicorn(no-array-sort)": 1
   },
   "lint/spawn-timeout.js": {

@@ -10,7 +10,9 @@
     "src/runtime/**",
     "assets/installers/examples/**",
     // the release fixture's config, which tsconfig.json includes only so lint resolves its import from source
-    ".github/**"
+    ".github/**",
+    // the repo's own lint rules, which tsconfig.json includes only so lint types them with Node
+    "lint/**"
   ],
   // exclude replaces tsconfig.json's own: its entries, then the tests and their helpers
   "extends": ["./tsconfig.json", "@workerstack/repo/tsconfig/strict"]
