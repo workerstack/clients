@@ -1,6 +1,6 @@
 {
   "name": "@workerstack/clients",
-  "version": "1.0.0-rc.30",
+  "version": "1.0.0-rc.31",
   "private": false,
   "description": "Generates SDKs (TypeScript, Go, Rust, Python, C#, Java), a CLI and an MCP server from any OpenAPI 3.x document.",
   "keywords": [
