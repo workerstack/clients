@@ -64,6 +64,7 @@ export const SPAWNING_HELPERS = new Map([
   ["src/emit/shared/gofmt.ts", ["gofmtFormatter"]],
   ["src/emit/shared/ruff.ts", ["ruffFormatter"]],
   ["src/emit/shared/rustfmt.ts", ["rustfmtFormatter"]],
+  ["src/emit/ts/__fixtures__/strict-compile.ts", ["browserBundle", "strictDiagnostics"]],
   ["src/gen/__fixtures__/pinned-bun.ts", ["findPinnedBun", "withPinnedBun"]],
   ["src/gen/process.ts", ["runCli"]],
   ["tests/integration/conformance/harness.ts", ["startReferenceApp", "targetSuite"]],

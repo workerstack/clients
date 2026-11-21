@@ -62,7 +62,10 @@ export const RUN: GenerateRun = {
 }
 
 /** The TS target's files for `run` over `document`. */
-export async function tsFiles(run: GenerateRun = RUN, document = DOCUMENT): Promise<Readonly<Record<string, string>>> {
+export async function tsFiles(
+	run: GenerateRun = RUN,
+	document: Record<string, unknown> = DOCUMENT,
+): Promise<Readonly<Record<string, string>>> {
 	return (await generated(run, document, { env: {}, report: () => undefined })).ts?.files ?? {}
 }
 

@@ -26,6 +26,7 @@ describe("a boolean target option takes no value (bit 22)", () => {
     expect(parseGenerate([...base, "--ts-tanstack-query"]).options.ts).toEqual({ tanstackQuery: "true" });
     expect(parseGenerate([...base, "--ts-tanstack-query=true"]).options.ts).toEqual({ tanstackQuery: "true" });
     expect(parseGenerate([...base, "--ts-tanstack-query=false"]).options.ts).toEqual({ tanstackQuery: "false" });
+    expect(parseGenerate([...base, "--ts-single-flight"]).options.ts).toStrictEqual({ singleFlight: "true" });
   });
 
   it("refuses a value after a space, and an inline value that is not a boolean", () => {

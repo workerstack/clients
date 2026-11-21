@@ -24,7 +24,7 @@ function cliOptions(target: (typeof TARGETS)[number]): Record<string, string> {
   const argv = ["--spec", "spec.json", "--out", "out", "--target", target];
 
   for (const [, flag] of USAGE.matchAll(new RegExp(`--${target}-([a-z-]+)`, "g")))
-    argv.push(`--${target}-${flag}=${flag === "aur" || flag === "tanstack-query" ? "true" : "x"}`);
+    argv.push(`--${target}-${flag}=${["aur", "single-flight", "tanstack-query"].includes(flag ?? "") ? "true" : "x"}`);
 
   return { ...parseGenerate(argv).options[target] };
 }
@@ -77,6 +77,7 @@ describe("targetOptionSchemas (plan 39 8.1)", () => {
     expectTypeOf<TargetOptions<"ts">>().toEqualTypeOf<{
       readonly name?: string;
       readonly packageName?: string;
+      readonly singleFlight?: "true" | "false";
       readonly stem?: string;
       readonly tanstackQuery?: "true" | "false";
       readonly version?: string;

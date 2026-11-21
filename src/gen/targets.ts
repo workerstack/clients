@@ -18,7 +18,8 @@ export type Target = (typeof TARGETS)[number];
 
 /**
  * Each target and the names of its generate function's options, which `--<target>-<option>` carries as strings.
- * `--ts-tanstack-query` is the one switch that takes no value: it turns the TanStack Query adapter on.
+ * `--ts-tanstack-query` and `--ts-single-flight` are the switches that take no value: they turn the TanStack Query
+ * adapter and the single-flight handler on.
  */
 export const TARGET_OPTIONS = {
   cli: [
@@ -79,7 +80,7 @@ export const TARGET_OPTIONS = {
     "repository",
     "version",
   ],
-  ts: ["name", "packageName", "stem", "tanstackQuery", "version"],
+  ts: ["name", "packageName", "singleFlight", "stem", "tanstackQuery", "version"],
 } as const;
 
 /**
@@ -88,9 +89,9 @@ export const TARGET_OPTIONS = {
  * the repo's README test (`tests/docs/readmes.test.ts`) reads to hold every flag to its README row; this table only
  * says how one is read. Bare is `true` and an inline `true`/`false` is read, exactly as `--watch` is.
  */
-const BOOLEAN_OPTIONS: { readonly cli: readonly ["aur"]; readonly ts: readonly ["tanstackQuery"] } = {
+const BOOLEAN_OPTIONS: { readonly cli: readonly ["aur"]; readonly ts: readonly ["singleFlight", "tanstackQuery"] } = {
   cli: ["aur"],
-  ts: ["tanstackQuery"],
+  ts: ["singleFlight", "tanstackQuery"],
 } as const satisfies { readonly [T in Target]?: readonly (typeof TARGET_OPTIONS)[T][number][] };
 
 /** The switches among `T`'s options: the ones `TargetOptions<T>` types as `"true"` or `"false"`. */

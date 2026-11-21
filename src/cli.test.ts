@@ -19,6 +19,7 @@ import { generated, type GenerateContext, type GenerateRun, main } from "./cli.t
 import { shop } from "./emit/cli/__fixtures__/shop.ts";
 import { goCacheDir, gofmtPath, withGo } from "./emit/go/__fixtures__/go-env.ts";
 import { EMIT_STYLE } from "./emit/shared/format.ts";
+import { DOCUMENT as FLIGHT } from "./emit/ts/__fixtures__/single-flight.ts";
 import { generateSdkPackage } from "./emit/ts/package.ts";
 import { pinnedBunVersion, withPinnedBun } from "./gen/__fixtures__/pinned-bun.ts";
 import { SPAWN_TIMEOUT } from "./gen/__fixtures__/spawn-timeout.ts";
@@ -121,6 +122,30 @@ describe("generated: a run with no options bag (bit 22 a)", () => {
     },
     SPAWN_TIMEOUT,
   );
+});
+
+describe("generated: --ts-single-flight", () => {
+  const context: GenerateContext = { env: {}, report: () => undefined };
+
+  it(
+    "writes the single-flight handler under the switch, none when it is false",
+    { timeout: SPAWN_TIMEOUT },
+    async () => {
+      const on = await generated({ options: { ts: { singleFlight: "true" } }, targets: ["ts"] }, FLIGHT, context);
+      const off = await generated({ options: { ts: { singleFlight: "false" } }, targets: ["ts"] }, FLIGHT, context);
+
+      expect([on, off].map((files) => Object.hasOwn(files.ts?.files ?? {}, "sdk.single-flight.gen.ts"))).toStrictEqual([
+        true,
+        false,
+      ]);
+    },
+  );
+
+  it("refuses the switch over an API whose writes invalidate no read", { timeout: SPAWN_TIMEOUT }, async () => {
+    const flight: GenerateRun = { options: { ts: { singleFlight: "true" } }, targets: ["ts"] };
+
+    await expect(generated(flight, shop(), context)).rejects.toThrow("singleFlight needs a write whose x-invalidate");
+  });
 });
 
 describe("generate's usage (phase h)", () => {

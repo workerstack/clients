@@ -14,6 +14,7 @@ import { runtimeFeatures, runtimeSource, type TsRuntimeFeatures } from "./http.t
 import { RESERVED } from "./sdk-types-preamble.ts";
 import { sdkTypesText } from "./sdk-types.ts";
 import { memberTree, serviceMapText } from "./service-map.ts";
+import { singleFlightText } from "./single-flight-text.ts";
 import { tanstackQueryText } from "./tanstack-query.ts";
 import { webhooksText, webhookTypeNames } from "./webhooks.ts";
 
@@ -22,6 +23,8 @@ export { sdkMemberPaths, serviceMapOf } from "./service-map.ts";
 export type SdkOptions = {
   /** the SDK class name, a TypeScript identifier */
   readonly name: string;
+  /** also write `<stem>.single-flight.gen.ts`, a server's handler for a write and its reads in one request */
+  readonly singleFlight?: boolean;
   /** the file-name stem; the name kebab-cased when left out (`TestSDK` → `test-sdk`) */
   readonly stem?: string;
   /** also write `<stem>.tanstack-query.gen.ts`; `@tanstack/query-core` is then the consumer's own peer */
@@ -244,6 +247,9 @@ export function generateSdk(document: Record<string, unknown>, options: SdkOptio
 
   // the index never names it: its text must not vary by option, and it must never name query-core
   if (options.tanstackQuery === true) files[`${stem}.tanstack-query.gen.ts`] = tanstackQueryText(ir, name, stem);
+
+  // a server's file: the index never names it, so no browser bundle carries the handler
+  if (options.singleFlight === true) files[`${stem}.single-flight.gen.ts`] = singleFlightText(ir, name, stem);
 
   return { files, notices, stem, version: ir.info.version };
 }

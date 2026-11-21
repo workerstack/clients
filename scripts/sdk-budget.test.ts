@@ -10,7 +10,7 @@ import { generatePythonSdk, pythonCallPlans } from "../src/emit/python/sdk.ts";
 import { runtimeFileNames as pythonRuntimeFileNames } from "../src/emit/python/transport.ts";
 import { runtimeFileNames as rustRuntimeFileNames } from "../src/emit/rust/http.ts";
 import { generateRustSdk, rustCallPlans } from "../src/emit/rust/sdk.ts";
-import { RUNTIME_MODULES } from "../src/emit/ts/http.ts";
+import { RUNTIME_MODULES, SINGLE_FLIGHT_MODULES } from "../src/emit/ts/http.ts";
 import { generateSdk } from "../src/emit/ts/sdk.ts";
 import { SPAWN_TIMEOUT } from "../src/gen/__fixtures__/spawn-timeout.ts";
 import { ceilingOf, countTokens, oversizedOperations } from "./capture-token-budget.ts";
@@ -912,7 +912,15 @@ describe("the C# runtime within its byte budget (bit 15, G14)", () => {
 // error sent to onLog and never to the write), config.ts +1,452 (InvalidateEvent, InvalidateTarget and the
 // onInvalidate field with its docs), sdk.ts +799 (the map entry's id and reads, the call after a 2xx), sdk-ws.ts
 // +166 and sdk-sse.ts +147 (the call once a socket or stream opens, detached).
-const TS_RUNTIME_BYTES = 144_382;
+// Plan 4 (single-flight handler), +26,089 B to 170,471 B, all in five new modules that ship only under
+// `--ts-single-flight`, and there in their own `single-flight.gen.ts`, outside runtime.gen.ts, as webhook.ts does:
+// single-flight-batch.ts +7,728 (the batch checked against the service map: one REST write, REST JSON reads, only
+// params, search, json and an idempotent write's idempotencyKey), single-flight.ts +7,232 (the handler's method,
+// media type, site, origin and body-size checks, the 400 and 502 problems, the 200 with the write's cookies),
+// single-flight-run.ts +7,536 (the write once, raw, then the reads in parallel under one signal and byte budget),
+// single-flight-body.ts +2,021 (a body read whole, cut where its taker refuses a chunk) and single-flight.constants.ts
+// +1,572. Nothing else moved: an SDK without the switch ships byte-identical runtime text.
+const TS_RUNTIME_BYTES = 170_471;
 
 describe("the TS runtime within its byte budget (bit 11, G14)", () => {
   it(
@@ -922,7 +930,7 @@ describe("the TS runtime within its byte budget (bit 11, G14)", () => {
       const { bytes, names, others } = runtimeBytes(runtimeDir("ts"), ".ts");
       expect({ bytes, names, others }).toEqual({
         bytes: TS_RUNTIME_BYTES,
-        names: [...RUNTIME_MODULES, "webhook"].map((name) => `${name}.ts`).sort(),
+        names: [...RUNTIME_MODULES, ...SINGLE_FLIGHT_MODULES, "webhook"].map((name) => `${name}.ts`).sort(),
         others: [],
       });
     },

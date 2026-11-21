@@ -39,6 +39,7 @@ const QUERY_CORE_RANGE = "^5.0.0";
 // each importable file's kind and the subpath it is exported at; the others are reached through the index
 const SUBPATHS: Readonly<Record<string, string>> = {
   index: ".",
+  "single-flight": "./single-flight",
   "tanstack-query": "./tanstack-query",
   webhook: "./webhook",
 };

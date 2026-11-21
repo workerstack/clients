@@ -128,6 +128,7 @@ One table, since a flag that is not written down is a flag nobody finds:
 | `--ts-stem`                | ts     | the file stem the generated modules share                                         |
 | `--ts-package-name`        | ts     | the npm name, and the JSR name when scoped; the stem by default                   |
 | `--ts-version`             | ts     | the version both registries carry; the document's by default                      |
+| `--ts-single-flight`       | ts     | also write the single-flight handler; takes no value                              |
 | `--ts-tanstack-query`      | ts     | also write the TanStack Query adapter; takes no value                             |
 | `--go-module-path`         | go     | the Go module path the SDK is imported by                                         |
 | `--go-version`             | go     | its semver; from v2 on, the major suffix (`/v2`) it puts on the module path       |
@@ -307,6 +308,32 @@ unseeded overload; it is harmless under react-query.
 Drop the flag and the next run deletes the file, the way `.clients-generated.json` deletes anything the previous
 run wrote and this one did not. The index file never re-exports the adapter, so an SDK generated without the
 flag names no TanStack type anywhere.
+
+#### Single-flight, a write and its reads in one request
+
+`--ts-single-flight` writes `<stem>.single-flight.gen.ts`, a server's file: `singleFlightHandler(getSdk, options)`
+is a fetch handler, and `runSingleFlight(sdk, body)` runs the same batch with no Request or Response. It takes no
+value, and the run refuses it for a document with no write whose `x-invalidate` names a read.
+
+```sh
+clients generate --spec openapi.json --target ts --out generated --ts-name Kitchen --ts-single-flight
+```
+
+A batch is `{ v: 1, op, input, reads: [{ id, operationId, input }] }` and its answer is
+`{ v: 1, write: { status, headers, body }, reads: [{ id, data } | { id, error: { status, body? } }] }`. Everything
+is checked against the service map before anything runs: one REST write, at most `maxReads` (10) REST JSON reads,
+and input of only `params`, `search`, `json` (the write's) and `idempotencyKey` (an idempotent write's). The
+handler takes only a JSON POST of at most `maxBodyBytes` (64 KiB), refuses a browser on another site or an origin
+outside `allowedOrigins` (its own by default), and answers a refusal as a 400 `application/problem+json`.
+
+The write runs once on `getSdk(request)`, which you make per request, forwarding only the auth you choose; the
+handler adds no retry, though the SDK's own hooks may. Only after a 2xx do the reads run, in parallel and past any
+cache, within `readBudgetMs` (2000) and `maxReadBytes` (1 MiB) in all; a read past either ends as its own error
+entry (504 or 502) and never fails the batch. The write's `Set-Cookie` headers are copied onto the 200, and a
+cookie only sticks when the API shares the handler's site.
+
+The index never re-exports the file, so no browser bundle carries the handler; the package exports it at
+`./single-flight`.
 
 ### The Go SDK
 

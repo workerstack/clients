@@ -14,6 +14,7 @@ import { SPAWN_TIMEOUT } from "../../gen/__fixtures__/spawn-timeout.ts";
 import { hasNpm } from "../mcp/__fixtures__/clients.ts";
 import { scratchDir, written } from "../mcp/__fixtures__/written.ts";
 import { DOCUMENT, REPO, tsFiles, withPeer } from "./__fixtures__/package-run.ts";
+import { DOCUMENT as FLIGHT } from "./__fixtures__/single-flight.ts";
 import { compiled } from "./package.ts";
 
 const TSC = join(REPO, "node_modules/typescript/bin/tsc");
@@ -59,6 +60,25 @@ describe("the package files the TS target writes (plan 39 8.3)", () => {
         ])
         .filter((path) => files[path] === undefined),
     ).toEqual([]);
+  });
+});
+
+describe("the single-flight subpath the TS target exports (bit 22)", () => {
+  it("exports ./single-flight, compiled with its declarations, only when the SDK writes the handler", async () => {
+    const options = { ts: { name: "Shop", packageName: "@acme/shop", singleFlight: "true" } } as const;
+    const files = await tsFiles({ options, targets: ["ts"] }, FLIGHT);
+    const subpath = { default: "./dist/shop.single-flight.gen.js", types: "./dist/shop.single-flight.gen.d.ts" };
+
+    expect([
+      json(files, "package.json"),
+      json(files, "jsr.json"),
+      files["dist/shop.single-flight.gen.d.ts"]?.includes("export declare function singleFlightHandler("),
+    ]).toMatchObject([
+      { exports: { "./single-flight": subpath } },
+      { exports: { "./single-flight": "./shop.single-flight.gen.ts" } },
+      true,
+    ]);
+    expect(json(await tsFiles(), "package.json")).not.toHaveProperty(["exports", "./single-flight"]);
   });
 });
 

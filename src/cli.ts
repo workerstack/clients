@@ -26,6 +26,7 @@ import { type Generate, parseGenerate, usage, UsageError } from "./gen/args.ts";
 import { FORMATTERS, formatterFor, missingFormatter } from "./gen/formatters.ts";
 import { runCli } from "./gen/process.ts";
 import { type ReadFile, shippedFiles } from "./gen/shipped.ts";
+import { SWITCH_ON } from "./gen/switch-on.constants.ts";
 import { type Options, optionsFor, type Target, type TargetOptions } from "./gen/targets.ts";
 import { writeTarget } from "./gen/write.ts";
 import { appRef, loadAppDocument } from "./ir/load.ts";
@@ -40,13 +41,14 @@ function sdkOf(
 ) {
   switch (target) {
     case "ts": {
-      // mapped key by key, never spread: `options` holds strings, and `tanstackQuery` is a boolean —
+      // mapped key by key, never spread: `options` holds strings, and `singleFlight` and `tanstackQuery` are booleans —
       // a spread under a cast would make "false" as truthy as "true"
       return generateSdkPackage(
         document,
         {
           name: options.name ?? "SDK",
           ...(options.packageName === undefined ? {} : { packageName: options.packageName }),
+          singleFlight: options.singleFlight === SWITCH_ON,
           ...(options.stem === undefined ? {} : { stem: options.stem }),
           tanstackQuery: options.tanstackQuery === "true",
           ...(options.version === undefined ? {} : { version: options.version }),

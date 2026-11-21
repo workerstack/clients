@@ -19,6 +19,7 @@ One table, since a flag that is not written down is a flag nobody finds:
 | `--ts-stem`                | ts     | the file stem the generated modules share                                         |
 | `--ts-package-name`        | ts     | the npm name, and the JSR name when scoped; the stem by default                   |
 | `--ts-version`             | ts     | the version both registries carry; the document's by default                      |
+| `--ts-single-flight`       | ts     | also write the single-flight handler; takes no value                              |
 | `--ts-tanstack-query`      | ts     | also write the TanStack Query adapter; takes no value                             |
 | `--go-module-path`         | go     | the Go module path the SDK is imported by                                         |
 | `--go-version`             | go     | its semver; from v2 on, the major suffix (`/v2`) it puts on the module path       |
